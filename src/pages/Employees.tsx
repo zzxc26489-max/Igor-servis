@@ -1,9 +1,11 @@
 import { useAppStore } from "../store/AppStore";
 import { Card, Page, TopBar } from "../components/ui";
 import { formatMoney } from "../lib/format";
+import { computePayroll } from "../lib/payroll";
 
 export default function Employees() {
-  const { employees } = useAppStore();
+  const { employees: rawEmployees, orders } = useAppStore();
+  const employees = computePayroll(rawEmployees, orders);
 
   return (
     <>

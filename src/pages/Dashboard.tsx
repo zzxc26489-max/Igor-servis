@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useAppStore } from "../store/AppStore";
 import { Card, Page, StatTile, StatusBadge, TopBar } from "../components/ui";
 import { formatMoney } from "../lib/format";
+import { computePayroll } from "../lib/payroll";
 
 export default function Dashboard() {
   const { orders, lifts, stock, clients, employees } = useAppStore();
@@ -13,7 +14,7 @@ export default function Dashboard() {
   }, 0);
 
   const partsCost = stock.reduce((s, i) => s + i.purchasePrice * i.qty, 0);
-  const salaries = employees.reduce((s, e) => s + e.accrued, 0);
+  const salaries = computePayroll(employees, orders).reduce((s, e) => s + e.accrued, 0);
   const criticalStock = stock.filter((i) => i.qty <= i.minQty);
   const activeOrders = orders.filter((o) => o.status !== "выдан");
 

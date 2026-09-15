@@ -1,16 +1,41 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAppStore } from "../store/AppStore";
 import { Button, Card, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDateTime, formatMoney } from "../lib/format";
-import type { OrderStatus } from "../types";
+import type { OrderLinePart, OrderLineWork, OrderStatus } from "../types";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
+const CUSTOM_SERVICE = "custom";
 
 export default function OrderDetail() {
   const { orderId } = useParams();
   const navigate = useNavigate();
-  const { orders, clients, vehicles, updateOrder } = useAppStore();
+  const {
+    orders,
+    clients,
+    vehicles,
+    services,
+    stock,
+    employees,
+    updateOrder,
+    updateStockItem,
+    addStockMovement,
+  } = useAppStore();
   const order = orders.find((o) => o.id === orderId);
+
+  const [addingWork, setAddingWork] = useState(false);
+  const [workServiceId, setWorkServiceId] = useState("");
+  const [workCustomName, setWorkCustomName] = useState("");
+  const [workCustomPrice, setWorkCustomPrice] = useState("");
+  const [workQty, setWorkQty] = useState("1");
+  const [workExecutor, setWorkExecutor] = useState("");
+
+  const [addingPart, setAddingPart] = useState(false);
+  const [partItemId, setPartItemId] = useState("");
+  const [partQty, setPartQty] = useState("1");
+  const [partPrice, setPartPrice] = useState("");
+  const [partError, setPartError] = useState("");
 
   if (!order) {
     return (
@@ -34,6 +59,106 @@ export default function OrderDetail() {
   const debt = due - paid;
 
   const currentStepIndex = STATUS_FLOW.indexOf(order.status);
+
+  function resetWorkForm() {
+    setAddingWork(false);
+    setWorkServiceId("");
+    setWorkCustomName("");
+    setWorkCustomPrice("");
+    setWorkQty("1");
+    setWorkExecutor("");
+  }
+
+  function handleAddWork() {
+    if (!order) return;
+    const qty = Math.max(1, Number(workQty) || 1);
+    let name = "";
+    let price = 0;
+    if (workServiceId === CUSTOM_SERVICE) {
+      name = workCustomName.trim();
+      price = Number(workCustomPrice) || 0;
+      if (!name || price <= 0) return;
+    } else {
+      const service = services.find((s) => s.id === workServiceId);
+      if (!service) return;
+      name = service.name;
+      price = service.price;
+    }
+    const newWork: OrderLineWork = {
+      id: `work-${Date.now()}`,
+      name,
+      qty,
+      price,
+      executor: workExecutor || undefined,
+    };
+    updateOrder(order.id, { works: [...order.works, newWork] });
+    resetWorkForm();
+  }
+
+  function handleRemoveWork(workId: string) {
+    if (!order) return;
+    updateOrder(order.id, { works: order.works.filter((w) => w.id !== workId) });
+  }
+
+  function resetPartForm() {
+    setAddingPart(false);
+    setPartItemId("");
+    setPartQty("1");
+    setPartPrice("");
+    setPartError("");
+  }
+
+  function handleAddPart() {
+    if (!order) return;
+    setPartError("");
+    const stockItem = stock.find((s) => s.id === partItemId);
+    if (!stockItem) return;
+    const qty = Math.max(1, Number(partQty) || 1);
+    if (qty > stockItem.qty) {
+      setPartError(`На складе доступно только ${stockItem.qty} ${stockItem.unit}.`);
+      return;
+    }
+    const price = Number(partPrice) || stockItem.purchasePrice;
+
+    const newPart: OrderLinePart = {
+      id: `part-${Date.now()}`,
+      name: stockItem.name,
+      sku: stockItem.sku,
+      qty,
+      price,
+      availability: "reserved",
+    };
+    updateOrder(order.id, { parts: [...order.parts, newPart] });
+    updateStockItem(stockItem.id, { qty: stockItem.qty - qty });
+    addStockMovement({
+      id: `mv-${Date.now()}`,
+      date: new Date().toISOString(),
+      itemId: stockItem.id,
+      operation: "Резерв",
+      qty,
+      from: stockItem.cell,
+      employee: order.advisor || "—",
+    });
+    resetPartForm();
+  }
+
+  function handleRemovePart(part: OrderLinePart) {
+    if (!order) return;
+    updateOrder(order.id, { parts: order.parts.filter((p) => p.id !== part.id) });
+    const stockItem = stock.find((s) => s.sku === part.sku);
+    if (stockItem) {
+      updateStockItem(stockItem.id, { qty: stockItem.qty + part.qty });
+      addStockMovement({
+        id: `mv-${Date.now()}`,
+        date: new Date().toISOString(),
+        itemId: stockItem.id,
+        operation: "Возврат",
+        qty: part.qty,
+        to: stockItem.cell,
+        employee: order.advisor || "—",
+      });
+    }
+  }
 
   return (
     <>
@@ -88,8 +213,9 @@ export default function OrderDetail() {
                 )}
                 <button
                   onClick={() => updateOrder(order.id, { status: step })}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold relative z-10 text-white"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold relative z-10 text-white cursor-pointer transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)]"
                   style={{ background: idx <= currentStepIndex ? "var(--accent)" : "#cfd3da" }}
+                  aria-label={`Установить статус «${step}»`}
                 >
                   {idx <= currentStepIndex ? "✓" : idx + 1}
                 </button>
@@ -101,19 +227,32 @@ export default function OrderDetail() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
           <Card>
-            <h2 className="font-semibold mb-3">Работы и услуги</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold">Работы и услуги</h2>
+              {!addingWork && (
+                <button
+                  onClick={() => setAddingWork(true)}
+                  className="text-sm font-medium rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--accent)]"
+                  style={{ color: "var(--accent)" }}
+                >
+                  + Добавить работу
+                </button>
+              )}
+            </div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left" style={{ color: "var(--text-muted)" }}>
                   <th className="pb-2 font-medium">Наименование</th>
                   <th className="pb-2 font-medium text-right">Сумма</th>
+                  <th className="pb-2 w-6" />
                 </tr>
               </thead>
               <tbody>
                 {order.works.map((w) => (
-                  <tr key={w.id} className="border-t" style={{ borderColor: "var(--border)" }}>
+                  <tr key={w.id} className="border-t group" style={{ borderColor: "var(--border)" }}>
                     <td className="py-2">
                       {w.name}
+                      {w.qty > 1 && <span style={{ color: "var(--text-muted)" }}> × {w.qty}</span>}
                       {w.executor && (
                         <div className="text-xs" style={{ color: "var(--text-muted)" }}>
                           Исполнитель: {w.executor}
@@ -121,34 +260,119 @@ export default function OrderDetail() {
                       )}
                     </td>
                     <td className="py-2 text-right">{formatMoney(w.price * w.qty)}</td>
+                    <td className="py-2 text-right">
+                      <button
+                        onClick={() => handleRemoveWork(w.id)}
+                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)] transition-opacity text-xs px-1 rounded"
+                        style={{ color: "var(--danger)" }}
+                        aria-label={`Удалить работу «${w.name}»`}
+                        title="Удалить"
+                      >
+                        ✕
+                      </button>
+                    </td>
                   </tr>
                 ))}
-                {order.works.length === 0 && (
+                {order.works.length === 0 && !addingWork && (
                   <tr>
-                    <td colSpan={2} className="py-3 text-center" style={{ color: "var(--text-muted)" }}>
+                    <td colSpan={3} className="py-3 text-center" style={{ color: "var(--text-muted)" }}>
                       Работы не добавлены
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+
+            {addingWork && (
+              <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
+                <div className="field-control mb-2">
+                  <select value={workServiceId} onChange={(e) => setWorkServiceId(e.target.value)}>
+                    <option value="">Выберите услугу…</option>
+                    {services.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} · {formatMoney(s.price)}
+                      </option>
+                    ))}
+                    <option value={CUSTOM_SERVICE}>Другое (ввести вручную)</option>
+                  </select>
+                </div>
+                {workServiceId === CUSTOM_SERVICE && (
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div className="field-control">
+                      <input
+                        placeholder="Название работы"
+                        value={workCustomName}
+                        onChange={(e) => setWorkCustomName(e.target.value)}
+                      />
+                    </div>
+                    <div className="field-control">
+                      <input
+                        placeholder="Цена, ₽"
+                        inputMode="numeric"
+                        value={workCustomPrice}
+                        onChange={(e) => setWorkCustomPrice(e.target.value.replace(/\D/g, ""))}
+                      />
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="field-control">
+                    <input
+                      placeholder="Количество"
+                      inputMode="numeric"
+                      value={workQty}
+                      onChange={(e) => setWorkQty(e.target.value.replace(/\D/g, ""))}
+                    />
+                  </div>
+                  <div className="field-control">
+                    <select value={workExecutor} onChange={(e) => setWorkExecutor(e.target.value)}>
+                      <option value="">Исполнитель не указан</option>
+                      {employees.map((e) => (
+                        <option key={e.id} value={e.name}>
+                          {e.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="secondary" onClick={resetWorkForm}>
+                    Отмена
+                  </Button>
+                  <Button onClick={handleAddWork}>Добавить</Button>
+                </div>
+              </div>
+            )}
             <div className="text-right font-semibold mt-3">Итого за работы: {formatMoney(worksTotal)}</div>
           </Card>
 
           <Card>
-            <h2 className="font-semibold mb-3">Запчасти</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold">Запчасти</h2>
+              {!addingPart && (
+                <button
+                  onClick={() => setAddingPart(true)}
+                  className="text-sm font-medium rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--accent)]"
+                  style={{ color: "var(--accent)" }}
+                >
+                  + Добавить запчасть
+                </button>
+              )}
+            </div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left" style={{ color: "var(--text-muted)" }}>
                   <th className="pb-2 font-medium">Наименование</th>
                   <th className="pb-2 font-medium text-right">Сумма</th>
+                  <th className="pb-2 w-6" />
                 </tr>
               </thead>
               <tbody>
                 {order.parts.map((p) => (
-                  <tr key={p.id} className="border-t" style={{ borderColor: "var(--border)" }}>
+                  <tr key={p.id} className="border-t group" style={{ borderColor: "var(--border)" }}>
                     <td className="py-2">
                       {p.name}
+                      {p.qty > 1 && <span style={{ color: "var(--text-muted)" }}> × {p.qty}</span>}
                       {p.sku && (
                         <div className="text-xs" style={{ color: "var(--text-muted)" }}>
                           Артикул: {p.sku}
@@ -156,17 +380,83 @@ export default function OrderDetail() {
                       )}
                     </td>
                     <td className="py-2 text-right">{formatMoney(p.price * p.qty)}</td>
+                    <td className="py-2 text-right">
+                      <button
+                        onClick={() => handleRemovePart(p)}
+                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)] transition-opacity text-xs px-1 rounded"
+                        style={{ color: "var(--danger)" }}
+                        aria-label={`Убрать запчасть «${p.name}»`}
+                        title="Убрать (вернуть на склад)"
+                      >
+                        ✕
+                      </button>
+                    </td>
                   </tr>
                 ))}
-                {order.parts.length === 0 && (
+                {order.parts.length === 0 && !addingPart && (
                   <tr>
-                    <td colSpan={2} className="py-3 text-center" style={{ color: "var(--text-muted)" }}>
+                    <td colSpan={3} className="py-3 text-center" style={{ color: "var(--text-muted)" }}>
                       Запчасти не добавлены
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+
+            {addingPart && (
+              <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
+                <div className="field-control mb-2">
+                  <select
+                    value={partItemId}
+                    onChange={(e) => {
+                      setPartItemId(e.target.value);
+                      setPartError("");
+                      const item = stock.find((s) => s.id === e.target.value);
+                      setPartPrice(item ? String(item.purchasePrice) : "");
+                    }}
+                  >
+                    <option value="">Выберите запчасть со склада…</option>
+                    {stock.map((s) => (
+                      <option key={s.id} value={s.id} disabled={s.qty === 0}>
+                        {s.name} — в наличии {s.qty} {s.unit}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div className="field-control">
+                    <input
+                      placeholder="Количество"
+                      inputMode="numeric"
+                      value={partQty}
+                      onChange={(e) => {
+                        setPartQty(e.target.value.replace(/\D/g, ""));
+                        setPartError("");
+                      }}
+                    />
+                  </div>
+                  <div className="field-control">
+                    <input
+                      placeholder="Цена для клиента, ₽"
+                      inputMode="numeric"
+                      value={partPrice}
+                      onChange={(e) => setPartPrice(e.target.value.replace(/\D/g, ""))}
+                    />
+                  </div>
+                </div>
+                {partError && (
+                  <div className="text-xs mb-2" style={{ color: "var(--danger)" }}>
+                    {partError}
+                  </div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <Button variant="secondary" onClick={resetPartForm}>
+                    Отмена
+                  </Button>
+                  <Button onClick={handleAddPart}>Добавить</Button>
+                </div>
+              </div>
+            )}
             <div className="text-right font-semibold mt-3">Итого за запчасти: {formatMoney(partsTotal)}</div>
           </Card>
         </div>

@@ -1,9 +1,11 @@
 import { useAppStore } from "../store/AppStore";
 import { Card, Page, StatTile, TopBar } from "../components/ui";
 import { formatMoney } from "../lib/format";
+import { computePayroll } from "../lib/payroll";
 
 export default function Reports() {
-  const { orders, expenses, employees, stock } = useAppStore();
+  const { orders, expenses, employees: rawEmployees, stock } = useAppStore();
+  const employees = computePayroll(rawEmployees, orders);
 
   const revenue = orders.reduce((sum, o) => {
     const works = o.works.reduce((s, w) => s + w.price * w.qty, 0);

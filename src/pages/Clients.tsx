@@ -34,7 +34,7 @@ export default function Clients() {
                 const clientVehicles = vehicles.filter((v) => v.clientId === c.id);
                 const clientOrders = orders.filter((o) => o.clientId === c.id);
                 return (
-                  <tr key={c.id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
+                  <tr key={c.id} className="border-b last:border-0 hover:bg-gray-50" style={{ borderColor: "var(--border)" }}>
                     <td className="px-4 py-2">
                       {c.name}
                       {c.isRegular && (

@@ -1,9 +1,11 @@
 import { useAppStore } from "../store/AppStore";
 import { Button, Card, Page, StatTile, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatMoney } from "../lib/format";
+import { computePayroll } from "../lib/payroll";
 
 export default function Finance() {
-  const { orders, expenses, employees, invoices } = useAppStore();
+  const { orders, expenses, employees: rawEmployees, invoices } = useAppStore();
+  const employees = computePayroll(rawEmployees, orders);
 
   const revenue = orders.reduce((sum, o) => {
     const works = o.works.reduce((s, w) => s + w.price * w.qty, 0);
@@ -40,7 +42,7 @@ export default function Finance() {
               </thead>
               <tbody>
                 {employees.map((e) => (
-                  <tr key={e.id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
+                  <tr key={e.id} className="border-b last:border-0 hover:bg-gray-50" style={{ borderColor: "var(--border)" }}>
                     <td className="px-4 py-2">
                       {e.name}
                       <div className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -73,7 +75,7 @@ export default function Finance() {
               </thead>
               <tbody>
                 {invoices.map((inv) => (
-                  <tr key={inv.id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
+                  <tr key={inv.id} className="border-b last:border-0 hover:bg-gray-50" style={{ borderColor: "var(--border)" }}>
                     <td className="px-4 py-2">{inv.number}</td>
                     <td className="px-4 py-2" style={{ color: "var(--text-muted)" }}>
                       {formatDate(inv.issuedAt)}
@@ -84,6 +86,13 @@ export default function Finance() {
                     </td>
                   </tr>
                 ))}
+                {invoices.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-4 text-center" style={{ color: "var(--text-muted)" }}>
+                      Счетов пока нет
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </Card>

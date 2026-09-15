@@ -5,6 +5,25 @@ import { useAppStore } from "../store/AppStore";
 
 const today = new Date().toISOString().slice(0, 10);
 
+function toMinutes(time: string) {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function intervalsOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
+  return toMinutes(aStart) < toMinutes(bEnd) && toMinutes(bStart) < toMinutes(aEnd);
+}
+
+function isValidPhone(value: string) {
+  return value.replace(/\D/g, "").length >= 10;
+}
+
+const PLATE_PATTERN = /^[a-zA-Zа-яА-Я]\d{3}[a-zA-Zа-яА-Я]{2}\s?\d{2,3}$/;
+
+function isValidPlate(value: string) {
+  return PLATE_PATTERN.test(value.trim());
+}
+
 export default function NewOrder() {
   const navigate = useNavigate();
   const { clients, vehicles, lifts, orders, setDB } = useAppStore();
@@ -51,11 +70,26 @@ export default function NewOrder() {
       setError("Заполните клиента, телефон и данные автомобиля.");
       return;
     }
+    if (!isValidPhone(phone)) {
+      setError("Проверьте номер телефона — укажите не менее 10 цифр.");
+      return;
+    }
+    if (!isValidPlate(plate)) {
+      setError("Проверьте формат госномера, например А123ВС 797.");
+      return;
+    }
 
     const chosenLift = liftId ? Number(liftId) : undefined;
-    const hasOverlap = chosenLift && orders.some((order) =>
-      order.liftId === chosenLift && order.plannedAt === date && order.scheduledStart === time && order.status !== "выдан",
-    );
+    const endHour = String(Math.min(Number(time.slice(0, 2)) + 1, 23)).padStart(2, "0");
+    const endTime = `${endHour}:${time.slice(3)}`;
+
+    const hasOverlap = chosenLift && orders.some((order) => {
+      if (order.liftId !== chosenLift || order.status === "выдан") return false;
+      if (!order.scheduledStart || !order.scheduledEnd) return false;
+      const orderDate = order.plannedAt ?? order.createdAt.slice(0, 10);
+      if (orderDate !== date) return false;
+      return intervalsOverlap(time, endTime, order.scheduledStart, order.scheduledEnd);
+    });
     if (hasOverlap) {
       setError("Этот подъёмник уже занят на выбранное время. Выберите другой или измените время.");
       return;
@@ -65,7 +99,6 @@ export default function NewOrder() {
     const clientId = existingClientId || `client-${stamp}`;
     const vehicleId = existingVehicleId || `vehicle-${stamp}`;
     const orderId = `order-${stamp}`;
-    const endHour = String(Math.min(Number(time.slice(0, 2)) + 1, 23)).padStart(2, "0");
     const orderNumber = `АИ-${String(orders.length + 1).padStart(4, "0")}`;
 
     setDB((previous) => ({
@@ -93,7 +126,7 @@ export default function NewOrder() {
         paid: 0,
         notes: note.trim() || undefined,
         scheduledStart: time,
-        scheduledEnd: `${endHour}:${time.slice(3)}`,
+        scheduledEnd: endTime,
       }],
     }));
     navigate(`/orders/${orderId}`);
@@ -120,7 +153,7 @@ export default function NewOrder() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Имя клиента *"><input value={clientName} onChange={(event) => setClientName(event.target.value)} required /></Field>
-              <Field label="Телефон *"><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" required /></Field>
+              <Field label="Телефон *"><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" placeholder="+7 900 000-00-00" required /></Field>
             </div>
           </Card>
 
@@ -138,7 +171,7 @@ export default function NewOrder() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Марка *"><input value={make} onChange={(event) => setMake(event.target.value)} required /></Field>
               <Field label="Модель *"><input value={model} onChange={(event) => setModel(event.target.value)} required /></Field>
-              <Field label="Госномер *"><input value={plate} onChange={(event) => setPlate(event.target.value)} required /></Field>
+              <Field label="Госномер *"><input value={plate} onChange={(event) => setPlate(event.target.value)} placeholder="А123ВС 797" required /></Field>
               <Field label="Пробег"><input value={mileage} onChange={(event) => setMileage(event.target.value.replace(/\D/g, ""))} inputMode="numeric" /></Field>
             </div>
           </Card>

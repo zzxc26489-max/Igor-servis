@@ -27,7 +27,7 @@ export default function Stock() {
               </thead>
               <tbody>
                 {stock.map((item) => (
-                  <tr key={item.id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
+                  <tr key={item.id} className="border-b last:border-0 hover:bg-gray-50" style={{ borderColor: "var(--border)" }}>
                     <td className="px-4 py-2">
                       {item.name}
                       <div className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -84,7 +84,7 @@ export default function Stock() {
               {stockMovements.map((m) => {
                 const item = stock.find((s) => s.id === m.itemId);
                 return (
-                  <tr key={m.id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
+                  <tr key={m.id} className="border-b last:border-0 hover:bg-gray-50" style={{ borderColor: "var(--border)" }}>
                     <td className="px-4 py-2" style={{ color: "var(--text-muted)" }}>
                       {formatDateTime(m.date)}
                     </td>
@@ -95,6 +95,13 @@ export default function Stock() {
                   </tr>
                 );
               })}
+              {stockMovements.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-4 text-center" style={{ color: "var(--text-muted)" }}>
+                    Движений пока не было
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </Card>

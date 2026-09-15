@@ -103,7 +103,7 @@ export interface StockMovement {
   id: string;
   date: string;
   itemId: string;
-  operation: "Приёмка" | "Списание" | "Перемещение" | "Резерв";
+  operation: "Приёмка" | "Списание" | "Перемещение" | "Резерв" | "Возврат";
   qty: number;
   from?: string;
   to?: string;
