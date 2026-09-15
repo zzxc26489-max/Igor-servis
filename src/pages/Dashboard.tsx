@@ -14,13 +14,14 @@ export default function Dashboard() {
   const salaries = employees.reduce((sum, employee) => sum + employee.accrued, 0);
   const critical = stock.filter((item) => item.qty <= item.minQty);
   const active = orders.filter((order) => order.status !== "выдан");
+  const todayLabel = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date());
 
   return <>
     <TopBar title="Доброе утро!" subtitle="Всё под контролем. Хорошего рабочего дня!" />
     <Page>
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Metric icon={<IconCoin />} label="Выручка сегодня" value={formatMoney(workRevenue + partsRevenue)} hint={`${orders.length} заказ-нарядов`} />
-        <Metric icon={<IconPackage />} label="Запчасти" value={formatMoney(partsRevenue)} hint={`${stock.length} позиций на складе`} />
+        <Metric icon={<IconPackage />} label="Выручка за запчасти" value={formatMoney(partsRevenue)} hint={`${stock.length} позиций на складе`} />
         <Metric icon={<IconUsersGroup />} label="Зарплаты" value={formatMoney(salaries)} hint="Начислено за период" />
         <Metric icon={<IconChartBar />} label="Чистая прибыль" value={formatMoney(Math.max(workRevenue + partsRevenue - salaries, 0))} hint="Расчётный показатель" />
         <Link to="/orders/new" className="flex min-h-28 items-center justify-center rounded-xl bg-[var(--accent)] px-4 text-base font-semibold text-white shadow-sm transition hover:bg-[var(--accent-strong)]">+ Новая запись</Link>
@@ -30,7 +31,7 @@ export default function Dashboard() {
         <section className="soft-panel overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4" style={{ borderColor: "var(--border)" }}>
             <div><h2 className="text-xl font-bold tracking-tight">Расписание на сегодня</h2><p className="mt-1 text-sm muted">Загрузка подъёмников и текущие работы</p></div>
-            <div className="rounded-lg border bg-white px-3 py-2 text-sm font-medium" style={{ borderColor: "var(--border)" }}>14 сентября 2026</div>
+            <div className="rounded-lg border bg-white px-3 py-2 text-sm font-medium" style={{ borderColor: "var(--border)" }}>{todayLabel}</div>
           </div>
           <div className="overflow-x-auto px-4 py-3"><div className="min-w-[740px]">
             <div className="grid grid-cols-[150px_repeat(12,minmax(46px,1fr))] border-b text-xs font-medium muted" style={{ borderColor: "var(--border)" }}><div className="py-2" />{HOURS.map((hour) => <div key={hour} className="py-2 text-center">{hour}</div>)}</div>

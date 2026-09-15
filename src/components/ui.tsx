@@ -53,7 +53,7 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
               <button
                 key={`${result.to}-${index}`}
                 onClick={() => { setQuery(""); navigate(result.to); }}
-                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50"
+                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 focus-visible:outline-none focus-visible:bg-gray-50"
               >
                 <span>{result.label}</span>
                 <span className="ml-3 text-xs" style={{ color: "var(--text-muted)" }}>{result.detail}</span>
@@ -67,7 +67,7 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
 
       <div className="flex shrink-0 items-center gap-2">
         <div className="hidden items-center gap-2 text-sm text-[var(--text-muted)] xl:flex"><IconCalendarEvent size={18} /> Сегодня</div>
-        <button aria-label="Уведомления" className="rounded-lg p-2 hover:bg-gray-100"><IconBell size={20} /></button>
+        <button aria-label="Уведомления" className="rounded-lg p-2 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"><IconBell size={20} /></button>
         <Link to="/orders/new"><Button><span className="inline-flex items-center gap-2"><IconPlus size={18} /> Новая запись</span></Button></Link>
         {actions}
       </div>
@@ -140,10 +140,16 @@ export function Button({
   variant?: "primary" | "secondary";
   type?: "button" | "submit";
 }) {
-  const base = "px-4 py-2 rounded-lg text-sm font-medium transition-colors";
+  const base =
+    "px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)]";
   if (variant === "secondary") {
     return (
-      <button type={type} onClick={onClick} className={`${base} border`} style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+      <button
+        type={type}
+        onClick={onClick}
+        className={`${base} border hover:bg-gray-50`}
+        style={{ borderColor: "var(--border)", color: "var(--text)" }}
+      >
         {children}
       </button>
     );
@@ -152,7 +158,7 @@ export function Button({
     <button
       type={type}
       onClick={onClick}
-      className={`${base} text-white`}
+      className={`${base} text-white hover:brightness-95`}
       style={{ background: "var(--accent)" }}
     >
       {children}
