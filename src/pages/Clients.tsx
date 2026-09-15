@@ -1,6 +1,7 @@
-import { useAppStore } from "../store/AppStore";
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { IconStar, IconUsers } from "@tabler/icons-react";
+import { useAppStore } from "../store/AppStore";
 import { Card, Page, TopBar } from "../components/ui";
 
 export default function Clients() {
@@ -14,50 +15,77 @@ export default function Clients() {
       .toLocaleLowerCase("ru-RU")
       .includes(query);
   }), [clients, query, vehicles]);
+  const regularCount = clients.filter((c) => c.isRegular).length;
 
   return (
     <>
       <TopBar title="Клиенты" subtitle={query ? `Найдено: ${filteredClients.length}` : `Всего: ${clients.length}`} />
       <Page>
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Card className="flex items-start gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#edf4ff] text-[#3978c9]">
+              <IconUsers size={22} />
+            </div>
+            <div>
+              <p className="muted text-sm">Всего клиентов</p>
+              <p className="mt-1 text-2xl font-semibold">{clients.length}</p>
+            </div>
+          </Card>
+          <Card className="flex items-start gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e9f5ed] text-[var(--accent)]">
+              <IconStar size={22} />
+            </div>
+            <div>
+              <p className="muted text-sm">Постоянные клиенты</p>
+              <p className="mt-1 text-2xl font-semibold">{regularCount}</p>
+            </div>
+          </Card>
+        </div>
+
         <Card className="p-0 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left border-b" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
-                <th className="px-4 py-2 font-medium">Клиент</th>
-                <th className="px-4 py-2 font-medium">Телефон</th>
-                <th className="px-4 py-2 font-medium">Автомобили</th>
-                <th className="px-4 py-2 font-medium text-right">Заказов</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredClients.map((c) => {
-                const clientVehicles = vehicles.filter((v) => v.clientId === c.id);
-                const clientOrders = orders.filter((o) => o.clientId === c.id);
-                return (
-                  <tr key={c.id} className="border-b last:border-0 hover:bg-gray-50" style={{ borderColor: "var(--border)" }}>
-                    <td className="px-4 py-2">
-                      {c.name}
-                      {c.isRegular && (
-                        <span className="ml-2 text-xs" style={{ color: "var(--accent)" }}>
-                          постоянный
+          <div className="overflow-auto">
+            <table className="app-table min-w-[640px]">
+              <thead>
+                <tr>
+                  <th>Клиент</th>
+                  <th>Телефон</th>
+                  <th>Автомобили</th>
+                  <th className="text-right">Заказов</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredClients.map((c) => {
+                  const clientVehicles = vehicles.filter((v) => v.clientId === c.id);
+                  const clientOrders = orders.filter((o) => o.clientId === c.id);
+                  return (
+                    <tr key={c.id}>
+                      <td>
+                        <span className="inline-flex items-center gap-2">
+                          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#e9f4ed] text-xs font-bold text-[var(--accent)]">
+                            {c.name.slice(0, 2).toUpperCase()}
+                          </span>
+                          <span>
+                            <b className="block">{c.name}</b>
+                            {c.isRegular && <span className="text-xs text-[var(--accent)]">постоянный</span>}
+                          </span>
                         </span>
-                      )}
+                      </td>
+                      <td className="muted">{c.phone}</td>
+                      <td>{clientVehicles.map((v) => `${v.make} ${v.model}`).join(", ") || "—"}</td>
+                      <td className="text-right font-medium">{clientOrders.length}</td>
+                    </tr>
+                  );
+                })}
+                {filteredClients.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center muted">
+                      По этому запросу клиентов и автомобилей не найдено.
                     </td>
-                    <td className="px-4 py-2" style={{ color: "var(--text-muted)" }}>
-                      {c.phone}
-                    </td>
-                    <td className="px-4 py-2">
-                      {clientVehicles.map((v) => `${v.make} ${v.model}`).join(", ")}
-                    </td>
-                    <td className="px-4 py-2 text-right">{clientOrders.length}</td>
                   </tr>
-                );
-              })}
-              {filteredClients.length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>По этому запросу клиентов и автомобилей не найдено.</td></tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </Card>
       </Page>
     </>

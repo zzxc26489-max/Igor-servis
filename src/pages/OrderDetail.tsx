@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { IconCar, IconNotes, IconReceipt2, IconUser } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { Button, Card, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDateTime, formatMoney } from "../lib/format";
@@ -173,31 +174,35 @@ export default function OrderDetail() {
       />
       <Page>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-          <Card>
-            <div className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
-              Клиент
+          <Card className="flex items-start gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e9f5ed] text-[var(--accent)]">
+              <IconUser size={22} />
             </div>
-            <div className="font-medium">{client?.name}</div>
-            <div className="text-sm" style={{ color: "var(--text-muted)" }}>
-              {client?.phone}
-            </div>
-          </Card>
-          <Card>
-            <div className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
-              Автомобиль
-            </div>
-            <div className="font-medium">
-              {vehicle?.make} {vehicle?.model}
-            </div>
-            <div className="text-sm" style={{ color: "var(--text-muted)" }}>
-              {vehicle?.plate} {vehicle?.mileage ? `· ${vehicle.mileage.toLocaleString("ru-RU")} км` : ""}
+            <div className="min-w-0">
+              <div className="muted text-xs">Клиент</div>
+              <div className="font-semibold">{client?.name}</div>
+              <div className="muted text-sm">{client?.phone}</div>
             </div>
           </Card>
-          <Card>
-            <div className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
-              Статус
+          <Card className="flex items-start gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#edf4ff] text-[#3978c9]">
+              <IconCar size={22} />
             </div>
-            <StatusBadge status={order.status} />
+            <div className="min-w-0">
+              <div className="muted text-xs">Автомобиль</div>
+              <div className="font-semibold">
+                {vehicle?.make} {vehicle?.model}
+              </div>
+              <div className="muted text-sm">
+                {vehicle?.plate} {vehicle?.mileage ? `· ${vehicle.mileage.toLocaleString("ru-RU")} км` : ""}
+              </div>
+            </div>
+          </Card>
+          <Card className="flex items-center justify-between">
+            <div>
+              <div className="muted text-xs mb-1">Статус</div>
+              <StatusBadge status={order.status} />
+            </div>
           </Card>
         </div>
 
@@ -228,7 +233,7 @@ export default function OrderDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
           <Card>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold">Работы и услуги</h2>
+              <h2 className="panel-title">Работы и услуги</h2>
               {!addingWork && (
                 <button
                   onClick={() => setAddingWork(true)}
@@ -239,28 +244,24 @@ export default function OrderDetail() {
                 </button>
               )}
             </div>
-            <table className="w-full text-sm">
+            <table className="app-table">
               <thead>
-                <tr className="text-left" style={{ color: "var(--text-muted)" }}>
-                  <th className="pb-2 font-medium">Наименование</th>
-                  <th className="pb-2 font-medium text-right">Сумма</th>
-                  <th className="pb-2 w-6" />
+                <tr>
+                  <th>Наименование</th>
+                  <th className="text-right">Сумма</th>
+                  <th className="w-6" />
                 </tr>
               </thead>
               <tbody>
                 {order.works.map((w) => (
-                  <tr key={w.id} className="border-t group" style={{ borderColor: "var(--border)" }}>
-                    <td className="py-2">
+                  <tr key={w.id} className="group">
+                    <td>
                       {w.name}
-                      {w.qty > 1 && <span style={{ color: "var(--text-muted)" }}> × {w.qty}</span>}
-                      {w.executor && (
-                        <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-                          Исполнитель: {w.executor}
-                        </div>
-                      )}
+                      {w.qty > 1 && <span className="muted"> × {w.qty}</span>}
+                      {w.executor && <div className="muted text-xs">Исполнитель: {w.executor}</div>}
                     </td>
-                    <td className="py-2 text-right">{formatMoney(w.price * w.qty)}</td>
-                    <td className="py-2 text-right">
+                    <td className="text-right">{formatMoney(w.price * w.qty)}</td>
+                    <td className="text-right">
                       <button
                         onClick={() => handleRemoveWork(w.id)}
                         className="opacity-0 group-hover:opacity-100 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)] transition-opacity text-xs px-1 rounded"
@@ -275,7 +276,7 @@ export default function OrderDetail() {
                 ))}
                 {order.works.length === 0 && !addingWork && (
                   <tr>
-                    <td colSpan={3} className="py-3 text-center" style={{ color: "var(--text-muted)" }}>
+                    <td colSpan={3} className="py-3 text-center muted">
                       Работы не добавлены
                     </td>
                   </tr>
@@ -348,7 +349,7 @@ export default function OrderDetail() {
 
           <Card>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold">Запчасти</h2>
+              <h2 className="panel-title">Запчасти</h2>
               {!addingPart && (
                 <button
                   onClick={() => setAddingPart(true)}
@@ -359,28 +360,24 @@ export default function OrderDetail() {
                 </button>
               )}
             </div>
-            <table className="w-full text-sm">
+            <table className="app-table">
               <thead>
-                <tr className="text-left" style={{ color: "var(--text-muted)" }}>
-                  <th className="pb-2 font-medium">Наименование</th>
-                  <th className="pb-2 font-medium text-right">Сумма</th>
-                  <th className="pb-2 w-6" />
+                <tr>
+                  <th>Наименование</th>
+                  <th className="text-right">Сумма</th>
+                  <th className="w-6" />
                 </tr>
               </thead>
               <tbody>
                 {order.parts.map((p) => (
-                  <tr key={p.id} className="border-t group" style={{ borderColor: "var(--border)" }}>
-                    <td className="py-2">
+                  <tr key={p.id} className="group">
+                    <td>
                       {p.name}
-                      {p.qty > 1 && <span style={{ color: "var(--text-muted)" }}> × {p.qty}</span>}
-                      {p.sku && (
-                        <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-                          Артикул: {p.sku}
-                        </div>
-                      )}
+                      {p.qty > 1 && <span className="muted"> × {p.qty}</span>}
+                      {p.sku && <div className="muted text-xs">Артикул: {p.sku}</div>}
                     </td>
-                    <td className="py-2 text-right">{formatMoney(p.price * p.qty)}</td>
-                    <td className="py-2 text-right">
+                    <td className="text-right">{formatMoney(p.price * p.qty)}</td>
+                    <td className="text-right">
                       <button
                         onClick={() => handleRemovePart(p)}
                         className="opacity-0 group-hover:opacity-100 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)] transition-opacity text-xs px-1 rounded"
@@ -395,7 +392,7 @@ export default function OrderDetail() {
                 ))}
                 {order.parts.length === 0 && !addingPart && (
                   <tr>
-                    <td colSpan={3} className="py-3 text-center" style={{ color: "var(--text-muted)" }}>
+                    <td colSpan={3} className="py-3 text-center muted">
                       Запчасти не добавлены
                     </td>
                   </tr>
@@ -463,14 +460,14 @@ export default function OrderDetail() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Card className="lg:col-span-2">
-            <h2 className="font-semibold mb-2">Заметки</h2>
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            <h2 className="panel-title mb-2 flex items-center gap-2"><IconNotes size={18} /> Заметки</h2>
+            <p className="text-sm muted">
               {order.notes || "Нет заметок"}
             </p>
           </Card>
 
           <Card>
-            <h2 className="font-semibold mb-3">Итог по заказу</h2>
+            <h2 className="panel-title mb-3 flex items-center gap-2"><IconReceipt2 size={18} /> Итог по заказу</h2>
             <div className="flex justify-between text-sm mb-1">
               <span>Работы</span>
               <span>{formatMoney(worksTotal)}</span>

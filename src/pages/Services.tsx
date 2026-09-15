@@ -1,3 +1,4 @@
+import { IconTool } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { Card, Page, TopBar } from "../components/ui";
 import { formatMoney } from "../lib/format";
@@ -8,19 +9,24 @@ export default function Services() {
 
   return (
     <>
-      <TopBar title="Услуги" subtitle="Прайс-лист (уточняется, добавим позже)" />
+      <TopBar title="Услуги" subtitle={`${services.length} позиций в прайс-листе · уточняется, добавим позже`} />
       <Page>
-        <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {categories.map((cat) => (
-            <Card key={cat}>
-              <h2 className="font-semibold mb-3">{cat}</h2>
-              <ul className="flex flex-col gap-2 text-sm">
+            <Card key={cat} className="p-0 overflow-hidden">
+              <div className="flex items-center gap-3 border-b p-4" style={{ borderColor: "var(--border)" }}>
+                <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#e9f5ed] text-[var(--accent)]">
+                  <IconTool size={18} />
+                </div>
+                <h2 className="panel-title">{cat}</h2>
+              </div>
+              <ul className="divide-y" style={{ borderColor: "var(--border)" }}>
                 {services
                   .filter((s) => s.category === cat)
                   .map((s) => (
-                    <li key={s.id} className="flex justify-between border-b last:border-0 py-1" style={{ borderColor: "var(--border)" }}>
+                    <li key={s.id} className="flex justify-between px-4 py-3 text-sm">
                       <span>{s.name}</span>
-                      <span className="font-medium">{formatMoney(s.price)}</span>
+                      <span className="font-semibold">{formatMoney(s.price)}</span>
                     </li>
                   ))}
               </ul>

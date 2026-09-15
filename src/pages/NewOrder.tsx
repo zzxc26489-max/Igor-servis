@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { IconAlertCircle, IconCalendarEvent, IconCar, IconUser } from "@tabler/icons-react";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { useAppStore } from "../store/AppStore";
 
@@ -139,12 +140,17 @@ export default function NewOrder() {
         <form onSubmit={handleSubmit} className="mx-auto max-w-4xl space-y-4">
           <Card>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="font-semibold">Клиент</h2>
-                <p className="text-sm" style={{ color: "var(--text-muted)" }}>Выберите из базы или внесите нового.</p>
+              <div className="flex items-center gap-3">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e9f5ed] text-[var(--accent)]">
+                  <IconUser size={22} />
+                </div>
+                <div>
+                  <h2 className="panel-title">Клиент</h2>
+                  <p className="muted text-sm">Выберите из базы или внесите нового.</p>
+                </div>
               </div>
               <label className="text-sm">
-                <span className="mb-1 block" style={{ color: "var(--text-muted)" }}>Найти в базе</span>
+                <span className="mb-1 block muted">Найти в базе</span>
                 <select value={existingClientId} onChange={(event) => selectExistingClient(event.target.value)} className="rounded-lg border px-3 py-2" style={{ borderColor: "var(--border)" }}>
                   <option value="">Новый клиент</option>
                   {clients.map((client) => <option key={client.id} value={client.id}>{client.name} · {client.phone}</option>)}
@@ -158,10 +164,15 @@ export default function NewOrder() {
           </Card>
 
           <Card>
-            <h2 className="mb-4 font-semibold">Автомобиль</h2>
+            <div className="mb-4 flex items-center gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#edf4ff] text-[#3978c9]">
+                <IconCar size={22} />
+              </div>
+              <h2 className="panel-title">Автомобиль</h2>
+            </div>
             {existingClientId && selectedClientVehicles.length > 0 && (
               <label className="mb-4 block text-sm">
-                <span className="mb-1 block" style={{ color: "var(--text-muted)" }}>Автомобиль из истории</span>
+                <span className="mb-1 block muted">Автомобиль из истории</span>
                 <select value={existingVehicleId} onChange={(event) => selectExistingVehicle(event.target.value)} className="w-full rounded-lg border px-3 py-2" style={{ borderColor: "var(--border)" }}>
                   <option value="">Новый автомобиль</option>
                   {selectedClientVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.make} {vehicle.model} · {vehicle.plate}</option>)}
@@ -177,7 +188,12 @@ export default function NewOrder() {
           </Card>
 
           <Card>
-            <h2 className="mb-4 font-semibold">Время и подъёмник</h2>
+            <div className="mb-4 flex items-center gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#fdf3e0] text-[var(--warning)]">
+                <IconCalendarEvent size={22} />
+              </div>
+              <h2 className="panel-title">Время и подъёмник</h2>
+            </div>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Дата"><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></Field>
               <Field label="Время"><input type="time" value={time} onChange={(event) => setTime(event.target.value)} /></Field>
@@ -186,7 +202,15 @@ export default function NewOrder() {
             <Field label="Комментарий" className="mt-4"><textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} placeholder="Причина обращения, пожелания клиента" /></Field>
           </Card>
 
-          {error && <div className="rounded-lg border px-4 py-3 text-sm" style={{ borderColor: "#f1c2c2", color: "var(--danger)", background: "#fff7f7" }}>{error}</div>}
+          {error && (
+            <div
+              className="flex items-center gap-2 rounded-lg border px-4 py-3 text-sm"
+              style={{ borderColor: "#f1c2c2", color: "var(--danger)", background: "#fff7f7" }}
+            >
+              <IconAlertCircle size={18} className="shrink-0" />
+              {error}
+            </div>
+          )}
           <div className="flex justify-end gap-3 pb-4">
             <Button variant="secondary" onClick={() => navigate(-1)}>Отмена</Button>
             <Button type="submit">Создать заказ-наряд</Button>
@@ -198,5 +222,5 @@ export default function NewOrder() {
 }
 
 function Field({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
-  return <label className={`block text-sm ${className}`}><span className="mb-1 block" style={{ color: "var(--text-muted)" }}>{label}</span><div className="field-control">{children}</div></label>;
+  return <label className={`block text-sm ${className}`}><span className="mb-1 block muted">{label}</span><div className="field-control">{children}</div></label>;
 }

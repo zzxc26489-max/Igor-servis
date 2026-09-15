@@ -1,57 +1,27 @@
-import { Link } from "react-router-dom";
 import { useAppStore } from "../store/AppStore";
-import { Card, Page, StatusBadge, TopBar } from "../components/ui";
+import { Card, Page, TopBar } from "../components/ui";
+import LiftTimeline from "../components/LiftTimeline";
+
+const WORK_HOURS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
 
 export default function Schedule() {
-  const { orders, lifts, clients, vehicles } = useAppStore();
+  const { lifts, orders } = useAppStore();
+  const busy = lifts.filter((l) => orders.some((o) => o.liftId === l.id && o.status !== "выдан")).length;
+  const todayLabel = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
 
   return (
     <>
-      <TopBar title="Расписание" subtitle="Загруженность подъёмников на сегодня" />
+      <TopBar title="Расписание" subtitle={`Загрузка подъёмников · ${busy} из ${lifts.length} занято`} />
       <Page>
-        <div className="flex flex-col gap-3">
-          {lifts.map((lift) => {
-            const lineOrders = orders.filter((o) => o.liftId === lift.id && o.status !== "выдан");
-            return (
-              <Card key={lift.id}>
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="font-semibold">{lift.name}</h2>
-                  <span
-                    className="text-xs px-2 py-1 rounded-full"
-                    style={{
-                      background: lineOrders.length ? "#fdf3e0" : "#e7f5ec",
-                      color: lineOrders.length ? "var(--warning)" : "var(--accent)",
-                    }}
-                  >
-                    {lineOrders.length ? "Занят" : "Свободен"}
-                  </span>
-                </div>
-                {lineOrders.length === 0 ? (
-                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                    Нажмите «+ Новая запись», чтобы добавить клиента
-                  </p>
-                ) : (
-                  <ul className="flex flex-col gap-2">
-                    {lineOrders.map((o) => {
-                      const client = clients.find((c) => c.id === o.clientId);
-                      const vehicle = vehicles.find((v) => v.id === o.vehicleId);
-                      return (
-                        <li key={o.id}>
-                          <Link to={`/orders/${o.id}`} className="flex items-center justify-between text-sm">
-                            <span>
-                              {o.scheduledStart}–{o.scheduledEnd} · {client?.name} · {vehicle?.make} {vehicle?.model}
-                            </span>
-                            <StatusBadge status={o.status} />
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </Card>
-            );
-          })}
-        </div>
+        <Card className="p-0 overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4" style={{ borderColor: "var(--border)" }}>
+            <div>
+              <h2 className="panel-title">Подъёмники на сегодня</h2>
+              <p className="muted mt-1 text-sm capitalize">{todayLabel}</p>
+            </div>
+          </div>
+          <LiftTimeline hours={WORK_HOURS} />
+        </Card>
       </Page>
     </>
   );
