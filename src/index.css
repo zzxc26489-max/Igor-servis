@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #f5f6f8;
+  --bg: #f6f7f5;
   --panel: #ffffff;
-  --border: #e5e4e7;
-  --text: #1f2430;
-  --text-muted: #6b7280;
-  --sidebar-bg: #14151a;
-  --sidebar-text: #c8cad1;
-  --accent: #1f7a4d;
-  --accent-strong: #16603c;
+  --border: #e5e8e5;
+  --text: #15201c;
+  --text-muted: #77827d;
+  --sidebar-bg: #17221f;
+  --sidebar-text: #c9d1ce;
+  --accent: #147449;
+  --accent-strong: #0d5d39;
   --danger: #d64545;
   --warning: #c98a1f;
   --info: #2f6fed;
@@ -25,6 +25,18 @@ body {
   background: var(--bg);
   color: var(--text);
 }
+
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+
+.app-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.app-table th { color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-align: left; background: #f7f8f7; }
+.app-table th, .app-table td { padding: 0.75rem 0.9rem; border-bottom: 1px solid var(--border); }
+.app-table tbody tr:last-child td { border-bottom: 0; }
+.app-table tbody tr:hover { background: #fbfcfb; }
+.panel-title { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
+.muted { color: var(--text-muted); }
+.soft-panel { border: 1px solid var(--border); border-radius: 0.85rem; background: var(--panel); }
 
 #root {
   min-height: 100svh;

@@ -1,124 +1,63 @@
+import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { IconChartBar, IconCoin, IconPackage, IconUsersGroup } from "@tabler/icons-react";
+import { Page, StatusBadge, TopBar } from "../components/ui";
 import { useAppStore } from "../store/AppStore";
-import { Card, Page, StatTile, StatusBadge, TopBar } from "../components/ui";
 import { formatMoney } from "../lib/format";
-import { computePayroll } from "../lib/payroll";
+
+const HOURS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
 
 export default function Dashboard() {
-  const { orders, lifts, stock, clients, employees } = useAppStore();
+  const { orders, lifts, stock, clients, employees, vehicles } = useAppStore();
+  const workRevenue = orders.reduce((sum, order) => sum + order.works.reduce((acc, work) => acc + work.price * work.qty, 0), 0);
+  const partsRevenue = orders.reduce((sum, order) => sum + order.parts.reduce((acc, part) => acc + part.price * part.qty, 0), 0);
+  const salaries = employees.reduce((sum, employee) => sum + employee.accrued, 0);
+  const critical = stock.filter((item) => item.qty <= item.minQty);
+  const active = orders.filter((order) => order.status !== "выдан");
 
-  const todayRevenue = orders.reduce((sum, o) => {
-    const works = o.works.reduce((s, w) => s + w.price * w.qty, 0);
-    const parts = o.parts.reduce((s, p) => s + p.price * p.qty, 0);
-    return sum + works + parts;
-  }, 0);
+  return <>
+    <TopBar title="Доброе утро!" subtitle="Всё под контролем. Хорошего рабочего дня!" />
+    <Page>
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <Metric icon={<IconCoin />} label="Выручка сегодня" value={formatMoney(workRevenue + partsRevenue)} hint={`${orders.length} заказ-нарядов`} />
+        <Metric icon={<IconPackage />} label="Запчасти" value={formatMoney(partsRevenue)} hint={`${stock.length} позиций на складе`} />
+        <Metric icon={<IconUsersGroup />} label="Зарплаты" value={formatMoney(salaries)} hint="Начислено за период" />
+        <Metric icon={<IconChartBar />} label="Чистая прибыль" value={formatMoney(Math.max(workRevenue + partsRevenue - salaries, 0))} hint="Расчётный показатель" />
+        <Link to="/orders/new" className="flex min-h-28 items-center justify-center rounded-xl bg-[var(--accent)] px-4 text-base font-semibold text-white shadow-sm transition hover:bg-[var(--accent-strong)]">+ Новая запись</Link>
+      </div>
 
-  const partsCost = stock.reduce((s, i) => s + i.purchasePrice * i.qty, 0);
-  const salaries = computePayroll(employees, orders).reduce((s, e) => s + e.accrued, 0);
-  const criticalStock = stock.filter((i) => i.qty <= i.minQty);
-  const activeOrders = orders.filter((o) => o.status !== "выдан");
-
-  const today = new Intl.DateTimeFormat("ru-RU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(new Date());
-
-  return (
-    <>
-      <TopBar title="Главная" subtitle={`Всё под контролем. Сегодня: ${today}`} />
-      <Page>
-        <div className="flex flex-wrap gap-4 mb-6">
-          <StatTile label="Выручка сегодня" value={formatMoney(todayRevenue)} hint={`${orders.length} заказ-наряда(ов)`} />
-          <StatTile label="Запчасти на складе" value={formatMoney(partsCost)} hint={`${stock.length} позиций`} />
-          <StatTile label="Зарплаты начислено" value={formatMoney(salaries)} />
-          <StatTile label="Клиентов в базе" value={String(clients.length)} />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2">
-            <Card>
-              <h2 className="font-semibold mb-3">Подъёмники сегодня</h2>
-              <div className="flex flex-col gap-2">
-                {lifts.map((lift) => {
-                  const order = orders.find((o) => o.liftId === lift.id && o.status !== "выдан");
-                  const client = order && clients.find((c) => c.id === order.clientId);
-                  return (
-                    <div
-                      key={lift.id}
-                      className="flex items-center justify-between border rounded-lg px-3 py-2"
-                      style={{ borderColor: "var(--border)" }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full"
-                          style={{ background: order ? "var(--warning)" : "var(--accent)" }}
-                        />
-                        <span className="font-medium text-sm">{lift.name}</span>
-                      </div>
-                      {order ? (
-                        <Link to={`/orders/${order.id}`} className="text-sm" style={{ color: "var(--text-muted)" }}>
-                          {order.scheduledStart}–{order.scheduledEnd} · {client?.name} · {order.number}
-                        </Link>
-                      ) : (
-                        <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-                          Свободен
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="soft-panel overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4" style={{ borderColor: "var(--border)" }}>
+            <div><h2 className="text-xl font-bold tracking-tight">Расписание на сегодня</h2><p className="mt-1 text-sm muted">Загрузка подъёмников и текущие работы</p></div>
+            <div className="rounded-lg border bg-white px-3 py-2 text-sm font-medium" style={{ borderColor: "var(--border)" }}>14 сентября 2026</div>
           </div>
+          <div className="overflow-x-auto px-4 py-3"><div className="min-w-[740px]">
+            <div className="grid grid-cols-[150px_repeat(12,minmax(46px,1fr))] border-b text-xs font-medium muted" style={{ borderColor: "var(--border)" }}><div className="py-2" />{HOURS.map((hour) => <div key={hour} className="py-2 text-center">{hour}</div>)}</div>
+            {lifts.map((lift) => {
+              const order = orders.find((item) => item.liftId === lift.id && item.status !== "выдан");
+              const client = order && clients.find((item) => item.id === order.clientId);
+              const vehicle = order && vehicles.find((item) => item.id === order.vehicleId);
+              const start = order ? Math.max(0, Number(order.scheduledStart?.slice(0, 2) ?? "8") - 8) : 0;
+              const end = order ? Math.min(12, Number(order.scheduledEnd?.slice(0, 2) ?? "9") - 8) : 0;
+              const palette = lift.id === 2 ? "#e8f1ff" : lift.id === 4 ? "#fff4dc" : "#e4f3e9";
+              return <div key={lift.id} className="grid min-h-28 grid-cols-[150px_repeat(12,minmax(46px,1fr))] border-b" style={{ borderColor: "var(--border)" }}>
+                <div className="flex flex-col justify-center pr-3"><b className="text-sm">{lift.name}</b><span className="mt-1 text-xs muted"><span className={`mr-1 inline-block h-2 w-2 rounded-full ${order ? "bg-emerald-500" : "bg-slate-300"}`} />{order ? "Занят" : "Свободен"}</span></div>
+                {HOURS.map((hour) => <div key={hour} className="border-l" style={{ borderColor: "#eef0ee" }} />)}
+                {order ? <Link to={`/orders/${order.id}`} className="z-10 m-2 rounded-lg p-3 text-sm shadow-sm" style={{ gridColumn: `${start + 2} / ${Math.max(start + 3, end + 2)}`, gridRow: 1, background: palette }}><div className="font-semibold">{order.scheduledStart} – {order.scheduledEnd}</div><div className="mt-1 font-semibold">{client?.name}</div><div className="mt-1 text-xs muted">{vehicle?.make} {vehicle?.model} · {order.works[0]?.name ?? "Диагностика"}</div></Link> : <div className="z-10 col-[2/14] row-start-1 m-2 flex items-center justify-center rounded-lg border border-dashed text-xs muted" style={{ borderColor: "var(--border)" }}>Подъёмник свободен</div>}
+              </div>;
+            })}
+          </div></div>
+        </section>
+        <aside className="space-y-4">
+          <section className="soft-panel p-4"><div className="mb-3 flex items-center justify-between"><h2 className="panel-title">Заканчиваются запчасти</h2><Link to="/stock" className="text-sm font-medium text-[var(--accent)]">Все ({critical.length})</Link></div><ul className="divide-y" style={{ borderColor: "var(--border)" }}>{critical.slice(0, 5).map((item) => <li key={item.id} className="flex items-center justify-between gap-3 py-3 text-sm"><span>{item.name}</span><b className="whitespace-nowrap text-[var(--danger)]">{item.qty} {item.unit}</b></li>)}</ul></section>
+          <section className="soft-panel p-4"><div className="mb-3 flex items-center justify-between"><h2 className="panel-title">Активные заказ-наряды</h2><Link to="/orders" className="text-sm font-medium text-[var(--accent)]">Все ({active.length})</Link></div><ul className="divide-y" style={{ borderColor: "var(--border)" }}>{active.slice(0, 5).map((order) => { const client = clients.find((item) => item.id === order.clientId); return <li key={order.id} className="py-3"><Link to={`/orders/${order.id}`} className="flex items-start justify-between gap-2"><span><b className="block text-sm">{order.number}</b><span className="text-xs muted">{client?.name}</span></span><StatusBadge status={order.status} /></Link></li>; })}</ul></section>
+        </aside>
+      </div>
+    </Page>
+  </>;
+}
 
-          <div className="flex flex-col gap-4">
-            <Card>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold">Заканчиваются запчасти</h2>
-                <Link to="/stock" className="text-xs" style={{ color: "var(--accent)" }}>
-                  Все ({criticalStock.length})
-                </Link>
-              </div>
-              <ul className="flex flex-col gap-2 text-sm">
-                {criticalStock.slice(0, 5).map((item) => (
-                  <li key={item.id} className="flex justify-between">
-                    <span>{item.name}</span>
-                    <span style={{ color: "var(--danger)" }}>
-                      {item.qty} {item.unit}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-
-            <Card>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold">Активные заказ-наряды</h2>
-                <Link to="/orders" className="text-xs" style={{ color: "var(--accent)" }}>
-                  Все ({activeOrders.length})
-                </Link>
-              </div>
-              <ul className="flex flex-col gap-2 text-sm">
-                {activeOrders.slice(0, 5).map((o) => {
-                  const client = clients.find((c) => c.id === o.clientId);
-                  return (
-                    <li key={o.id}>
-                      <Link to={`/orders/${o.id}`} className="flex items-center justify-between">
-                        <span>
-                          {o.number} · {client?.name}
-                        </span>
-                        <StatusBadge status={o.status} />
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Card>
-          </div>
-        </div>
-      </Page>
-    </>
-  );
+function Metric({ icon, label, value, hint }: { icon: ReactNode; label: string; value: string; hint: string }) {
+  return <div className="soft-panel flex min-h-28 items-center gap-3 p-4"><div className="rounded-xl bg-emerald-50 p-2.5 text-[var(--accent)]">{icon}</div><div><div className="text-sm muted">{label}</div><div className="mt-1 text-2xl font-bold tracking-tight">{value}</div><div className="mt-1 text-xs muted">{hint}</div></div></div>;
 }

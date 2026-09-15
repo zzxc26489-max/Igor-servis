@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { IconBell, IconCalendarEvent, IconPlus, IconSearch } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 
 export function TopBar({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
@@ -28,7 +29,7 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
   }, [clients, orders, query, vehicles]);
 
   return (
-    <header className="flex flex-col gap-3 border-b bg-white px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between" style={{ borderColor: "var(--border)" }}>
+    <header className="flex flex-col gap-3 border-b bg-white px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between" style={{ borderColor: "var(--border)" }}>
       <div className="min-w-0">
         <h1 className="text-xl font-semibold" style={{ color: "var(--text)" }}>
           {title}
@@ -41,18 +42,18 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Поиск: клиент, авто, номер заказа"
-          className="w-full rounded-lg border bg-white px-3 py-2 pl-9 text-sm outline-none focus:ring-2"
+          className="w-full rounded-lg border bg-[#f8f9f8] px-3 py-2 pl-10 text-sm outline-none focus:ring-2"
           style={{ borderColor: "var(--border)", boxShadow: "none" }}
           aria-label="Поиск по CRM"
         />
-        <span className="pointer-events-none absolute left-3 top-2 text-sm" aria-hidden="true">⌕</span>
+        <IconSearch className="pointer-events-none absolute left-3 top-2.5" size={18} color="var(--text-muted)" aria-hidden="true" />
         {query.trim().length >= 2 && (
           <div className="absolute z-40 mt-1 w-full overflow-hidden rounded-lg border bg-white shadow-lg" style={{ borderColor: "var(--border)" }}>
             {results.length > 0 ? results.map((result, index) => (
               <button
                 key={`${result.to}-${index}`}
                 onClick={() => { setQuery(""); navigate(result.to); }}
-                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 focus-visible:outline-none focus-visible:bg-gray-50"
+                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50"
               >
                 <span>{result.label}</span>
                 <span className="ml-3 text-xs" style={{ color: "var(--text-muted)" }}>{result.detail}</span>
@@ -65,7 +66,9 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        <Link to="/orders/new"><Button>+ Новая запись</Button></Link>
+        <div className="hidden items-center gap-2 text-sm text-[var(--text-muted)] xl:flex"><IconCalendarEvent size={18} /> Сегодня</div>
+        <button aria-label="Уведомления" className="rounded-lg p-2 hover:bg-gray-100"><IconBell size={20} /></button>
+        <Link to="/orders/new"><Button><span className="inline-flex items-center gap-2"><IconPlus size={18} /> Новая запись</span></Button></Link>
         {actions}
       </div>
     </header>
@@ -137,16 +140,10 @@ export function Button({
   variant?: "primary" | "secondary";
   type?: "button" | "submit";
 }) {
-  const base =
-    "px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)]";
+  const base = "px-4 py-2 rounded-lg text-sm font-medium transition-colors";
   if (variant === "secondary") {
     return (
-      <button
-        type={type}
-        onClick={onClick}
-        className={`${base} border hover:bg-gray-50`}
-        style={{ borderColor: "var(--border)", color: "var(--text)" }}
-      >
+      <button type={type} onClick={onClick} className={`${base} border`} style={{ borderColor: "var(--border)", color: "var(--text)" }}>
         {children}
       </button>
     );
@@ -155,7 +152,7 @@ export function Button({
     <button
       type={type}
       onClick={onClick}
-      className={`${base} text-white hover:brightness-95`}
+      className={`${base} text-white`}
       style={{ background: "var(--accent)" }}
     >
       {children}
