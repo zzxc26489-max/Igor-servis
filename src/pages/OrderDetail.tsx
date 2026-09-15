@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { IconCar, IconFileDescription, IconNotes, IconPrinter, IconReceipt2, IconUser } from "@tabler/icons-react";
+import { IconArrowLeft, IconCar, IconFileDescription, IconNotes, IconPrinter, IconReceipt2, IconUser } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
 import { Button, Card, Page, StatusBadge, TopBar } from "../components/ui";
@@ -238,20 +238,19 @@ export default function OrderDetail() {
       <TopBar
         title={`Заказ-наряд ${order.number}`}
         subtitle={`Создан ${formatDateTime(order.createdAt)}${order.advisor ? ` · Мастер-приёмщик: ${order.advisor}` : ""}`}
+        hideNewRecordOnMobile
         actions={
           <>
-            <Link to={`/orders/${order.id}/act`}>
-              <Button variant="secondary">
-                <span className="inline-flex items-center gap-2"><IconFileDescription size={18} /> Акт работ</span>
+            <Link to={`/orders/${order.id}/act`} aria-label="Открыть акт работ" title="Акт работ">
+              <Button variant="secondary" size="sm">
+                <IconFileDescription size={18} /> <span className="hidden sm:inline">Акт работ</span>
               </Button>
             </Link>
-            <Button variant="secondary" onClick={() => window.print()}>
-              <span className="inline-flex items-center gap-2">
-                <IconPrinter size={18} /> Печать
-              </span>
+            <Button variant="secondary" size="sm" onClick={() => window.print()}>
+              <IconPrinter size={18} /> <span className="hidden sm:inline">Печать</span>
             </Button>
-            <Button variant="secondary" onClick={() => navigate(-1)}>
-              Назад
+            <Button variant="secondary" size="sm" onClick={() => navigate(-1)}>
+              <IconArrowLeft size={18} /> <span className="hidden sm:inline">Назад</span>
             </Button>
           </>
         }
@@ -271,46 +270,48 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 print:grid-cols-3">
-          <Card className="flex items-start gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e9f5ed] text-[var(--accent)]">
-              <IconUser size={22} />
-            </div>
-            <div className="min-w-0">
-              <div className="muted text-xs">Клиент</div>
-              <div className="font-semibold">{client?.name}</div>
-              <div className="muted text-sm">{client?.phone}</div>
-            </div>
-          </Card>
-          <Card className="flex items-start gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#edf4ff] text-[#3978c9]">
-              <IconCar size={22} />
-            </div>
-            <div className="min-w-0">
-              <div className="muted text-xs">Автомобиль</div>
-              <div className="font-semibold">
-                {vehicle?.make} {vehicle?.model}
+        <Card className="mb-3 overflow-hidden p-0">
+          <div className="grid grid-cols-1 divide-y divide-[#e5e8e5] lg:grid-cols-3 lg:divide-x lg:divide-y-0 print:grid-cols-3 print:divide-x print:divide-y-0">
+            <div className="flex min-w-0 items-center gap-3 p-3.5">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#e9f5ed] text-[var(--accent)]">
+                <IconUser size={20} />
               </div>
-              <div className="muted text-sm">
-                {vehicle?.plate} {vehicle?.mileage ? `· ${vehicle.mileage.toLocaleString("ru-RU")} км` : ""}
+              <div className="min-w-0">
+                <div className="muted text-[11px]">Клиент</div>
+                <div className="truncate text-sm font-semibold">{client?.name}</div>
+                <div className="muted truncate text-xs">{client?.phone}</div>
               </div>
             </div>
-          </Card>
-          <Card className="flex items-center justify-between">
-            <div>
-              <div className="muted text-xs mb-1">Статус</div>
-              <StatusBadge status={order.status} />
+            <div className="flex min-w-0 items-center gap-3 p-3.5">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#edf4ff] text-[#3978c9]">
+                <IconCar size={20} />
+              </div>
+              <div className="min-w-0">
+                <div className="muted text-[11px]">Автомобиль</div>
+                <div className="truncate text-sm font-semibold">
+                  {vehicle?.make} {vehicle?.model}
+                </div>
+                <div className="muted truncate text-xs">
+                  {vehicle?.plate} {vehicle?.mileage ? `· ${vehicle.mileage.toLocaleString("ru-RU")} км` : ""}
+                </div>
+              </div>
             </div>
-          </Card>
-        </div>
+            <div className="flex min-h-16 items-center justify-between p-3.5">
+              <div>
+                <div className="muted mb-1 text-[11px]">Статус заказа</div>
+                <StatusBadge status={order.status} />
+              </div>
+            </div>
+          </div>
+        </Card>
 
-        <Card className="mb-4 print:hidden">
+        <Card className="mb-3 p-3 print:hidden">
           <div className="flex items-center justify-between">
             {STATUS_FLOW.map((step, idx) => (
-              <div key={step} className="flex-1 flex flex-col items-center relative">
+              <div key={step} className="relative flex min-w-0 flex-1 flex-col items-center">
                 {idx > 0 && (
                   <div
-                    className="absolute top-3 right-1/2 w-full h-0.5"
+                    className="absolute right-1/2 top-3 h-0.5 w-full"
                     style={{ background: idx <= currentStepIndex ? "var(--accent)" : "var(--border)" }}
                   />
                 )}
@@ -319,13 +320,13 @@ export default function OrderDetail() {
                     updateOrder(order.id, { status: step });
                     showToast(`Статус изменён: «${step}»`);
                   }}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold relative z-10 text-white cursor-pointer transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)]"
+                  className="relative z-10 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-xs font-semibold text-white transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
                   style={{ background: idx <= currentStepIndex ? "var(--accent)" : "#cfd3da" }}
                   aria-label={`Установить статус «${step}»`}
                 >
                   {idx <= currentStepIndex ? "✓" : idx + 1}
                 </button>
-                <div className="text-xs mt-2 capitalize">{step}</div>
+                <div className="mt-1.5 max-w-full truncate px-0.5 text-center text-[10px] capitalize sm:text-xs">{step}</div>
               </div>
             ))}
           </div>
@@ -361,7 +362,7 @@ export default function OrderDetail() {
                       {w.qty > 1 && <span className="muted"> × {w.qty}</span>}
                       {w.executor && <div className="muted text-xs">Исполнитель: {w.executor}</div>}
                     </td>
-                    <td className="text-right">{formatMoney(w.price * w.qty)}</td>
+                    <td className="whitespace-nowrap text-right">{formatMoney(w.price * w.qty)}</td>
                     <td className="text-right">
                       <button
                         onClick={() => handleRemoveWork(w.id)}
@@ -477,7 +478,7 @@ export default function OrderDetail() {
                       {p.qty > 1 && <span className="muted"> × {p.qty}</span>}
                       {p.sku && <div className="muted text-xs">Артикул: {p.sku}</div>}
                     </td>
-                    <td className="text-right">{formatMoney(p.price * p.qty)}</td>
+                    <td className="whitespace-nowrap text-right">{formatMoney(p.price * p.qty)}</td>
                     <td className="text-right">
                       <button
                         onClick={() => handleRemovePart(p)}

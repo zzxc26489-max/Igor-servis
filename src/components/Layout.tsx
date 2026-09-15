@@ -99,7 +99,7 @@ export default function Layout() {
   const { open, setOpen } = useMobileMenu();
 
   return (
-    <div className="flex min-h-screen">
+    <div className="app-shell flex min-h-screen print:min-h-0">
       <aside
         className="hidden lg:flex w-60 shrink-0 flex-col print:hidden"
         style={{ background: "var(--sidebar-bg)", color: "var(--sidebar-text)" }}
@@ -130,7 +130,7 @@ export default function Layout() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0 print:pb-0">
+      <div className="app-content flex min-w-0 flex-1 flex-col pb-16 lg:pb-0 print:block print:min-h-0 print:pb-0">
         <Outlet />
       </div>
 

@@ -71,12 +71,46 @@ button { cursor: pointer; }
 }
 
 @media print {
+  html,
+  body,
+  #root,
+  .app-shell,
+  .app-content,
+  main {
+    display: block !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
   body {
     background: #fff;
   }
   @page { size: A4; margin: 12mm; }
-  .work-act { font-size: 11pt; }
+  .work-act {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    font-size: 11pt;
+    break-after: avoid-page;
+    page-break-after: avoid;
+  }
+  .work-act .overflow-x-auto { overflow: visible !important; }
+  .work-act header,
+  .work-act section,
+  .work-act footer,
+  .act-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
   .act-table { font-size: 9pt; }
+}
+
+@media (max-width: 639px) {
+  .app-table th,
+  .app-table td {
+    padding: 0.65rem 0.5rem;
+  }
 }
 
 @keyframes toast-in {

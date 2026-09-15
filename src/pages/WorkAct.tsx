@@ -25,7 +25,8 @@ export default function WorkAct() {
       <TopBar
         title={`Акт выполненных работ ${actNumber}`}
         subtitle="Документ сформирован автоматически из заказ-наряда"
-        actions={<><Button onClick={() => window.print()}><span className="inline-flex items-center gap-2"><IconPrinter size={18} /> Печать / PDF</span></Button><Link to={`/orders/${order.id}`}><Button variant="secondary"><span className="inline-flex items-center gap-2"><IconArrowLeft size={18} /> К заказу</span></Button></Link></>}
+        hideNewRecordOnMobile
+        actions={<><Button size="sm" onClick={() => window.print()}><IconPrinter size={18} /><span className="hidden sm:inline">Печать / PDF</span></Button><Link to={`/orders/${order.id}`} aria-label="Вернуться к заказу" title="К заказу"><Button size="sm" variant="secondary"><IconArrowLeft size={18} /><span className="hidden sm:inline">К заказу</span></Button></Link></>}
       />
       <Page>
         <article className="work-act mx-auto max-w-[900px] rounded-xl border bg-white p-5 shadow-sm sm:p-8 print:max-w-none print:border-0 print:p-0 print:shadow-none" style={{ borderColor: "var(--border)" }}>

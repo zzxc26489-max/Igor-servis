@@ -4,7 +4,17 @@ import { IconBell, IconCalendarEvent, IconMenu2, IconPlus, IconSearch } from "@t
 import { useAppStore } from "../store/AppStore";
 import { useMobileMenu } from "./MobileMenu";
 
-export function TopBar({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
+export function TopBar({
+  title,
+  subtitle,
+  actions,
+  hideNewRecordOnMobile = false,
+}: {
+  title: string;
+  subtitle?: string;
+  actions?: ReactNode;
+  hideNewRecordOnMobile?: boolean;
+}) {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const { clients, vehicles, orders } = useAppStore();
@@ -48,8 +58,8 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
   }, [clients, orders, query, vehicles]);
 
   return (
-    <header className="flex flex-col gap-3 border-b bg-white px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between print:hidden" style={{ borderColor: "var(--border)" }}>
-      <div className="flex items-center gap-2 min-w-0">
+    <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-3 overflow-hidden border-b bg-white px-3 py-3 sm:px-6 lg:grid-cols-[minmax(230px,auto)_minmax(260px,1fr)_auto] lg:gap-x-4 print:hidden" style={{ borderColor: "var(--border)" }}>
+      <div className="flex min-w-0 items-center gap-2">
         <button
           onClick={() => setOpen(true)}
           aria-label="Открыть меню"
@@ -58,14 +68,14 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
           <IconMenu2 size={22} />
         </button>
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold" style={{ color: "var(--text)" }}>
+          <h1 className="truncate text-lg font-semibold sm:text-xl" title={title} style={{ color: "var(--text)" }}>
             {title}
           </h1>
-          {subtitle && <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
+          {subtitle && <p className="mt-0.5 truncate text-xs sm:text-sm" title={subtitle} style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
         </div>
       </div>
 
-      <div className="relative w-full lg:max-w-md">
+      <div className="relative col-span-2 row-start-2 w-full lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:max-w-md lg:justify-self-center">
         <input
           ref={inputRef}
           value={query}
@@ -100,10 +110,10 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="col-start-2 row-start-1 flex min-w-0 items-center justify-end gap-1.5 sm:gap-2 lg:col-start-3">
         <div className="hidden items-center gap-2 text-sm text-[var(--text-muted)] xl:flex"><IconCalendarEvent size={18} /> Сегодня</div>
-        <button aria-label="Уведомления" className="rounded-lg p-2 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"><IconBell size={20} /></button>
-        <Link to="/orders/new"><Button><span className="inline-flex items-center gap-2"><IconPlus size={18} /> Новая запись</span></Button></Link>
+        <button aria-label="Уведомления" className="hidden h-9 w-9 shrink-0 place-items-center rounded-lg hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:grid"><IconBell size={19} /></button>
+        <Link to="/orders/new" aria-label="Новая запись" className={hideNewRecordOnMobile ? "hidden sm:block" : "shrink-0"}><Button size="sm"><IconPlus size={17} /><span className="hidden sm:inline">Новая запись</span></Button></Link>
         {actions}
       </div>
     </header>
@@ -111,13 +121,13 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
 }
 
 export function Page({ children }: { children: ReactNode }) {
-  return <main className="flex-1 overflow-auto p-4 sm:p-6 print:overflow-visible print:p-0">{children}</main>;
+  return <main className="min-w-0 flex-1 overflow-auto overflow-x-hidden p-3 sm:p-6 print:flex-none print:overflow-visible print:p-0">{children}</main>;
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`bg-white rounded-xl border p-4 ${className}`}
+      className={`rounded-xl border bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ${className}`}
       style={{ borderColor: "var(--border)" }}
     >
       {children}
@@ -169,14 +179,17 @@ export function Button({
   onClick,
   variant = "primary",
   type = "button",
+  size = "md",
 }: {
   children: ReactNode;
   onClick?: () => void;
   variant?: "primary" | "secondary";
   type?: "button" | "submit";
+  size?: "sm" | "md" | "icon";
 }) {
+  const dimensions = size === "icon" ? "h-9 w-9 p-0" : size === "sm" ? "min-h-9 px-3 py-1.5" : "min-h-10 px-3.5 py-2";
   const base =
-    "px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)]";
+    `inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)] ${dimensions}`;
   if (variant === "secondary") {
     return (
       <button
