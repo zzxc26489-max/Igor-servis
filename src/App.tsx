@@ -16,6 +16,7 @@ import Finance from "./pages/Finance";
 import Reports from "./pages/Reports";
 import NewOrder from "./pages/NewOrder";
 import Settings from "./pages/Settings";
+import WorkAct from "./pages/WorkAct";
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
                 <Route path="orders" element={<Orders />} />
                 <Route path="orders/new" element={<NewOrder />} />
                 <Route path="orders/:orderId" element={<OrderDetail />} />
+                <Route path="orders/:orderId/act" element={<WorkAct />} />
                 <Route path="stock" element={<Stock />} />
                 <Route path="purchases" element={<Purchases />} />
                 <Route path="services" element={<Services />} />

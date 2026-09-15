@@ -4,6 +4,12 @@ export interface CompanyInfo {
   address: string;
   phone: string;
   workHours: string;
+  inn: string;
+  responsible: string;
+}
+
+export interface AppSettings {
+  autoPriceAdjustment: boolean;
 }
 
 export type LiftStatus = "free" | "busy";

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { IconCar, IconNotes, IconPrinter, IconReceipt2, IconUser } from "@tabler/icons-react";
+import { IconCar, IconFileDescription, IconNotes, IconPrinter, IconReceipt2, IconUser } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
 import { Button, Card, Page, StatusBadge, TopBar } from "../components/ui";
@@ -21,6 +21,7 @@ export default function OrderDetail() {
     stock,
     employees,
     company,
+    settings,
     updateOrder,
     updateStockItem,
     addStockMovement,
@@ -44,6 +45,7 @@ export default function OrderDetail() {
   const [editingDiscount, setEditingDiscount] = useState(false);
   const [discountInput, setDiscountInput] = useState("0");
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [targetTotal, setTargetTotal] = useState("");
 
   if (!order) {
     return (
@@ -67,6 +69,30 @@ export default function OrderDetail() {
   const debt = due - paid;
 
   const currentStepIndex = STATUS_FLOW.indexOf(order.status);
+
+  function adjustWorkPrices(works: OrderLineWork[], target: number, partsAmount = partsTotal, discountAmount = discount) {
+    const targetWorksTotal = target - partsAmount + discountAmount;
+    const currentWorksTotal = works.reduce((sum, work) => sum + work.price * work.qty, 0);
+    if (targetWorksTotal <= 0 || currentWorksTotal <= 0) return works;
+    const ratio = targetWorksTotal / currentWorksTotal;
+    return works.map((work) => ({ ...work, price: Math.max(10, Math.round((work.price * ratio) / 10) * 10) }));
+  }
+
+  function applyTargetTotal() {
+    if (!order) return;
+    const target = Number(targetTotal);
+    if (!settings.autoPriceAdjustment || target <= 0) return;
+    if (order.works.length === 0) {
+      showToast("Сначала добавьте хотя бы одну работу", "error");
+      return;
+    }
+    if (target <= partsTotal - discount) {
+      showToast("Согласованная сумма должна быть больше стоимости запчастей", "error");
+      return;
+    }
+    updateOrder(order.id, { works: adjustWorkPrices(order.works, target) });
+    showToast("Цены работ подогнаны под согласованную сумму");
+  }
 
   function resetWorkForm() {
     setAddingWork(false);
@@ -99,14 +125,18 @@ export default function OrderDetail() {
       price,
       executor: workExecutor || undefined,
     };
-    updateOrder(order.id, { works: [...order.works, newWork] });
+    const nextWorks = [...order.works, newWork];
+    const target = Number(targetTotal);
+    updateOrder(order.id, { works: settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(nextWorks, target) : nextWorks });
     resetWorkForm();
     showToast(`Добавлена работа «${name}»`);
   }
 
   function handleRemoveWork(workId: string) {
     if (!order) return;
-    updateOrder(order.id, { works: order.works.filter((w) => w.id !== workId) });
+    const nextWorks = order.works.filter((w) => w.id !== workId);
+    const target = Number(targetTotal);
+    updateOrder(order.id, { works: settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(nextWorks, target) : nextWorks });
     showToast("Работа удалена", "error");
   }
 
@@ -138,7 +168,13 @@ export default function OrderDetail() {
       price,
       availability: "reserved",
     };
-    updateOrder(order.id, { parts: [...order.parts, newPart] });
+    const nextParts = [...order.parts, newPart];
+    const target = Number(targetTotal);
+    const nextPartsTotal = nextParts.reduce((sum, part) => sum + part.price * part.qty, 0);
+    updateOrder(order.id, {
+      parts: nextParts,
+      works: settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(order.works, target, nextPartsTotal) : order.works,
+    });
     updateStockItem(stockItem.id, { qty: stockItem.qty - qty });
     addStockMovement({
       id: `mv-${Date.now()}`,
@@ -155,7 +191,13 @@ export default function OrderDetail() {
 
   function handleRemovePart(part: OrderLinePart) {
     if (!order) return;
-    updateOrder(order.id, { parts: order.parts.filter((p) => p.id !== part.id) });
+    const nextParts = order.parts.filter((p) => p.id !== part.id);
+    const target = Number(targetTotal);
+    const nextPartsTotal = nextParts.reduce((sum, item) => sum + item.price * item.qty, 0);
+    updateOrder(order.id, {
+      parts: nextParts,
+      works: settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(order.works, target, nextPartsTotal) : order.works,
+    });
     const stockItem = stock.find((s) => s.sku === part.sku);
     if (stockItem) {
       updateStockItem(stockItem.id, { qty: stockItem.qty + part.qty });
@@ -175,7 +217,11 @@ export default function OrderDetail() {
   function handleSaveDiscount() {
     if (!order) return;
     const value = Math.max(0, Number(discountInput) || 0);
-    updateOrder(order.id, { discount: value });
+    const target = Number(targetTotal);
+    updateOrder(order.id, {
+      discount: value,
+      works: settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(order.works, target, partsTotal, value) : order.works,
+    });
     setEditingDiscount(false);
     showToast("Скидка обновлена");
   }
@@ -194,6 +240,11 @@ export default function OrderDetail() {
         subtitle={`Создан ${formatDateTime(order.createdAt)}${order.advisor ? ` · Мастер-приёмщик: ${order.advisor}` : ""}`}
         actions={
           <>
+            <Link to={`/orders/${order.id}/act`}>
+              <Button variant="secondary">
+                <span className="inline-flex items-center gap-2"><IconFileDescription size={18} /> Акт работ</span>
+              </Button>
+            </Link>
             <Button variant="secondary" onClick={() => window.print()}>
               <span className="inline-flex items-center gap-2">
                 <IconPrinter size={18} /> Печать
@@ -566,6 +617,24 @@ export default function OrderDetail() {
               <span>К оплате</span>
               <span>{formatMoney(due)}</span>
             </div>
+            {settings.autoPriceAdjustment && (
+              <div className="mt-3 rounded-lg border bg-[#f7faf8] p-3 print:hidden" style={{ borderColor: "var(--border)" }}>
+                <label className="text-xs font-medium">Согласованная сумма заказа</label>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={targetTotal}
+                    onChange={(event) => setTargetTotal(event.target.value.replace(/\D/g, ""))}
+                    onKeyDown={(event) => event.key === "Enter" && applyTargetTotal()}
+                    placeholder={String(due)}
+                    inputMode="numeric"
+                    className="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm"
+                    style={{ borderColor: "var(--border)" }}
+                  />
+                  <Button variant="secondary" onClick={applyTargetTotal}>Подогнать</Button>
+                </div>
+                <p className="muted mt-2 text-xs">Пересчитываются только цены работ, с округлением до 10 ₽.</p>
+              </div>
+            )}
             <div className="flex justify-between text-sm mt-1">
               <span>Оплачено</span>
               <span>{formatMoney(paid)}</span>

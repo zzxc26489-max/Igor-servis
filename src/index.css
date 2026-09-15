@@ -39,6 +39,9 @@ button { cursor: pointer; }
 .panel-title { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
 .muted { color: var(--text-muted); }
 .soft-panel { border: 1px solid var(--border); border-radius: 0.85rem; background: var(--panel); }
+.act-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.act-table th, .act-table td { padding: 0.6rem 0.65rem; border: 1px solid var(--border); }
+.act-table th { background: #f4f6f4; font-weight: 700; text-align: left; }
 
 #root {
   min-height: 100svh;
@@ -71,6 +74,9 @@ button { cursor: pointer; }
   body {
     background: #fff;
   }
+  @page { size: A4; margin: 12mm; }
+  .work-act { font-size: 11pt; }
+  .act-table { font-size: 9pt; }
 }
 
 @keyframes toast-in {

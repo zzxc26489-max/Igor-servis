@@ -1,38 +1,122 @@
-import { IconTool } from "@tabler/icons-react";
+import { useMemo, useState, type FormEvent } from "react";
+import { IconEdit, IconPlus, IconSearch, IconTool, IconTrash } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
-import { Card, Page, TopBar } from "../components/ui";
+import { useToast } from "../components/Toast";
+import { Button, Card, Page, TopBar } from "../components/ui";
 import { formatMoney } from "../lib/format";
 
 export default function Services() {
-  const { services } = useAppStore();
-  const categories = Array.from(new Set(services.map((s) => s.category)));
+  const { services, addService, updateService, deleteService } = useAppStore();
+  const { showToast } = useToast();
+  const [query, setQuery] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("");
+  const [price, setPrice] = useState("");
+
+  const filtered = useMemo(() => {
+    const term = query.trim().toLocaleLowerCase("ru-RU");
+    if (!term) return services;
+    return services.filter((service) => `${service.name} ${service.category}`.toLocaleLowerCase("ru-RU").includes(term));
+  }, [query, services]);
+  const categories = Array.from(new Set(filtered.map((service) => service.category)));
+
+  function resetForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setName("");
+    setCategory("");
+    setPrice("");
+  }
+
+  function startEdit(id: string) {
+    const service = services.find((item) => item.id === id);
+    if (!service) return;
+    setEditingId(id);
+    setName(service.name);
+    setCategory(service.category);
+    setPrice(String(service.price));
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const cleanName = name.trim();
+    const cleanCategory = category.trim();
+    const numericPrice = Number(price);
+    if (!cleanName || !cleanCategory || numericPrice <= 0) {
+      showToast("Заполните название, категорию и цену", "error");
+      return;
+    }
+    if (editingId) {
+      updateService(editingId, { name: cleanName, category: cleanCategory, price: numericPrice });
+      showToast("Услуга обновлена");
+    } else {
+      addService({ id: `sv-${Date.now()}`, name: cleanName, category: cleanCategory, price: numericPrice });
+      showToast("Услуга добавлена");
+    }
+    resetForm();
+  }
+
+  function handleDelete(id: string, serviceName: string) {
+    if (!window.confirm(`Удалить услугу «${serviceName}» из прайс-листа?`)) return;
+    deleteService(id);
+    if (editingId === id) resetForm();
+    showToast("Услуга удалена", "error");
+  }
 
   return (
     <>
-      <TopBar title="Услуги" subtitle={`${services.length} позиций в прайс-листе · уточняется, добавим позже`} />
+      <TopBar
+        title="Услуги"
+        subtitle={`${services.length} позиций в прайс-листе`}
+        actions={<Button onClick={() => { resetForm(); setShowForm(true); }}><span className="inline-flex items-center gap-2"><IconPlus size={18} /> Добавить услугу</span></Button>}
+      />
       <Page>
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {categories.map((cat) => (
-            <Card key={cat} className="p-0 overflow-hidden">
-              <div className="flex items-center gap-3 border-b p-4" style={{ borderColor: "var(--border)" }}>
-                <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#e9f5ed] text-[var(--accent)]">
-                  <IconTool size={18} />
+        <div className="relative mb-4 max-w-xl">
+          <IconSearch className="pointer-events-none absolute left-3 top-2.5" size={18} color="var(--text-muted)" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full rounded-lg border bg-white py-2 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]" style={{ borderColor: "var(--border)" }} placeholder="Поиск по названию или категории" />
+        </div>
+
+        {showForm && (
+          <Card className="mb-4">
+            <h2 className="panel-title mb-4">{editingId ? "Изменить услугу" : "Новая услуга"}</h2>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_180px_auto] lg:items-end">
+              <label className="text-sm"><span className="mb-1 block muted">Название</span><div className="field-control"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Например, замена ступичного подшипника" autoFocus required /></div></label>
+              <label className="text-sm"><span className="mb-1 block muted">Категория</span><div className="field-control"><input value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Ходовая часть" list="service-categories" required /></div></label>
+              <datalist id="service-categories">{Array.from(new Set(services.map((service) => service.category))).map((item) => <option value={item} key={item} />)}</datalist>
+              <label className="text-sm"><span className="mb-1 block muted">Цена, ₽</span><div className="field-control"><input value={price} onChange={(event) => setPrice(event.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="2500" required /></div></label>
+              <div className="flex gap-2"><Button type="submit">{editingId ? "Сохранить" : "Добавить"}</Button><Button variant="secondary" onClick={resetForm}>Отмена</Button></div>
+            </form>
+          </Card>
+        )}
+
+        {categories.length === 0 ? (
+          <Card><p className="muted text-sm">Услуги не найдены.</p></Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {categories.map((currentCategory) => (
+              <Card key={currentCategory} className="p-0 overflow-hidden">
+                <div className="flex items-center gap-3 border-b p-4" style={{ borderColor: "var(--border)" }}>
+                  <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#e9f5ed] text-[var(--accent)]"><IconTool size={18} /></div>
+                  <div><h2 className="panel-title">{currentCategory}</h2><p className="muted text-xs">{filtered.filter((service) => service.category === currentCategory).length} услуг</p></div>
                 </div>
-                <h2 className="panel-title">{cat}</h2>
-              </div>
-              <ul className="divide-y" style={{ borderColor: "var(--border)" }}>
-                {services
-                  .filter((s) => s.category === cat)
-                  .map((s) => (
-                    <li key={s.id} className="flex justify-between px-4 py-3 text-sm">
-                      <span>{s.name}</span>
-                      <span className="font-semibold">{formatMoney(s.price)}</span>
+                <ul className="divide-y" style={{ borderColor: "var(--border)" }}>
+                  {filtered.filter((service) => service.category === currentCategory).map((service) => (
+                    <li key={service.id} className="flex items-center gap-3 px-4 py-3 text-sm">
+                      <span className="min-w-0 flex-1">{service.name}</span>
+                      <span className="shrink-0 font-semibold">{formatMoney(service.price)}</span>
+                      <button onClick={() => startEdit(service.id)} className="rounded-lg p-2 text-[var(--accent)] hover:bg-[#e9f5ed]" aria-label={`Изменить услугу «${service.name}»`}><IconEdit size={17} /></button>
+                      <button onClick={() => handleDelete(service.id, service.name)} className="rounded-lg p-2 text-[var(--danger)] hover:bg-[#fbe9e9]" aria-label={`Удалить услугу «${service.name}»`}><IconTrash size={17} /></button>
                     </li>
                   ))}
-              </ul>
-            </Card>
-          ))}
-        </div>
+                </ul>
+              </Card>
+            ))}
+          </div>
+        )}
       </Page>
     </>
   );

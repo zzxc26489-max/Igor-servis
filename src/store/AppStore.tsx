@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type {
   Client,
+  AppSettings,
   CompanyInfo,
   Employee,
   Expense,
@@ -19,6 +20,7 @@ const STORAGE_KEY = "igor-servis-db-v1";
 
 interface DB {
   company: CompanyInfo;
+  settings: AppSettings;
   lifts: Lift[];
   employees: Employee[];
   clients: Client[];
@@ -31,9 +33,14 @@ interface DB {
   invoices: Invoice[];
 }
 
+const defaultSettings: AppSettings = {
+  autoPriceAdjustment: true,
+};
+
 function seedDB(): DB {
   return {
     company: companySeed,
+    settings: defaultSettings,
     lifts: seed.lifts,
     employees: seed.employees,
     clients: seed.clients,
@@ -52,7 +59,12 @@ function loadInitial(): DB {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as DB;
-      return { ...seedDB(), ...parsed, company: { ...companySeed, ...parsed.company } };
+      return {
+        ...seedDB(),
+        ...parsed,
+        company: { ...companySeed, ...parsed.company },
+        settings: { ...defaultSettings, ...parsed.settings },
+      };
     }
   } catch {
     // ignore corrupted storage and fall back to seed data
@@ -67,6 +79,10 @@ interface AppStoreValue extends DB {
   updateStockItem: (id: string, patch: Partial<StockItem>) => void;
   addExpense: (e: Expense) => void;
   updateCompany: (patch: Partial<CompanyInfo>) => void;
+  updateSettings: (patch: Partial<AppSettings>) => void;
+  addService: (service: Service) => void;
+  updateService: (id: string, patch: Partial<Service>) => void;
+  deleteService: (id: string) => void;
   resetToSeed: () => void;
 }
 
@@ -97,6 +113,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         })),
       addExpense: (e) => setDB((prev) => ({ ...prev, expenses: [e, ...prev.expenses] })),
       updateCompany: (patch) => setDB((prev) => ({ ...prev, company: { ...prev.company, ...patch } })),
+      updateSettings: (patch) => setDB((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } })),
+      addService: (service) => setDB((prev) => ({ ...prev, services: [...prev.services, service] })),
+      updateService: (id, patch) =>
+        setDB((prev) => ({
+          ...prev,
+          services: prev.services.map((service) => (service.id === id ? { ...service, ...patch } : service)),
+        })),
+      deleteService: (id) => setDB((prev) => ({ ...prev, services: prev.services.filter((service) => service.id !== id) })),
       resetToSeed: () => setDB(seedDB()),
     }),
     [db],
