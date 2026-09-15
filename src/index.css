@@ -7,7 +7,9 @@
   --text: #15201c;
   --text-muted: #77827d;
   --sidebar-bg: #17221f;
+  --sidebar-bg-alt: #0f1714;
   --sidebar-text: #c9d1ce;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
   --accent: #147449;
   --accent-strong: #0d5d39;
   --danger: #d64545;

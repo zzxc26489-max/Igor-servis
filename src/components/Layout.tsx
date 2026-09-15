@@ -7,36 +7,58 @@ import {
 import { useAppStore } from "../store/AppStore";
 import logo from "../assets/logo.jpg";
 
-const NAV_ITEMS = [
-  { to: "/", label: "Главная", icon: IconHome2, end: true },
-  { to: "/schedule", label: "Расписание", icon: IconCalendarEvent },
-  { to: "/orders", label: "Заказ-наряды", icon: IconClipboardList },
-  { to: "/stock", label: "Склад", icon: IconCube },
-  { to: "/purchases", label: "Закупки", icon: IconShoppingCart },
-  { to: "/services", label: "Услуги", icon: IconTool },
-  { to: "/clients", label: "Клиенты", icon: IconUsers },
-  { to: "/employees", label: "Сотрудники", icon: IconUsersGroup },
-  { to: "/finance", label: "Финансы", icon: IconCoin },
-  { to: "/reports", label: "Отчёты", icon: IconChartBar },
+const NAV_GROUPS = [
+  {
+    label: "Работа",
+    items: [
+      { to: "/", label: "Главная", icon: IconHome2, end: true },
+      { to: "/schedule", label: "Расписание", icon: IconCalendarEvent },
+      { to: "/orders", label: "Заказ-наряды", icon: IconClipboardList },
+    ],
+  },
+  {
+    label: "Склад",
+    items: [
+      { to: "/stock", label: "Склад", icon: IconCube },
+      { to: "/purchases", label: "Закупки", icon: IconShoppingCart },
+      { to: "/services", label: "Услуги", icon: IconTool },
+    ],
+  },
+  {
+    label: "Бизнес",
+    items: [
+      { to: "/clients", label: "Клиенты", icon: IconUsers },
+      { to: "/employees", label: "Сотрудники", icon: IconUsersGroup },
+      { to: "/finance", label: "Финансы", icon: IconCoin },
+      { to: "/reports", label: "Отчёты", icon: IconChartBar },
+    ],
+  },
 ];
 
 const MOBILE_NAV_ITEMS = [
-  NAV_ITEMS[0],
-  NAV_ITEMS[1],
-  NAV_ITEMS[2],
-  NAV_ITEMS[3],
-  NAV_ITEMS[8],
+  NAV_GROUPS[0].items[0],
+  NAV_GROUPS[0].items[1],
+  NAV_GROUPS[0].items[2],
+  NAV_GROUPS[1].items[0],
+  NAV_GROUPS[2].items[2],
 ];
+
+const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+    isActive ? "text-white font-medium" : "text-[var(--sidebar-text)] hover:bg-white/8 hover:text-white"
+  }`;
+
+const navLinkStyle = ({ isActive }: { isActive: boolean }) => (isActive ? { background: "var(--accent)" } : undefined);
 
 export default function Layout() {
   const { company } = useAppStore();
   return (
     <div className="flex min-h-screen">
       <aside
-        className="hidden lg:flex w-60 shrink-0 flex-col p-4 gap-1 print:hidden"
+        className="hidden lg:flex w-60 shrink-0 flex-col print:hidden"
         style={{ background: "var(--sidebar-bg)", color: "var(--sidebar-text)" }}
       >
-        <div className="flex items-center gap-3 px-2 py-2 mb-4">
+        <div className="flex items-center gap-3 border-b px-4 py-4" style={{ borderColor: "var(--sidebar-border)" }}>
           <img src={logo} alt={company.shortName} className="h-10 w-10 rounded-lg object-cover bg-white" />
           <div>
             <div className="text-white font-semibold leading-tight text-sm">{company.shortName}</div>
@@ -44,39 +66,30 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="flex flex-col gap-1">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
-                  isActive ? "text-white" : "hover:bg-white/5"
-                }`
-              }
-              style={({ isActive }) => (isActive ? { background: "var(--accent)" } : undefined)}
-            >
-              <item.icon size={20} stroke={1.8} />
-              <span>{item.label}</span>
-            </NavLink>
+        <nav className="flex flex-1 flex-col gap-4 overflow-y-auto p-3">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label}>
+              <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider opacity-40">
+                {group.label}
+              </div>
+              <div className="flex flex-col gap-1">
+                {group.items.map((item) => (
+                  <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass} style={navLinkStyle}>
+                    <item.icon size={20} stroke={1.8} />
+                    <span>{item.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
 
-        <div className="mt-auto pt-2">
-          <NavLink
-            to="/settings"
-            className={({ isActive }) =>
-              `mb-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
-                isActive ? "text-white" : "hover:bg-white/5"
-              }`
-            }
-            style={({ isActive }) => (isActive ? { background: "var(--accent)" } : undefined)}
-          >
+        <div className="border-t p-3" style={{ borderColor: "var(--sidebar-border)", background: "var(--sidebar-bg-alt)" }}>
+          <NavLink to="/settings" className={navLinkClass} style={navLinkStyle}>
             <IconSettings size={20} stroke={1.8} />
             <span>Настройки</span>
           </NavLink>
-          <div className="px-3 text-[11px] opacity-50">
+          <div className="mt-2 px-3 text-[11px] opacity-50">
             <div>{company.address}</div>
             <div className="mt-1">{company.workHours}</div>
           </div>
