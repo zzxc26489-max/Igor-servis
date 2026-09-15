@@ -1,10 +1,10 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { IconClipboardList, IconClockHour4, IconAlertTriangle, IconCoin } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronUp, IconClipboardList, IconClockHour4, IconAlertTriangle, IconCoin } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
-import { Page, StatusBadge, TopBar, Card } from "../components/ui";
+import { EmptyState, Page, StatusBadge, TopBar, Card } from "../components/ui";
 import { formatDateTime, formatMoney } from "../lib/format";
-import type { OrderStatus } from "../types";
+import type { Order, OrderStatus } from "../types";
 
 function orderTotals(o: { works: { price: number; qty: number }[]; parts: { price: number; qty: number }[]; discount?: number; paid?: number }) {
   const works = o.works.reduce((s, w) => s + w.price * w.qty, 0);
@@ -24,18 +24,63 @@ const STATUS_FILTERS: { value: OrderStatus | "all"; label: string }[] = [
   { value: "выдан", label: "Выдан" },
 ];
 
+type SortKey = "date" | "client" | "amount" | "debt";
+
 export default function Orders() {
   const { orders, clients, vehicles } = useAppStore();
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const active = orders.filter((o) => o.status !== "выдан");
   const waitingParts = orders.filter((o) => o.status === "ожидает запчасти");
   const totalDebt = orders.reduce((s, o) => s + Math.max(0, orderTotals(o).debt), 0);
 
-  const shown = useMemo(
-    () => (statusFilter === "all" ? orders : orders.filter((o) => o.status === statusFilter)),
-    [orders, statusFilter],
-  );
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "client" ? "asc" : "desc");
+    }
+  }
+
+  function clientName(o: Order) {
+    return clients.find((c) => c.id === o.clientId)?.name ?? "";
+  }
+
+  const shown = useMemo(() => {
+    const filtered = statusFilter === "all" ? orders : orders.filter((o) => o.status === statusFilter);
+    const sorted = [...filtered].sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === "date") cmp = a.createdAt.localeCompare(b.createdAt);
+      else if (sortKey === "client") cmp = clientName(a).localeCompare(clientName(b), "ru");
+      else if (sortKey === "amount") cmp = orderTotals(a).due - orderTotals(b).due;
+      else if (sortKey === "debt") cmp = orderTotals(a).debt - orderTotals(b).debt;
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [orders, statusFilter, sortKey, sortDir, clients]);
+
+  function SortHeader({ label, sortKeyName, align }: { label: string; sortKeyName: SortKey; align?: "right" }) {
+    const isActive = sortKey === sortKeyName;
+    return (
+      <th className={align === "right" ? "text-right" : ""}>
+        <button
+          onClick={() => toggleSort(sortKeyName)}
+          className={`inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded ${align === "right" ? "flex-row-reverse" : ""}`}
+          style={{ color: isActive ? "var(--accent)" : undefined }}
+        >
+          {label}
+          {isActive ? (
+            sortDir === "asc" ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />
+          ) : (
+            <IconChevronDown size={14} className="opacity-30" />
+          )}
+        </button>
+      </th>
+    );
+  }
 
   return (
     <>
@@ -69,12 +114,12 @@ export default function Orders() {
               <thead>
                 <tr>
                   <th>№</th>
-                  <th>Клиент</th>
+                  <SortHeader label="Клиент" sortKeyName="client" />
                   <th>Автомобиль</th>
-                  <th>Создан</th>
+                  <SortHeader label="Создан" sortKeyName="date" />
                   <th>Статус</th>
-                  <th className="text-right">Сумма</th>
-                  <th className="text-right">Долг</th>
+                  <SortHeader label="Сумма" sortKeyName="amount" align="right" />
+                  <SortHeader label="Долг" sortKeyName="debt" align="right" />
                 </tr>
               </thead>
               <tbody>
@@ -106,8 +151,8 @@ export default function Orders() {
                 })}
                 {shown.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-6 text-center muted">
-                      Заказ-нарядов с таким статусом нет
+                    <td colSpan={7}>
+                      <EmptyState icon={<IconClipboardList size={22} />} title="Заказ-нарядов с таким статусом нет" hint="Попробуйте выбрать другой статус" />
                     </td>
                   </tr>
                 )}

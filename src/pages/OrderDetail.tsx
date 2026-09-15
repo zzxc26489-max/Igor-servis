@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { IconCar, IconNotes, IconReceipt2, IconUser } from "@tabler/icons-react";
+import { IconCar, IconNotes, IconPrinter, IconReceipt2, IconUser } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
+import { useToast } from "../components/Toast";
 import { Button, Card, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDateTime, formatMoney } from "../lib/format";
 import type { OrderLinePart, OrderLineWork, OrderStatus } from "../types";
@@ -19,10 +20,12 @@ export default function OrderDetail() {
     services,
     stock,
     employees,
+    company,
     updateOrder,
     updateStockItem,
     addStockMovement,
   } = useAppStore();
+  const { showToast } = useToast();
   const order = orders.find((o) => o.id === orderId);
 
   const [addingWork, setAddingWork] = useState(false);
@@ -37,6 +40,10 @@ export default function OrderDetail() {
   const [partQty, setPartQty] = useState("1");
   const [partPrice, setPartPrice] = useState("");
   const [partError, setPartError] = useState("");
+
+  const [editingDiscount, setEditingDiscount] = useState(false);
+  const [discountInput, setDiscountInput] = useState("0");
+  const [paymentAmount, setPaymentAmount] = useState("");
 
   if (!order) {
     return (
@@ -94,11 +101,13 @@ export default function OrderDetail() {
     };
     updateOrder(order.id, { works: [...order.works, newWork] });
     resetWorkForm();
+    showToast(`Добавлена работа «${name}»`);
   }
 
   function handleRemoveWork(workId: string) {
     if (!order) return;
     updateOrder(order.id, { works: order.works.filter((w) => w.id !== workId) });
+    showToast("Работа удалена", "error");
   }
 
   function resetPartForm() {
@@ -141,6 +150,7 @@ export default function OrderDetail() {
       employee: order.advisor || "—",
     });
     resetPartForm();
+    showToast(`Добавлена запчасть «${stockItem.name}»`);
   }
 
   function handleRemovePart(part: OrderLinePart) {
@@ -159,6 +169,22 @@ export default function OrderDetail() {
         employee: order.advisor || "—",
       });
     }
+    showToast("Запчасть возвращена на склад", "error");
+  }
+
+  function handleSaveDiscount() {
+    if (!order) return;
+    const value = Math.max(0, Number(discountInput) || 0);
+    updateOrder(order.id, { discount: value });
+    setEditingDiscount(false);
+    showToast("Скидка обновлена");
+  }
+
+  function handleAcceptPayment(amount: number) {
+    if (!order || amount <= 0) return;
+    updateOrder(order.id, { paid: (order.paid ?? 0) + amount });
+    setPaymentAmount("");
+    showToast(`Принята оплата ${formatMoney(amount)}`);
   }
 
   return (
@@ -167,13 +193,34 @@ export default function OrderDetail() {
         title={`Заказ-наряд ${order.number}`}
         subtitle={`Создан ${formatDateTime(order.createdAt)}${order.advisor ? ` · Мастер-приёмщик: ${order.advisor}` : ""}`}
         actions={
-          <Button variant="secondary" onClick={() => navigate(-1)}>
-            Назад
-          </Button>
+          <>
+            <Button variant="secondary" onClick={() => window.print()}>
+              <span className="inline-flex items-center gap-2">
+                <IconPrinter size={18} /> Печать
+              </span>
+            </Button>
+            <Button variant="secondary" onClick={() => navigate(-1)}>
+              Назад
+            </Button>
+          </>
         }
       />
       <Page>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        <div className="mb-4 hidden print:block">
+          <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--border)" }}>
+            <div>
+              <div className="text-lg font-bold">{company.shortName}</div>
+              <div className="text-sm">{company.address}</div>
+              <div className="text-sm">{company.phone} · {company.workHours}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-bold">Заказ-наряд {order.number}</div>
+              <div className="text-sm">{formatDateTime(order.createdAt)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 print:grid-cols-3">
           <Card className="flex items-start gap-3">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e9f5ed] text-[var(--accent)]">
               <IconUser size={22} />
@@ -206,7 +253,7 @@ export default function OrderDetail() {
           </Card>
         </div>
 
-        <Card className="mb-4">
+        <Card className="mb-4 print:hidden">
           <div className="flex items-center justify-between">
             {STATUS_FLOW.map((step, idx) => (
               <div key={step} className="flex-1 flex flex-col items-center relative">
@@ -217,7 +264,10 @@ export default function OrderDetail() {
                   />
                 )}
                 <button
-                  onClick={() => updateOrder(order.id, { status: step })}
+                  onClick={() => {
+                    updateOrder(order.id, { status: step });
+                    showToast(`Статус изменён: «${step}»`);
+                  }}
                   className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold relative z-10 text-white cursor-pointer transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)]"
                   style={{ background: idx <= currentStepIndex ? "var(--accent)" : "#cfd3da" }}
                   aria-label={`Установить статус «${step}»`}
@@ -237,7 +287,7 @@ export default function OrderDetail() {
               {!addingWork && (
                 <button
                   onClick={() => setAddingWork(true)}
-                  className="text-sm font-medium rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--accent)]"
+                  className="text-sm font-medium rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--accent)] print:hidden"
                   style={{ color: "var(--accent)" }}
                 >
                   + Добавить работу
@@ -249,7 +299,7 @@ export default function OrderDetail() {
                 <tr>
                   <th>Наименование</th>
                   <th className="text-right">Сумма</th>
-                  <th className="w-6" />
+                  <th className="w-6 print:hidden" />
                 </tr>
               </thead>
               <tbody>
@@ -353,7 +403,7 @@ export default function OrderDetail() {
               {!addingPart && (
                 <button
                   onClick={() => setAddingPart(true)}
-                  className="text-sm font-medium rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--accent)]"
+                  className="text-sm font-medium rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[var(--accent)] print:hidden"
                   style={{ color: "var(--accent)" }}
                 >
                   + Добавить запчасть
@@ -365,7 +415,7 @@ export default function OrderDetail() {
                 <tr>
                   <th>Наименование</th>
                   <th className="text-right">Сумма</th>
-                  <th className="w-6" />
+                  <th className="w-6 print:hidden" />
                 </tr>
               </thead>
               <tbody>
@@ -476,12 +526,42 @@ export default function OrderDetail() {
               <span>Запчасти</span>
               <span>{formatMoney(partsTotal)}</span>
             </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-sm mb-1" style={{ color: "var(--danger)" }}>
-                <span>Скидка</span>
-                <span>-{formatMoney(discount)}</span>
-              </div>
-            )}
+            <div className="flex items-center justify-between text-sm mb-1">
+              {editingDiscount ? (
+                <>
+                  <span>Скидка</span>
+                  <span className="flex items-center gap-1">
+                    <input
+                      autoFocus
+                      value={discountInput}
+                      onChange={(e) => setDiscountInput(e.target.value.replace(/\D/g, ""))}
+                      onKeyDown={(e) => e.key === "Enter" && handleSaveDiscount()}
+                      onBlur={handleSaveDiscount}
+                      className="w-20 rounded border px-2 py-0.5 text-right text-sm"
+                      style={{ borderColor: "var(--border)" }}
+                      inputMode="numeric"
+                    />
+                    ₽
+                  </span>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      setDiscountInput(String(discount));
+                      setEditingDiscount(true);
+                    }}
+                    className="underline decoration-dotted print:no-underline"
+                    style={{ color: "var(--text)" }}
+                  >
+                    Скидка
+                  </button>
+                  <span style={{ color: discount > 0 ? "var(--danger)" : undefined }}>
+                    {discount > 0 ? `-${formatMoney(discount)}` : "нет"}
+                  </span>
+                </>
+              )}
+            </div>
             <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2" style={{ borderColor: "var(--border)" }}>
               <span>К оплате</span>
               <span>{formatMoney(due)}</span>
@@ -495,8 +575,19 @@ export default function OrderDetail() {
               <span>{formatMoney(debt)}</span>
             </div>
             {debt > 0 && (
-              <div className="mt-3">
-                <Button onClick={() => updateOrder(order.id, { paid: due })}>Принять оплату</Button>
+              <div className="mt-3 flex gap-2 print:hidden">
+                <input
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value.replace(/\D/g, ""))}
+                  placeholder={String(debt)}
+                  inputMode="numeric"
+                  className="w-24 rounded-lg border px-2 py-2 text-sm"
+                  style={{ borderColor: "var(--border)" }}
+                  aria-label="Сумма оплаты"
+                />
+                <Button onClick={() => handleAcceptPayment(paymentAmount ? Number(paymentAmount) : debt)}>
+                  Принять оплату
+                </Button>
               </div>
             )}
           </Card>

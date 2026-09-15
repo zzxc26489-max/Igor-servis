@@ -1,6 +1,6 @@
-import { IconAlertTriangle, IconShoppingCart, IconStack2 } from "@tabler/icons-react";
+import { IconAlertTriangle, IconCheck, IconShoppingCart, IconStack2 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
-import { Card, Page, TopBar } from "../components/ui";
+import { Card, EmptyState, Page, TopBar } from "../components/ui";
 import { formatMoney } from "../lib/format";
 
 export default function Purchases() {
@@ -79,8 +79,8 @@ export default function Purchases() {
                 })}
                 {toOrder.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-6 text-center muted">
-                      Все запчасти в наличии, закупка не требуется
+                    <td colSpan={6}>
+                      <EmptyState icon={<IconCheck size={22} />} title="Все запчасти в наличии" hint="Закупка не требуется" />
                     </td>
                   </tr>
                 )}

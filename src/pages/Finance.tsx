@@ -1,14 +1,17 @@
-import type { ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { IconBriefcase, IconChartBar, IconCoin, IconCreditCardPay, IconPlus } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
+import { useToast } from "../components/Toast";
 import { Button, Card, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatMoney } from "../lib/format";
 import { computePayroll } from "../lib/payroll";
 
 const daily = [42, 58, 45, 50, 68, 60, 44, 52, 64, 73, 59, 84, 62, 92, 78, 56, 69, 83, 71, 112, 91, 57, 64, 80, 93, 118, 86];
+const EXPENSE_CATEGORIES = ["Закупка запчастей", "Аренда", "Доставка", "Коммунальные услуги", "Прочее"];
 
 export default function Finance() {
-  const { orders, expenses, employees: rawEmployees } = useAppStore();
+  const { orders, expenses, employees: rawEmployees, addExpense } = useAppStore();
+  const { showToast } = useToast();
   const employees = computePayroll(rawEmployees, orders);
   const worksRevenue = orders.reduce((sum, order) => sum + order.works.reduce((s, work) => s + work.price * work.qty, 0), 0);
   const partsRevenue = orders.reduce((sum, order) => sum + order.parts.reduce((s, part) => s + part.price * part.qty, 0), 0);
@@ -16,6 +19,37 @@ export default function Finance() {
   const totalExpenses = expenses.reduce((s, expense) => s + expense.amount, 0);
   const totalSalaries = employees.reduce((s, employee) => s + employee.accrued, 0);
   const net = revenue - totalExpenses - totalSalaries;
+
+  const [addingExpense, setAddingExpense] = useState(false);
+  const [category, setCategory] = useState(EXPENSE_CATEGORIES[0]);
+  const [description, setDescription] = useState("");
+  const [amount, setAmount] = useState("");
+  const [counterparty, setCounterparty] = useState("");
+
+  function resetExpenseForm() {
+    setAddingExpense(false);
+    setCategory(EXPENSE_CATEGORIES[0]);
+    setDescription("");
+    setAmount("");
+    setCounterparty("");
+  }
+
+  function handleAddExpense(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const value = Number(amount);
+    if (!description.trim() || value <= 0) return;
+    addExpense({
+      id: `ex-${Date.now()}`,
+      date: new Date().toISOString().slice(0, 10),
+      category,
+      description: description.trim(),
+      amount: value,
+      counterparty: counterparty.trim() || "—",
+      status: "Оплачено",
+    });
+    showToast(`Расход добавлен: ${formatMoney(value)}`);
+    resetExpenseForm();
+  }
 
   return <>
     <TopBar title="Финансы и зарплаты" subtitle="Выручка, себестоимость, зарплаты и чистая прибыль за период." />
@@ -34,7 +68,49 @@ export default function Finance() {
         </Card>
         <Card className="p-0 overflow-hidden"><div className="flex items-center justify-between p-4"><h2 className="panel-title">Зарплата сотрудников</h2><span className="text-xs text-[var(--text-muted)]">По выполненным работам</span></div><div className="overflow-auto"><table className="app-table min-w-[500px]"><thead><tr><th>Сотрудник</th><th>Способ расчёта</th><th className="text-right">Начислено</th></tr></thead><tbody>{employees.map((employee) => <tr key={employee.id}><td><span className="mr-2 inline-grid h-8 w-8 place-items-center rounded-full bg-[#e9f4ed] text-xs font-bold text-[var(--accent)]">{employee.name.slice(0,2).toUpperCase()}</span><b>{employee.name}</b><div className="muted ml-10 text-xs">{employee.role}</div></td><td className="text-sm">{employee.payType === "percent" ? `${employee.payValue}% от работ` : employee.payType === "salary" ? "Оклад" : "Оклад + %"}</td><td className="text-right font-semibold">{formatMoney(employee.accrued)}</td></tr>)}</tbody></table></div><div className="border-t p-4 text-right font-semibold" style={{ borderColor: "var(--border)" }}>Итого к выплате: {formatMoney(totalSalaries)}</div></Card>
       </div>
-      <Card className="mt-4 p-0 overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 p-4"><div><h2 className="panel-title">Последние расходы</h2><p className="muted mt-1 text-xs">Оплаченные и ожидающие платежи</p></div><Button variant="secondary"><span className="inline-flex items-center gap-2"><IconPlus size={18} /> Добавить расход</span></Button></div><div className="overflow-auto"><table className="app-table min-w-[800px]"><thead><tr><th>Дата</th><th>Категория</th><th>Описание</th><th className="text-right">Сумма</th><th>Поставщик</th><th>Статус</th></tr></thead><tbody>{expenses.map((expense) => <tr key={expense.id}><td>{formatDate(expense.date)}</td><td>{expense.category}</td><td>{expense.description}</td><td className="text-right font-medium">{formatMoney(expense.amount)}</td><td>{expense.counterparty}</td><td><StatusBadge status={expense.status} /></td></tr>)}</tbody></table></div></Card>
+      <Card className="mt-4 p-0 overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div>
+            <h2 className="panel-title">Последние расходы</h2>
+            <p className="muted mt-1 text-xs">Оплаченные и ожидающие платежи</p>
+          </div>
+          {!addingExpense && (
+            <Button variant="secondary" onClick={() => setAddingExpense(true)}>
+              <span className="inline-flex items-center gap-2"><IconPlus size={18} /> Добавить расход</span>
+            </Button>
+          )}
+        </div>
+
+        {addingExpense && (
+          <form onSubmit={handleAddExpense} className="grid grid-cols-1 gap-3 border-t p-4 sm:grid-cols-2 lg:grid-cols-5" style={{ borderColor: "var(--border)" }}>
+            <div className="field-control">
+              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                {EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="field-control lg:col-span-2">
+              <input placeholder="Описание" value={description} onChange={(e) => setDescription(e.target.value)} required />
+            </div>
+            <div className="field-control">
+              <input placeholder="Сумма, ₽" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} required />
+            </div>
+            <div className="field-control">
+              <input placeholder="Поставщик" value={counterparty} onChange={(e) => setCounterparty(e.target.value)} />
+            </div>
+            <div className="flex gap-2 sm:col-span-2 lg:col-span-5 lg:justify-end">
+              <Button variant="secondary" onClick={resetExpenseForm}>Отмена</Button>
+              <Button type="submit">Добавить</Button>
+            </div>
+          </form>
+        )}
+
+        <div className="overflow-auto">
+          <table className="app-table min-w-[800px]">
+            <thead><tr><th>Дата</th><th>Категория</th><th>Описание</th><th className="text-right">Сумма</th><th>Поставщик</th><th>Статус</th></tr></thead>
+            <tbody>{expenses.map((expense) => <tr key={expense.id}><td>{formatDate(expense.date)}</td><td>{expense.category}</td><td>{expense.description}</td><td className="text-right font-medium">{formatMoney(expense.amount)}</td><td>{expense.counterparty}</td><td><StatusBadge status={expense.status} /></td></tr>)}</tbody>
+          </table>
+        </div>
+      </Card>
     </Page>
   </>;
 }

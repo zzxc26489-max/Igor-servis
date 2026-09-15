@@ -1,12 +1,29 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { IconBell, IconCalendarEvent, IconPlus, IconSearch } from "@tabler/icons-react";
+import { IconBell, IconCalendarEvent, IconPlus, IconSearch, IconSettings } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 
 export function TopBar({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const { clients, vehicles, orders } = useAppStore();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+      if (e.key === "Escape" && document.activeElement === inputRef.current) {
+        setQuery("");
+        inputRef.current?.blur();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const results = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("ru-RU");
     if (term.length < 2) return [];
@@ -29,7 +46,7 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
   }, [clients, orders, query, vehicles]);
 
   return (
-    <header className="flex flex-col gap-3 border-b bg-white px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between" style={{ borderColor: "var(--border)" }}>
+    <header className="flex flex-col gap-3 border-b bg-white px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between print:hidden" style={{ borderColor: "var(--border)" }}>
       <div className="min-w-0">
         <h1 className="text-xl font-semibold" style={{ color: "var(--text)" }}>
           {title}
@@ -39,14 +56,21 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
 
       <div className="relative w-full lg:max-w-md">
         <input
+          ref={inputRef}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Поиск: клиент, авто, номер заказа"
-          className="w-full rounded-lg border bg-[#f8f9f8] px-3 py-2 pl-10 text-sm outline-none focus:ring-2"
+          className="w-full rounded-lg border bg-[#f8f9f8] px-3 py-2 pl-10 pr-12 text-sm outline-none focus:ring-2"
           style={{ borderColor: "var(--border)", boxShadow: "none" }}
           aria-label="Поиск по CRM"
         />
         <IconSearch className="pointer-events-none absolute left-3 top-2.5" size={18} color="var(--text-muted)" aria-hidden="true" />
+        <kbd
+          className="pointer-events-none absolute right-2.5 top-1.5 hidden rounded border px-1.5 py-0.5 text-[10px] font-medium sm:block"
+          style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+        >
+          ⌘K
+        </kbd>
         {query.trim().length >= 2 && (
           <div className="absolute z-40 mt-1 w-full overflow-hidden rounded-lg border bg-white shadow-lg" style={{ borderColor: "var(--border)" }}>
             {results.length > 0 ? results.map((result, index) => (
@@ -68,6 +92,13 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
       <div className="flex shrink-0 items-center gap-2">
         <div className="hidden items-center gap-2 text-sm text-[var(--text-muted)] xl:flex"><IconCalendarEvent size={18} /> Сегодня</div>
         <button aria-label="Уведомления" className="rounded-lg p-2 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"><IconBell size={20} /></button>
+        <Link
+          to="/settings"
+          aria-label="Настройки"
+          className="rounded-lg p-2 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] lg:hidden"
+        >
+          <IconSettings size={20} />
+        </Link>
         <Link to="/orders/new"><Button><span className="inline-flex items-center gap-2"><IconPlus size={18} /> Новая запись</span></Button></Link>
         {actions}
       </div>
@@ -76,7 +107,7 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
 }
 
 export function Page({ children }: { children: ReactNode }) {
-  return <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>;
+  return <main className="flex-1 overflow-auto p-4 sm:p-6 print:overflow-visible print:p-0">{children}</main>;
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -163,5 +194,23 @@ export function Button({
     >
       {children}
     </button>
+  );
+}
+
+export function EmptyState({ icon, title, hint }: { icon: ReactNode; title: string; hint?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+      <div className="grid h-12 w-12 place-items-center rounded-full bg-[#f1f3f2]" style={{ color: "var(--text-muted)" }}>
+        {icon}
+      </div>
+      <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
+        {title}
+      </p>
+      {hint && (
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {hint}
+        </p>
+      )}
+    </div>
   );
 }

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { IconStar, IconUsers } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
-import { Card, Page, TopBar } from "../components/ui";
+import { Card, EmptyState, Page, TopBar } from "../components/ui";
 
 export default function Clients() {
   const { clients, vehicles, orders } = useAppStore();
@@ -78,8 +78,8 @@ export default function Clients() {
                 })}
                 {filteredClients.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center muted">
-                      По этому запросу клиентов и автомобилей не найдено.
+                    <td colSpan={4}>
+                      <EmptyState icon={<IconUsers size={22} />} title="Ничего не найдено" hint="Проверьте написание или попробуйте другой запрос" />
                     </td>
                   </tr>
                 )}

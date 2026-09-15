@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { IconBarcode, IconBox, IconCamera, IconMapPin, IconPlus, IconShoppingCart } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
+import { useToast } from "../components/Toast";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { formatDateTime, formatMoney } from "../lib/format";
 
@@ -8,11 +10,11 @@ const CELLS = ["A-01-01", "A-01-02", "A-02-01", "A-02-02", "A-03-01", "A-03-02",
 
 export default function Stock() {
   const { stock, stockMovements, updateStockItem, addStockMovement } = useAppStore();
+  const { showToast } = useToast();
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(stock[0]?.id ?? "");
   const [qty, setQty] = useState("1");
   const [cell, setCell] = useState(stock[0]?.cell || "A-03-02");
-  const [notice, setNotice] = useState("");
   const critical = stock.filter((i) => i.qty <= i.minQty);
   const selected = useMemo(() => stock.find((item) => item.id === selectedId) ?? stock[0], [selectedId, stock]);
   const shownStock = stock.filter((item) => `${item.name} ${item.sku} ${item.brand ?? ""}`.toLowerCase().includes(query.toLowerCase()));
@@ -23,7 +25,7 @@ export default function Stock() {
     const received = Math.max(1, Number(qty) || 1);
     updateStockItem(selected.id, { qty: selected.qty + received, cell });
     addStockMovement({ id: `mv-${Date.now()}`, date: new Date().toISOString(), itemId: selected.id, operation: "Приёмка", qty: received, to: cell, employee: "Юра" });
-    setNotice(`${selected.name}: принято ${received} ${selected.unit} в ячейку ${cell}.`);
+    showToast(`${selected.name}: принято ${received} ${selected.unit} в ячейку ${cell}`);
   }
 
   return (
@@ -39,13 +41,13 @@ export default function Stock() {
                   <IconBarcode className="absolute left-3 top-3" size={22} color="var(--text-muted)" />
                   <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full rounded-lg border py-3 pl-11 pr-3 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]" style={{ borderColor: "var(--accent)" }} placeholder="Введите артикул или название…" />
                 </div>
-                <button className="rounded-lg border px-3 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" style={{ borderColor: "var(--border)" }} aria-label="Сканировать камерой" onClick={() => setNotice("Камера будет подключена после запуска серверной версии CRM.")}><IconCamera size={22} /></button>
+                <button className="rounded-lg border px-3 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" style={{ borderColor: "var(--border)" }} aria-label="Сканировать камерой" onClick={() => showToast("Камера будет подключена после запуска серверной версии CRM.", "info")}><IconCamera size={22} /></button>
               </div>
               <p className="muted mt-2 text-xs">Сканер штрихкода работает как клавиатура: наведите его в это поле.</p>
             </div>
             <div className="max-h-64 overflow-auto divide-y" style={{ borderColor: "var(--border)" }}>
               {shownStock.map((item) => (
-                <button key={item.id} className="flex w-full items-center gap-3 p-4 text-left hover:bg-[#f7faf8] focus-visible:outline-none focus-visible:bg-[#f7faf8]" onClick={() => { setSelectedId(item.id); setCell(item.cell || "A-03-02"); setNotice(""); }}>
+                <button key={item.id} className="flex w-full items-center gap-3 p-4 text-left hover:bg-[#f7faf8] focus-visible:outline-none focus-visible:bg-[#f7faf8]" onClick={() => { setSelectedId(item.id); setCell(item.cell || "A-03-02"); }}>
                   <div className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-[#edf5f0] text-[var(--accent)]"><IconBox size={28} /></div>
                   <span className="min-w-0 flex-1"><b className="block">{item.name}</b><span className="muted text-xs">{item.brand || "Без бренда"} · {item.sku}</span></span>
                   <span className="text-right text-xs"><b className="block">{item.qty} {item.unit}</b><span className={item.qty <= item.minQty ? "text-red-500" : "muted"}>мин. {item.minQty}</span></span>
@@ -65,9 +67,8 @@ export default function Stock() {
             <div className="mt-5 grid grid-cols-4 gap-1 text-center text-[10px]">{CELLS.map((value) => <button onClick={() => setCell(value)} key={value} className="rounded border px-1 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" style={{ borderColor: value === cell ? "var(--accent)" : "var(--border)", background: value === cell ? "var(--accent)" : occupiedCells.has(value) ? "#f1f3f2" : "white", color: value === cell ? "white" : "var(--text)" }}>{value}</button>)}</div>
           </Card>
 
-          <Card className="p-0 overflow-hidden"><div className="p-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}><h2 className="panel-title">Остатки и закупка</h2><span className="text-sm text-[var(--accent)]">Все</span></div><div className="p-2">{critical.map((item) => <div key={item.id} className="flex items-center justify-between gap-2 border-b p-3 last:border-0" style={{ borderColor: "var(--border)" }}><span className="text-sm"><b className="block">{item.name}</b><span className="text-xs text-red-500">Мин. остаток: {item.minQty}</span></span><b className="text-red-500">{item.qty}</b></div>)}</div><div className="p-3"><Button variant="secondary"><span className="inline-flex items-center gap-2"><IconShoppingCart size={18} /> Перейти к закупкам</span></Button></div></Card>
+          <Card className="p-0 overflow-hidden"><div className="p-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}><h2 className="panel-title">Остатки и закупка</h2><Link to="/purchases" className="text-sm text-[var(--accent)]">Все</Link></div><div className="p-2">{critical.map((item) => <div key={item.id} className="flex items-center justify-between gap-2 border-b p-3 last:border-0" style={{ borderColor: "var(--border)" }}><span className="text-sm"><b className="block">{item.name}</b><span className="text-xs text-red-500">Мин. остаток: {item.minQty}</span></span><b className="text-red-500">{item.qty}</b></div>)}</div><div className="p-3"><Link to="/purchases"><Button variant="secondary"><span className="inline-flex items-center gap-2"><IconShoppingCart size={18} /> Перейти к закупкам</span></Button></Link></div></Card>
         </div>
-        {notice && <div className="mt-4 rounded-lg border border-[#b9dfc8] bg-[#edf7f0] px-4 py-3 text-sm text-[var(--accent)]">{notice}</div>}
         <div className="mt-4"><Button onClick={receive}><span className="inline-flex items-center gap-2"><IconPlus size={18} /> Оприходовать на склад</span></Button></div>
         <Card className="mt-4 p-0 overflow-hidden"><div className="flex items-center justify-between p-4"><h2 className="panel-title">Последние движения по складу</h2><span className="text-sm text-[var(--accent)]">Все движения</span></div><div className="overflow-auto"><table className="app-table min-w-[720px]"><thead><tr><th>Дата и время</th><th>Запчасть</th><th>Операция</th><th className="text-right">Кол-во</th><th>Куда</th><th>Сотрудник</th></tr></thead><tbody>{stockMovements.map((movement) => { const item = stock.find((i) => i.id === movement.itemId); return <tr key={movement.id}><td>{formatDateTime(movement.date)}</td><td><b>{item?.name || "—"}</b><div className="muted text-xs">{item?.sku}</div></td><td><span className="rounded-full bg-[#e8f5ed] px-2 py-1 text-xs text-[var(--accent)]">{movement.operation}</span></td><td className="text-right">{movement.qty} {item?.unit}</td><td>{movement.to || movement.from || "—"}</td><td>{movement.employee}</td></tr>; })}</tbody></table></div></Card>
       </Page>

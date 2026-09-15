@@ -1,3 +1,11 @@
+export interface CompanyInfo {
+  name: string;
+  shortName: string;
+  address: string;
+  phone: string;
+  workHours: string;
+}
+
 export type LiftStatus = "free" | "busy";
 
 export interface Lift {

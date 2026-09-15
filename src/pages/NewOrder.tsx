@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconAlertCircle, IconCalendarEvent, IconCar, IconUser } from "@tabler/icons-react";
 import { Button, Card, Page, TopBar } from "../components/ui";
+import { useToast } from "../components/Toast";
 import { useAppStore } from "../store/AppStore";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -27,6 +28,7 @@ function isValidPlate(value: string) {
 
 export default function NewOrder() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const { clients, vehicles, lifts, orders, setDB } = useAppStore();
   const [existingClientId, setExistingClientId] = useState("");
   const [existingVehicleId, setExistingVehicleId] = useState("");
@@ -130,6 +132,7 @@ export default function NewOrder() {
         scheduledEnd: endTime,
       }],
     }));
+    showToast(`Заказ-наряд ${orderNumber} создан`);
     navigate(`/orders/${orderId}`);
   }
 

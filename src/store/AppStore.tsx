@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type {
   Client,
+  CompanyInfo,
   Employee,
   Expense,
   Invoice,
@@ -12,10 +13,12 @@ import type {
   Vehicle,
 } from "../types";
 import * as seed from "../data/seed";
+import { company as companySeed } from "../data/company";
 
 const STORAGE_KEY = "igor-servis-db-v1";
 
 interface DB {
+  company: CompanyInfo;
   lifts: Lift[];
   employees: Employee[];
   clients: Client[];
@@ -28,14 +31,9 @@ interface DB {
   invoices: Invoice[];
 }
 
-function loadInitial(): DB {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as DB;
-  } catch {
-    // ignore corrupted storage and fall back to seed data
-  }
+function seedDB(): DB {
   return {
+    company: companySeed,
     lifts: seed.lifts,
     employees: seed.employees,
     clients: seed.clients,
@@ -49,12 +47,26 @@ function loadInitial(): DB {
   };
 }
 
+function loadInitial(): DB {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as DB;
+      return { ...seedDB(), ...parsed, company: { ...companySeed, ...parsed.company } };
+    }
+  } catch {
+    // ignore corrupted storage and fall back to seed data
+  }
+  return seedDB();
+}
+
 interface AppStoreValue extends DB {
   setDB: React.Dispatch<React.SetStateAction<DB>>;
   updateOrder: (id: string, patch: Partial<Order>) => void;
   addStockMovement: (m: StockMovement) => void;
   updateStockItem: (id: string, patch: Partial<StockItem>) => void;
   addExpense: (e: Expense) => void;
+  updateCompany: (patch: Partial<CompanyInfo>) => void;
   resetToSeed: () => void;
 }
 
@@ -84,19 +96,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           stock: prev.stock.map((s) => (s.id === id ? { ...s, ...patch } : s)),
         })),
       addExpense: (e) => setDB((prev) => ({ ...prev, expenses: [e, ...prev.expenses] })),
-      resetToSeed: () =>
-        setDB({
-          lifts: seed.lifts,
-          employees: seed.employees,
-          clients: seed.clients,
-          vehicles: seed.vehicles,
-          services: seed.services,
-          stock: seed.stock,
-          stockMovements: seed.stockMovements,
-          orders: seed.orders,
-          expenses: seed.expenses,
-          invoices: seed.invoices,
-        }),
+      updateCompany: (patch) => setDB((prev) => ({ ...prev, company: { ...prev.company, ...patch } })),
+      resetToSeed: () => setDB(seedDB()),
     }),
     [db],
   );

@@ -4,7 +4,7 @@ import {
   IconCube, IconHome2, IconSettings, IconShoppingCart,
   IconTool, IconUsers, IconUsersGroup,
 } from "@tabler/icons-react";
-import { company } from "../data/company";
+import { useAppStore } from "../store/AppStore";
 import logo from "../assets/logo.jpg";
 
 const NAV_ITEMS = [
@@ -29,10 +29,11 @@ const MOBILE_NAV_ITEMS = [
 ];
 
 export default function Layout() {
+  const { company } = useAppStore();
   return (
     <div className="flex min-h-screen">
       <aside
-        className="hidden lg:flex w-60 shrink-0 flex-col p-4 gap-1"
+        className="hidden lg:flex w-60 shrink-0 flex-col p-4 gap-1 print:hidden"
         style={{ background: "var(--sidebar-bg)", color: "var(--sidebar-text)" }}
       >
         <div className="flex items-center gap-3 px-2 py-2 mb-4">
@@ -62,19 +63,32 @@ export default function Layout() {
           ))}
         </nav>
 
-        <div className="mt-auto pt-4 text-[11px] opacity-50 px-2">
-          <div className="mb-3 flex items-center gap-2"><IconSettings size={16} /> Настройки</div>
-          <div>{company.address}</div>
-          <div className="mt-1">{company.workHours}</div>
+        <div className="mt-auto pt-2">
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              `mb-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+                isActive ? "text-white" : "hover:bg-white/5"
+              }`
+            }
+            style={({ isActive }) => (isActive ? { background: "var(--accent)" } : undefined)}
+          >
+            <IconSettings size={20} stroke={1.8} />
+            <span>Настройки</span>
+          </NavLink>
+          <div className="px-3 text-[11px] opacity-50">
+            <div>{company.address}</div>
+            <div className="mt-1">{company.workHours}</div>
+          </div>
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0">
+      <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0 print:pb-0">
         <Outlet />
       </div>
 
       <nav
-        className="lg:hidden fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t bg-white px-1"
+        className="lg:hidden fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t bg-white px-1 print:hidden"
         style={{ borderColor: "var(--border)" }}
         aria-label="Основная навигация"
       >
