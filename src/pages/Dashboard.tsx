@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAppStore } from "../store/AppStore";
-import { Card, Page, StatTile, StatusBadge, TopBar, Button } from "../components/ui";
+import { Card, Page, StatTile, StatusBadge, TopBar } from "../components/ui";
 import { formatMoney } from "../lib/format";
 
 export default function Dashboard() {
@@ -26,15 +26,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <TopBar
-        title="Главная"
-        subtitle={`Всё под контролем. Сегодня: ${today}`}
-        actions={
-          <Link to="/orders">
-            <Button>+ Новая запись</Button>
-          </Link>
-        }
-      />
+      <TopBar title="Главная" subtitle={`Всё под контролем. Сегодня: ${today}`} />
       <Page>
         <div className="flex flex-wrap gap-4 mb-6">
           <StatTile label="Выручка сегодня" value={formatMoney(todayRevenue)} hint={`${orders.length} заказ-наряда(ов)`} />

@@ -1,0 +1,169 @@
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button, Card, Page, TopBar } from "../components/ui";
+import { useAppStore } from "../store/AppStore";
+
+const today = new Date().toISOString().slice(0, 10);
+
+export default function NewOrder() {
+  const navigate = useNavigate();
+  const { clients, vehicles, lifts, orders, setDB } = useAppStore();
+  const [existingClientId, setExistingClientId] = useState("");
+  const [existingVehicleId, setExistingVehicleId] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [make, setMake] = useState("");
+  const [model, setModel] = useState("");
+  const [plate, setPlate] = useState("");
+  const [mileage, setMileage] = useState("");
+  const [date, setDate] = useState(today);
+  const [time, setTime] = useState("10:00");
+  const [liftId, setLiftId] = useState("");
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+
+  const selectedClientVehicles = useMemo(
+    () => vehicles.filter((vehicle) => vehicle.clientId === existingClientId),
+    [existingClientId, vehicles],
+  );
+
+  function selectExistingClient(clientId: string) {
+    setExistingClientId(clientId);
+    setExistingVehicleId("");
+    const client = clients.find((item) => item.id === clientId);
+    setClientName(client?.name ?? "");
+    setPhone(client?.phone ?? "");
+  }
+
+  function selectExistingVehicle(vehicleId: string) {
+    setExistingVehicleId(vehicleId);
+    const vehicle = vehicles.find((item) => item.id === vehicleId);
+    setMake(vehicle?.make ?? "");
+    setModel(vehicle?.model ?? "");
+    setPlate(vehicle?.plate ?? "");
+    setMileage(vehicle?.mileage ? String(vehicle.mileage) : "");
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    if (!clientName.trim() || !phone.trim() || !make.trim() || !model.trim() || !plate.trim()) {
+      setError("Заполните клиента, телефон и данные автомобиля.");
+      return;
+    }
+
+    const chosenLift = liftId ? Number(liftId) : undefined;
+    const hasOverlap = chosenLift && orders.some((order) =>
+      order.liftId === chosenLift && order.plannedAt === date && order.scheduledStart === time && order.status !== "выдан",
+    );
+    if (hasOverlap) {
+      setError("Этот подъёмник уже занят на выбранное время. Выберите другой или измените время.");
+      return;
+    }
+
+    const stamp = Date.now();
+    const clientId = existingClientId || `client-${stamp}`;
+    const vehicleId = existingVehicleId || `vehicle-${stamp}`;
+    const orderId = `order-${stamp}`;
+    const endHour = String(Math.min(Number(time.slice(0, 2)) + 1, 23)).padStart(2, "0");
+    const orderNumber = `АИ-${String(orders.length + 1).padStart(4, "0")}`;
+
+    setDB((previous) => ({
+      ...previous,
+      clients: existingClientId ? previous.clients : [...previous.clients, { id: clientId, name: clientName.trim(), phone: phone.trim() }],
+      vehicles: existingVehicleId ? previous.vehicles : [...previous.vehicles, {
+        id: vehicleId,
+        clientId,
+        make: make.trim(),
+        model: model.trim(),
+        plate: plate.trim().toUpperCase(),
+        mileage: mileage ? Number(mileage) : undefined,
+      }],
+      orders: [...previous.orders, {
+        id: orderId,
+        number: orderNumber,
+        clientId,
+        vehicleId,
+        liftId: chosenLift,
+        status: "запись",
+        createdAt: new Date().toISOString(),
+        plannedAt: date,
+        works: [],
+        parts: [],
+        paid: 0,
+        notes: note.trim() || undefined,
+        scheduledStart: time,
+        scheduledEnd: `${endHour}:${time.slice(3)}`,
+      }],
+    }));
+    navigate(`/orders/${orderId}`);
+  }
+
+  return (
+    <>
+      <TopBar title="Новая запись" subtitle="Создайте клиента, автомобиль и предварительный заказ-наряд" />
+      <Page>
+        <form onSubmit={handleSubmit} className="mx-auto max-w-4xl space-y-4">
+          <Card>
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">Клиент</h2>
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>Выберите из базы или внесите нового.</p>
+              </div>
+              <label className="text-sm">
+                <span className="mb-1 block" style={{ color: "var(--text-muted)" }}>Найти в базе</span>
+                <select value={existingClientId} onChange={(event) => selectExistingClient(event.target.value)} className="rounded-lg border px-3 py-2" style={{ borderColor: "var(--border)" }}>
+                  <option value="">Новый клиент</option>
+                  {clients.map((client) => <option key={client.id} value={client.id}>{client.name} · {client.phone}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Имя клиента *"><input value={clientName} onChange={(event) => setClientName(event.target.value)} required /></Field>
+              <Field label="Телефон *"><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" required /></Field>
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="mb-4 font-semibold">Автомобиль</h2>
+            {existingClientId && selectedClientVehicles.length > 0 && (
+              <label className="mb-4 block text-sm">
+                <span className="mb-1 block" style={{ color: "var(--text-muted)" }}>Автомобиль из истории</span>
+                <select value={existingVehicleId} onChange={(event) => selectExistingVehicle(event.target.value)} className="w-full rounded-lg border px-3 py-2" style={{ borderColor: "var(--border)" }}>
+                  <option value="">Новый автомобиль</option>
+                  {selectedClientVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.make} {vehicle.model} · {vehicle.plate}</option>)}
+                </select>
+              </label>
+            )}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="Марка *"><input value={make} onChange={(event) => setMake(event.target.value)} required /></Field>
+              <Field label="Модель *"><input value={model} onChange={(event) => setModel(event.target.value)} required /></Field>
+              <Field label="Госномер *"><input value={plate} onChange={(event) => setPlate(event.target.value)} required /></Field>
+              <Field label="Пробег"><input value={mileage} onChange={(event) => setMileage(event.target.value.replace(/\D/g, ""))} inputMode="numeric" /></Field>
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="mb-4 font-semibold">Время и подъёмник</h2>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Дата"><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></Field>
+              <Field label="Время"><input type="time" value={time} onChange={(event) => setTime(event.target.value)} /></Field>
+              <Field label="Подъёмник"><select value={liftId} onChange={(event) => setLiftId(event.target.value)}><option value="">Без назначения</option>{lifts.map((lift) => <option key={lift.id} value={lift.id}>{lift.name}</option>)}</select></Field>
+            </div>
+            <Field label="Комментарий" className="mt-4"><textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} placeholder="Причина обращения, пожелания клиента" /></Field>
+          </Card>
+
+          {error && <div className="rounded-lg border px-4 py-3 text-sm" style={{ borderColor: "#f1c2c2", color: "var(--danger)", background: "#fff7f7" }}>{error}</div>}
+          <div className="flex justify-end gap-3 pb-4">
+            <Button variant="secondary" onClick={() => navigate(-1)}>Отмена</Button>
+            <Button type="submit">Создать заказ-наряд</Button>
+          </div>
+        </form>
+      </Page>
+    </>
+  );
+}
+
+function Field({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
+  return <label className={`block text-sm ${className}`}><span className="mb-1 block" style={{ color: "var(--text-muted)" }}>{label}</span><div className="field-control">{children}</div></label>;
+}

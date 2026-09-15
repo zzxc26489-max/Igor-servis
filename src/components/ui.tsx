@@ -1,21 +1,79 @@
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAppStore } from "../store/AppStore";
 
 export function TopBar({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
+  const [query, setQuery] = useState("");
+  const navigate = useNavigate();
+  const { clients, vehicles, orders } = useAppStore();
+  const results = useMemo(() => {
+    const term = query.trim().toLocaleLowerCase("ru-RU");
+    if (term.length < 2) return [];
+
+    const matches = [
+      ...clients
+        .filter((client) => `${client.name} ${client.phone}`.toLocaleLowerCase("ru-RU").includes(term))
+        .slice(0, 3)
+        .map((client) => ({ label: client.name, detail: client.phone, to: `/clients?q=${encodeURIComponent(term)}` })),
+      ...vehicles
+        .filter((vehicle) => `${vehicle.make} ${vehicle.model} ${vehicle.plate} ${vehicle.vin ?? ""}`.toLocaleLowerCase("ru-RU").includes(term))
+        .slice(0, 3)
+        .map((vehicle) => ({ label: `${vehicle.make} ${vehicle.model}`, detail: vehicle.plate, to: `/clients?q=${encodeURIComponent(term)}` })),
+      ...orders
+        .filter((order) => order.number.toLocaleLowerCase("ru-RU").includes(term))
+        .slice(0, 3)
+        .map((order) => ({ label: order.number, detail: "Заказ-наряд", to: `/orders/${order.id}` })),
+    ];
+    return matches.slice(0, 6);
+  }, [clients, orders, query, vehicles]);
+
   return (
-    <header className="flex items-center justify-between px-6 py-4 border-b bg-white" style={{ borderColor: "var(--border)" }}>
-      <div>
+    <header className="flex flex-col gap-3 border-b bg-white px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between" style={{ borderColor: "var(--border)" }}>
+      <div className="min-w-0">
         <h1 className="text-xl font-semibold" style={{ color: "var(--text)" }}>
           {title}
         </h1>
         {subtitle && <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+
+      <div className="relative w-full lg:max-w-md">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Поиск: клиент, авто, номер заказа"
+          className="w-full rounded-lg border bg-white px-3 py-2 pl-9 text-sm outline-none focus:ring-2"
+          style={{ borderColor: "var(--border)", boxShadow: "none" }}
+          aria-label="Поиск по CRM"
+        />
+        <span className="pointer-events-none absolute left-3 top-2 text-sm" aria-hidden="true">⌕</span>
+        {query.trim().length >= 2 && (
+          <div className="absolute z-40 mt-1 w-full overflow-hidden rounded-lg border bg-white shadow-lg" style={{ borderColor: "var(--border)" }}>
+            {results.length > 0 ? results.map((result, index) => (
+              <button
+                key={`${result.to}-${index}`}
+                onClick={() => { setQuery(""); navigate(result.to); }}
+                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50"
+              >
+                <span>{result.label}</span>
+                <span className="ml-3 text-xs" style={{ color: "var(--text-muted)" }}>{result.detail}</span>
+              </button>
+            )) : (
+              <div className="px-3 py-3 text-sm" style={{ color: "var(--text-muted)" }}>Ничего не найдено</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
+        <Link to="/orders/new"><Button>+ Новая запись</Button></Link>
+        {actions}
+      </div>
     </header>
   );
 }
 
 export function Page({ children }: { children: ReactNode }) {
-  return <main className="flex-1 p-6 overflow-auto">{children}</main>;
+  return <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>;
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {

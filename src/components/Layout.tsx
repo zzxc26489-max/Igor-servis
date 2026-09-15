@@ -15,11 +15,19 @@ const NAV_ITEMS = [
   { to: "/reports", label: "Отчёты", icon: "📊" },
 ];
 
+const MOBILE_NAV_ITEMS = [
+  NAV_ITEMS[0],
+  NAV_ITEMS[1],
+  NAV_ITEMS[2],
+  NAV_ITEMS[3],
+  NAV_ITEMS[8],
+];
+
 export default function Layout() {
   return (
     <div className="flex min-h-screen">
       <aside
-        className="w-64 shrink-0 flex flex-col p-4 gap-1"
+        className="hidden lg:flex w-64 shrink-0 flex-col p-4 gap-1"
         style={{ background: "var(--sidebar-bg)", color: "var(--sidebar-text)" }}
       >
         <div className="flex items-center gap-3 px-2 py-3 mb-2">
@@ -55,9 +63,32 @@ export default function Layout() {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0">
         <Outlet />
       </div>
+
+      <nav
+        className="lg:hidden fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t bg-white px-1"
+        style={{ borderColor: "var(--border)" }}
+        aria-label="Основная навигация"
+      >
+        {MOBILE_NAV_ITEMS.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) =>
+              `flex min-w-0 flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-[10px] ${
+                isActive ? "font-semibold" : ""
+              }`
+            }
+            style={({ isActive }) => ({ color: isActive ? "var(--accent)" : "var(--text-muted)" })}
+          >
+            <span className="text-base" aria-hidden="true">{item.icon}</span>
+            <span className="max-w-16 truncate">{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 }

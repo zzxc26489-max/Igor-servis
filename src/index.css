@@ -30,6 +30,29 @@ body {
   min-height: 100svh;
 }
 
+.field-control input,
+.field-control select,
+.field-control textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+}
+
+.field-control textarea {
+  resize: vertical;
+}
+
+.field-control input:focus,
+.field-control select:focus,
+.field-control textarea:focus {
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
