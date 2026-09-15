@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { IconBell, IconCalendarEvent, IconPlus, IconSearch, IconSettings } from "@tabler/icons-react";
+import { IconBell, IconCalendarEvent, IconMenu2, IconPlus, IconSearch } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
+import { useMobileMenu } from "./MobileMenu";
 
 export function TopBar({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const { clients, vehicles, orders } = useAppStore();
+  const { setOpen } = useMobileMenu();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -47,11 +49,20 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
 
   return (
     <header className="flex flex-col gap-3 border-b bg-white px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between print:hidden" style={{ borderColor: "var(--border)" }}>
-      <div className="min-w-0">
-        <h1 className="text-xl font-semibold" style={{ color: "var(--text)" }}>
-          {title}
-        </h1>
-        {subtitle && <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
+      <div className="flex items-center gap-2 min-w-0">
+        <button
+          onClick={() => setOpen(true)}
+          aria-label="Открыть меню"
+          className="rounded-lg p-2 -ml-2 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] lg:hidden"
+        >
+          <IconMenu2 size={22} />
+        </button>
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold" style={{ color: "var(--text)" }}>
+            {title}
+          </h1>
+          {subtitle && <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
+        </div>
       </div>
 
       <div className="relative w-full lg:max-w-md">
@@ -92,13 +103,6 @@ export function TopBar({ title, subtitle, actions }: { title: string; subtitle?:
       <div className="flex shrink-0 items-center gap-2">
         <div className="hidden items-center gap-2 text-sm text-[var(--text-muted)] xl:flex"><IconCalendarEvent size={18} /> Сегодня</div>
         <button aria-label="Уведомления" className="rounded-lg p-2 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"><IconBell size={20} /></button>
-        <Link
-          to="/settings"
-          aria-label="Настройки"
-          className="rounded-lg p-2 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] lg:hidden"
-        >
-          <IconSettings size={20} />
-        </Link>
         <Link to="/orders/new"><Button><span className="inline-flex items-center gap-2"><IconPlus size={18} /> Новая запись</span></Button></Link>
         {actions}
       </div>
