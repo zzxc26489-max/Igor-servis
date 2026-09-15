@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { HashRouter, Route, Routes } from "react-router-dom";
 import { AppStoreProvider } from "./store/AppStore";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
@@ -16,7 +16,7 @@ import Reports from "./pages/Reports";
 function App() {
   return (
     <AppStoreProvider>
-      <BrowserRouter>
+      <HashRouter>
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<Dashboard />} />
@@ -32,7 +32,7 @@ function App() {
             <Route path="reports" element={<Reports />} />
           </Route>
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </AppStoreProvider>
   );
 }
