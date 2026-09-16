@@ -7,6 +7,7 @@ import {
 import { useAppStore } from "../store/AppStore";
 import { useMobileMenu } from "./MobileMenu";
 import logo from "../assets/logo.jpg";
+import { APP_VERSION } from "../data/version";
 
 const NAV_GROUPS = [
   {
@@ -45,8 +46,8 @@ const MOBILE_NAV_ITEMS = [
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
-    isActive ? "text-white font-medium" : "text-[var(--sidebar-text)] hover:bg-white/8 hover:text-white"
+  `relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+    isActive ? "font-semibold text-white shadow-[0_6px_18px_rgba(0,0,0,.12)]" : "text-[var(--sidebar-text)] hover:bg-white/8 hover:text-white"
   }`;
 
 const navLinkStyle = ({ isActive }: { isActive: boolean }) => (isActive ? { background: "var(--accent)" } : undefined);
@@ -54,18 +55,18 @@ const navLinkStyle = ({ isActive }: { isActive: boolean }) => (isActive ? { back
 function SidebarContent({ company, onNavigate }: { company: { shortName: string; address: string; workHours: string }; onNavigate?: () => void }) {
   return (
     <>
-      <div className="flex items-center gap-3 border-b px-4 py-4" style={{ borderColor: "var(--sidebar-border)" }}>
-        <img src={logo} alt={company.shortName} className="h-10 w-10 rounded-lg object-cover bg-white" />
+      <div className="flex items-center gap-3 border-b px-4 py-5" style={{ borderColor: "var(--sidebar-border)" }}>
+        <img src={logo} alt={company.shortName} className="h-11 w-11 rounded-xl bg-white object-cover ring-1 ring-white/10" />
         <div>
-          <div className="text-white font-semibold leading-tight text-sm">{company.shortName}</div>
-          <div className="text-[11px] opacity-55">CRM автосервиса</div>
+          <div className="text-[15px] font-bold leading-tight text-white">{company.shortName}</div>
+          <div className="mt-1 text-[11px] opacity-55">Надёжно. По-честному.</div>
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-4 overflow-y-auto p-3">
+      <nav className="flex flex-1 flex-col gap-5 overflow-y-auto p-3">
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
-            <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider opacity-40">
+            <div className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[.12em] opacity-38">
               {group.label}
             </div>
             <div className="flex flex-col gap-1">
@@ -88,6 +89,7 @@ function SidebarContent({ company, onNavigate }: { company: { shortName: string;
         <div className="mt-2 px-3 text-[11px] opacity-50">
           <div>{company.address}</div>
           <div className="mt-1">{company.workHours}</div>
+          <div className="mt-3">Версия {APP_VERSION}</div>
         </div>
       </div>
     </>
@@ -101,7 +103,7 @@ export default function Layout() {
   return (
     <div className="app-shell flex min-h-screen print:min-h-0">
       <aside
-        className="hidden lg:flex w-60 shrink-0 flex-col print:hidden"
+        className="hidden w-[228px] shrink-0 flex-col lg:flex print:hidden"
         style={{ background: "var(--sidebar-bg)", color: "var(--sidebar-text)" }}
       >
         <SidebarContent company={company} />
@@ -135,7 +137,7 @@ export default function Layout() {
       </div>
 
       <nav
-        className="lg:hidden fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t bg-white px-1 print:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t bg-white/95 px-1 shadow-[0_-4px_18px_rgba(23,34,30,.06)] backdrop-blur lg:hidden print:hidden"
         style={{ borderColor: "var(--border)" }}
         aria-label="Основная навигация"
       >

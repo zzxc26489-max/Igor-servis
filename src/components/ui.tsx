@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { IconBell, IconCalendarEvent, IconMenu2, IconPlus, IconSearch } from "@tabler/icons-react";
+import { IconBell, IconCalendarEvent, IconChevronDown, IconMenu2, IconPlus, IconSearch } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useMobileMenu } from "./MobileMenu";
 
@@ -58,7 +58,7 @@ export function TopBar({
   }, [clients, orders, query, vehicles]);
 
   return (
-    <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-3 overflow-hidden border-b bg-white px-3 py-3 sm:px-6 lg:grid-cols-[minmax(230px,auto)_minmax(260px,1fr)_auto] lg:gap-x-4 print:hidden" style={{ borderColor: "var(--border)" }}>
+    <header className="sticky top-0 z-30 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-3 overflow-visible border-b bg-white/95 px-3 py-3 backdrop-blur sm:px-6 lg:grid-cols-[minmax(230px,auto)_minmax(260px,1fr)_auto] lg:gap-x-4 print:hidden" style={{ borderColor: "var(--border)" }}>
       <div className="flex min-w-0 items-center gap-2">
         <button
           onClick={() => setOpen(true)}
@@ -68,7 +68,7 @@ export function TopBar({
           <IconMenu2 size={22} />
         </button>
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold sm:text-xl" title={title} style={{ color: "var(--text)" }}>
+          <h1 className="truncate text-lg font-bold tracking-[-0.025em] sm:text-[22px]" title={title} style={{ color: "var(--text)" }}>
             {title}
           </h1>
           {subtitle && <p className="mt-0.5 truncate text-xs sm:text-sm" title={subtitle} style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
@@ -81,7 +81,7 @@ export function TopBar({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Поиск: клиент, авто, номер заказа"
-          className="w-full rounded-lg border bg-[#f8f9f8] px-3 py-2 pl-10 pr-12 text-sm outline-none focus:ring-2"
+          className="w-full rounded-lg border bg-[#f5f7f5] px-3 py-2 pl-10 pr-12 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--accent)_12%,transparent)]"
           style={{ borderColor: "var(--border)", boxShadow: "none" }}
           aria-label="Поиск по CRM"
         />
@@ -112,22 +112,35 @@ export function TopBar({
 
       <div className="col-start-2 row-start-1 flex min-w-0 items-center justify-end gap-1.5 sm:gap-2 lg:col-start-3">
         <div className="hidden items-center gap-2 text-sm text-[var(--text-muted)] xl:flex"><IconCalendarEvent size={18} /> Сегодня</div>
-        <button aria-label="Уведомления" className="hidden h-9 w-9 shrink-0 place-items-center rounded-lg hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:grid"><IconBell size={19} /></button>
-        <Link to="/orders/new" aria-label="Новая запись" className={hideNewRecordOnMobile ? "hidden sm:block" : "shrink-0"}><Button size="sm"><IconPlus size={17} /><span className="hidden sm:inline">Новая запись</span></Button></Link>
+        <button aria-label="Уведомления" className="relative hidden h-9 w-9 shrink-0 place-items-center rounded-lg hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:grid">
+          <IconBell size={19} />
+          <span className="absolute right-2 top-1.5 h-2 w-2 rounded-full border-2 border-white bg-[var(--danger)]" />
+        </button>
+        <Link to="/orders/new" aria-label="Новая запись" className={hideNewRecordOnMobile || actions ? "hidden sm:block" : "shrink-0"}><Button size="sm"><IconPlus size={17} /><span className="hidden sm:inline">Новая запись</span></Button></Link>
         {actions}
+        {!actions && (
+          <div className="hidden items-center gap-2 border-l border-[var(--border)] pl-3 min-[1440px]:flex">
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-[var(--sidebar-bg)] text-sm font-bold text-white">И</span>
+            <span className="leading-tight">
+              <span className="block text-sm font-semibold">Игорь</span>
+              <span className="block text-xs text-[var(--text-muted)]">Владелец</span>
+            </span>
+            <IconChevronDown size={16} className="text-[var(--text-muted)]" />
+          </div>
+        )}
       </div>
     </header>
   );
 }
 
 export function Page({ children }: { children: ReactNode }) {
-  return <main className="min-w-0 flex-1 overflow-auto overflow-x-hidden p-3 sm:p-6 print:flex-none print:overflow-visible print:p-0">{children}</main>;
+  return <main className="min-w-0 flex-1 overflow-auto overflow-x-hidden p-4 pb-24 sm:p-5 sm:pb-6 lg:p-6 print:flex-none print:overflow-visible print:p-0">{children}</main>;
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`rounded-xl border bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ${className}`}
+      className={`rounded-xl border bg-white p-4 shadow-[0_2px_8px_rgba(23,34,30,0.045)] ${className}`}
       style={{ borderColor: "var(--border)" }}
     >
       {children}
@@ -166,9 +179,10 @@ export function StatusBadge({ status }: { status: string }) {
   const style = STATUS_STYLES[status] ?? { bg: "#eef0f4", text: "#5b6270" };
   return (
     <span
-      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
       style={{ background: style.bg, color: style.text }}
     >
+      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
       {status}
     </span>
   );
@@ -180,12 +194,16 @@ export function Button({
   variant = "primary",
   type = "button",
   size = "md",
+  className = "",
+  disabled = false,
 }: {
   children: ReactNode;
   onClick?: () => void;
   variant?: "primary" | "secondary";
   type?: "button" | "submit";
   size?: "sm" | "md" | "icon";
+  className?: string;
+  disabled?: boolean;
 }) {
   const dimensions = size === "icon" ? "h-9 w-9 p-0" : size === "sm" ? "min-h-9 px-3 py-1.5" : "min-h-10 px-3.5 py-2";
   const base =
@@ -195,7 +213,8 @@ export function Button({
       <button
         type={type}
         onClick={onClick}
-        className={`${base} border hover:bg-gray-50`}
+        disabled={disabled}
+        className={`${base} border hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
         style={{ borderColor: "var(--border)", color: "var(--text)" }}
       >
         {children}
@@ -206,7 +225,8 @@ export function Button({
     <button
       type={type}
       onClick={onClick}
-      className={`${base} text-white hover:brightness-95`}
+      disabled={disabled}
+      className={`${base} text-white shadow-[0_4px_12px_rgba(15,122,77,.16)] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={{ background: "var(--accent)" }}
     >
       {children}

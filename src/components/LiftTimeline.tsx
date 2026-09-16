@@ -10,10 +10,10 @@ export default function LiftTimeline({ hours = DEFAULT_HOURS }: { hours?: string
 
   return (
     <div className="overflow-x-auto px-4 py-3">
-      <div style={{ minWidth: `${150 + colCount * 46}px` }}>
+      <div style={{ minWidth: `${138 + colCount * 46}px` }}>
         <div
           className="grid border-b text-xs font-medium muted"
-          style={{ gridTemplateColumns: `150px repeat(${colCount}, minmax(46px, 1fr))`, borderColor: "var(--border)" }}
+          style={{ gridTemplateColumns: `138px repeat(${colCount}, minmax(46px, 1fr))`, borderColor: "var(--border)" }}
         >
           <div className="py-2" />
           {hours.map((hour) => (
@@ -32,8 +32,8 @@ export default function LiftTimeline({ hours = DEFAULT_HOURS }: { hours?: string
           return (
             <div
               key={lift.id}
-              className="grid min-h-28 border-b"
-              style={{ gridTemplateColumns: `150px repeat(${colCount}, minmax(46px, 1fr))`, borderColor: "var(--border)" }}
+              className="grid min-h-24 border-b last:border-b-0"
+              style={{ gridTemplateColumns: `138px repeat(${colCount}, minmax(46px, 1fr))`, borderColor: "var(--border)" }}
             >
               <div className="flex flex-col justify-center pr-3">
                 <b className="text-sm">{lift.name}</b>
@@ -48,7 +48,7 @@ export default function LiftTimeline({ hours = DEFAULT_HOURS }: { hours?: string
               {order ? (
                 <Link
                   to={`/orders/${order.id}`}
-                  className="z-10 m-2 rounded-lg p-3 text-sm shadow-sm"
+                  className="z-10 m-2 rounded-lg border border-white/70 p-3 text-sm shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                   style={{ gridColumn: `${start + 2} / ${Math.max(start + 3, end + 2)}`, gridRow: 1, background: palette }}
                 >
                   <div className="font-semibold">

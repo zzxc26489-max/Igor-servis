@@ -271,7 +271,7 @@ export default function OrderDetail() {
         </div>
 
         <Card className="mb-3 overflow-hidden p-0">
-          <div className="grid grid-cols-1 divide-y divide-[#e5e8e5] lg:grid-cols-3 lg:divide-x lg:divide-y-0 print:grid-cols-3 print:divide-x print:divide-y-0">
+          <div className="grid grid-cols-1 [&>*+*]:border-t [&>*]:border-[#e5e8e5] sm:grid-cols-2 sm:[&>*]:border-t-0 sm:[&>*:nth-child(n+3)]:border-t sm:[&>*:nth-child(odd)]:border-r lg:grid-cols-4 lg:[&>*]:border-t-0 lg:[&>*]:border-r lg:[&>*:last-child]:border-r-0 print:grid-cols-4 print:[&>*]:border-t-0">
             <div className="flex min-w-0 items-center gap-3 p-3.5">
               <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#e9f5ed] text-[var(--accent)]">
                 <IconUser size={20} />
@@ -280,6 +280,16 @@ export default function OrderDetail() {
                 <div className="muted text-[11px]">Клиент</div>
                 <div className="truncate text-sm font-semibold">{client?.name}</div>
                 <div className="muted truncate text-xs">{client?.phone}</div>
+              </div>
+            </div>
+            <div className="flex min-w-0 items-center gap-3 p-3.5">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#f5f0ff] text-[#6656b8]">
+                <IconClipboardText size={20} />
+              </div>
+              <div className="min-w-0">
+                <div className="muted text-[11px]">Заказ-наряд</div>
+                <div className="truncate text-sm font-semibold">{order.number}</div>
+                <div className="muted truncate text-xs">{formatDateTime(order.createdAt)}</div>
               </div>
             </div>
             <div className="flex min-w-0 items-center gap-3 p-3.5">
@@ -332,9 +342,9 @@ export default function OrderDetail() {
           </div>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-          <Card>
-            <div className="flex items-center justify-between mb-3">
+        <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card className="overflow-hidden p-0">
+            <div className="mb-0 flex items-center justify-between p-4">
               <h2 className="panel-title">Работы и услуги</h2>
               {!addingWork && (
                 <button
@@ -346,7 +356,7 @@ export default function OrderDetail() {
                 </button>
               )}
             </div>
-            <table className="app-table">
+            <div className="overflow-x-auto"><table className="app-table min-w-[440px]">
               <thead>
                 <tr>
                   <th>Наименование</th>
@@ -384,10 +394,10 @@ export default function OrderDetail() {
                   </tr>
                 )}
               </tbody>
-            </table>
+            </table></div>
 
             {addingWork && (
-              <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
+              <div className="m-4 mt-3 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
                 <div className="field-control mb-2">
                   <select value={workServiceId} onChange={(e) => setWorkServiceId(e.target.value)}>
                     <option value="">Выберите услугу…</option>
@@ -446,11 +456,11 @@ export default function OrderDetail() {
                 </div>
               </div>
             )}
-            <div className="text-right font-semibold mt-3">Итого за работы: {formatMoney(worksTotal)}</div>
+            <div className="border-t bg-[#fafbfa] p-4 text-right font-semibold" style={{ borderColor: "var(--border)" }}>Итого за работы: {formatMoney(worksTotal)}</div>
           </Card>
 
-          <Card>
-            <div className="flex items-center justify-between mb-3">
+          <Card className="overflow-hidden p-0">
+            <div className="mb-0 flex items-center justify-between p-4">
               <h2 className="panel-title">Запчасти</h2>
               {!addingPart && (
                 <button
@@ -462,7 +472,7 @@ export default function OrderDetail() {
                 </button>
               )}
             </div>
-            <table className="app-table">
+            <div className="overflow-x-auto"><table className="app-table min-w-[440px]">
               <thead>
                 <tr>
                   <th>Наименование</th>
@@ -500,10 +510,10 @@ export default function OrderDetail() {
                   </tr>
                 )}
               </tbody>
-            </table>
+            </table></div>
 
             {addingPart && (
-              <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
+              <div className="m-4 mt-3 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
                 <div className="field-control mb-2">
                   <select
                     value={partItemId}
@@ -556,7 +566,7 @@ export default function OrderDetail() {
                 </div>
               </div>
             )}
-            <div className="text-right font-semibold mt-3">Итого за запчасти: {formatMoney(partsTotal)}</div>
+            <div className="border-t bg-[#fafbfa] p-4 text-right font-semibold" style={{ borderColor: "var(--border)" }}>Итого за запчасти: {formatMoney(partsTotal)}</div>
           </Card>
         </div>
 
@@ -607,7 +617,7 @@ export default function OrderDetail() {
             </div>
           </Card>
 
-          <Card>
+          <Card className="lg:sticky lg:top-24 lg:self-start">
             <h2 className="panel-title mb-3 flex items-center gap-2"><IconReceipt2 size={18} /> Итог по заказу</h2>
             <div className="flex justify-between text-sm mb-1">
               <span>Работы</span>
@@ -690,11 +700,11 @@ export default function OrderDetail() {
                   onChange={(e) => setPaymentAmount(e.target.value.replace(/\D/g, ""))}
                   placeholder={String(debt)}
                   inputMode="numeric"
-                  className="w-24 rounded-lg border px-2 py-2 text-sm"
+                  className="min-w-0 flex-1 rounded-lg border px-2 py-2 text-sm"
                   style={{ borderColor: "var(--border)" }}
                   aria-label="Сумма оплаты"
                 />
-                <Button onClick={() => handleAcceptPayment(paymentAmount ? Number(paymentAmount) : debt)}>
+                <Button className="shrink-0" onClick={() => handleAcceptPayment(paymentAmount ? Number(paymentAmount) : debt)}>
                   Принять оплату
                 </Button>
               </div>

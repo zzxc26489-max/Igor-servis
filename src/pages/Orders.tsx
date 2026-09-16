@@ -86,7 +86,7 @@ export default function Orders() {
     <>
       <TopBar title="Заказ-наряды" subtitle={`Всего заказ-нарядов: ${orders.length}`} />
       <Page>
-        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
           <Metric icon={<IconClipboardList />} label="Активных" value={String(active.length)} hint="Ещё не выданы клиенту" />
           <Metric icon={<IconClockHour4 />} label="В работе" value={String(orders.filter((o) => o.status === "в работе").length)} hint="Идёт обслуживание" />
           <Metric icon={<IconAlertTriangle />} label="Ждут запчасти" value={String(waitingParts.length)} hint="Требуют внимания" tone="warning" />
@@ -184,12 +184,12 @@ function Metric({
     danger: "bg-[#fbe9e9] text-[var(--danger)]",
   };
   return (
-    <Card className="flex items-start gap-3">
-      <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${colors[tone]}`}>{icon}</div>
+    <Card className="flex min-h-[112px] flex-col items-start gap-2 p-3 sm:flex-row sm:gap-3 sm:p-4">
+      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-11 sm:w-11 ${colors[tone]}`}>{icon}</div>
       <div className="min-w-0">
-        <p className="muted text-sm">{label}</p>
-        <p className="mt-1 text-2xl font-semibold">{value}</p>
-        <p className="mt-1 text-xs muted">{hint}</p>
+        <p className="truncate text-xs muted sm:text-sm">{label}</p>
+        <p className="mt-1 truncate text-lg font-bold tracking-[-0.03em] sm:text-2xl">{value}</p>
+        <p className="mt-1 line-clamp-1 text-[11px] muted sm:text-xs">{hint}</p>
       </div>
     </Card>
   );

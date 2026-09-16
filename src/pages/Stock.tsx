@@ -47,7 +47,12 @@ export default function Stock() {
             </div>
             <div className="max-h-64 overflow-auto divide-y" style={{ borderColor: "var(--border)" }}>
               {shownStock.map((item) => (
-                <button key={item.id} className="flex w-full items-center gap-3 p-4 text-left hover:bg-[#f7faf8] focus-visible:outline-none focus-visible:bg-[#f7faf8]" onClick={() => { setSelectedId(item.id); setCell(item.cell || "A-03-02"); }}>
+                <button
+                  key={item.id}
+                  aria-pressed={item.id === selected?.id}
+                  className={`relative flex w-full items-center gap-3 p-4 text-left transition hover:bg-[#f7faf8] focus-visible:outline-none focus-visible:bg-[#f7faf8] ${item.id === selected?.id ? "bg-[#f1f8f4] after:absolute after:inset-y-0 after:left-0 after:w-1 after:bg-[var(--accent)]" : ""}`}
+                  onClick={() => { setSelectedId(item.id); setCell(item.cell || "A-03-02"); }}
+                >
                   <div className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-[#edf5f0] text-[var(--accent)]"><IconBox size={28} /></div>
                   <span className="min-w-0 flex-1"><b className="block">{item.name}</b><span className="muted text-xs">{item.brand || "Без бренда"} · {item.sku}</span></span>
                   <span className="text-right text-xs"><b className="block">{item.qty} {item.unit}</b><span className={item.qty <= item.minQty ? "text-red-500" : "muted"}>мин. {item.minQty}</span></span>
@@ -60,16 +65,16 @@ export default function Stock() {
             </div>}
           </Card>
 
-          <Card>
+          <Card className="xl:min-h-full">
             <div className="flex items-start justify-between gap-3"><div><h2 className="panel-title">Куда положить</h2><p className="muted mt-1 text-xs">Ячейка хранения детали</p></div><IconMapPin size={22} color="var(--accent)" /></div>
             <div className="mt-5 rounded-lg bg-[#edf7f0] p-4"><span className="muted text-xs">Рекомендуемая ячейка</span><b className="mt-1 block text-xl">{cell}</b><span className="mt-2 inline-block rounded-full bg-white px-2 py-1 text-xs text-[var(--accent)]">Свободна</span></div>
             <label className="mt-4 block text-sm font-medium">Или выберите другую ячейку<select className="mt-2 w-full rounded-lg border bg-white px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }} value={cell} onChange={(e) => setCell(e.target.value)}>{CELLS.map((value) => <option value={value} key={value}>{value} {occupiedCells.has(value) && value !== selected?.cell ? "(занята)" : "(свободна)"}</option>)}</select></label>
             <div className="mt-5 grid grid-cols-4 gap-1 text-center text-[10px]">{CELLS.map((value) => <button onClick={() => setCell(value)} key={value} className="rounded border px-1 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" style={{ borderColor: value === cell ? "var(--accent)" : "var(--border)", background: value === cell ? "var(--accent)" : occupiedCells.has(value) ? "#f1f3f2" : "white", color: value === cell ? "white" : "var(--text)" }}>{value}</button>)}</div>
           </Card>
 
-          <Card className="p-0 overflow-hidden"><div className="p-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}><h2 className="panel-title">Остатки и закупка</h2><Link to="/purchases" className="text-sm text-[var(--accent)]">Все</Link></div><div className="p-2">{critical.map((item) => <div key={item.id} className="flex items-center justify-between gap-2 border-b p-3 last:border-0" style={{ borderColor: "var(--border)" }}><span className="text-sm"><b className="block">{item.name}</b><span className="text-xs text-red-500">Мин. остаток: {item.minQty}</span></span><b className="text-red-500">{item.qty}</b></div>)}</div><div className="p-3"><Link to="/purchases"><Button variant="secondary"><span className="inline-flex items-center gap-2"><IconShoppingCart size={18} /> Перейти к закупкам</span></Button></Link></div></Card>
+          <Card className="overflow-hidden p-0"><div className="flex items-center justify-between border-b p-4" style={{ borderColor: "var(--border)" }}><h2 className="panel-title">Остатки и закупка</h2><Link to="/purchases" className="text-sm font-semibold text-[var(--accent)]">Все</Link></div><div className="p-2">{critical.map((item) => <div key={item.id} className="flex items-center justify-between gap-2 border-b p-3 last:border-0" style={{ borderColor: "var(--border)" }}><span className="text-sm"><b className="block">{item.name}</b><span className="text-xs text-red-500">Мин. остаток: {item.minQty}</span></span><b className="text-red-500">{item.qty}</b></div>)}</div><div className="p-3"><Link to="/purchases" className="block"><Button variant="secondary" className="w-full"><IconShoppingCart size={18} /> Перейти к закупкам</Button></Link></div></Card>
         </div>
-        <div className="mt-4"><Button onClick={receive}><span className="inline-flex items-center gap-2"><IconPlus size={18} /> Оприходовать на склад</span></Button></div>
+        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.45fr_.86fr_.64fr]"><Button className="w-full xl:col-span-2" onClick={receive}><IconPlus size={18} /> Оприходовать на склад</Button></div>
         <Card className="mt-4 p-0 overflow-hidden"><div className="flex items-center justify-between p-4"><h2 className="panel-title">Последние движения по складу</h2><span className="text-sm text-[var(--accent)]">Все движения</span></div><div className="overflow-auto"><table className="app-table min-w-[720px]"><thead><tr><th>Дата и время</th><th>Запчасть</th><th>Операция</th><th className="text-right">Кол-во</th><th>Куда</th><th>Сотрудник</th></tr></thead><tbody>{stockMovements.map((movement) => { const item = stock.find((i) => i.id === movement.itemId); return <tr key={movement.id}><td>{formatDateTime(movement.date)}</td><td><b>{item?.name || "—"}</b><div className="muted text-xs">{item?.sku}</div></td><td><span className="rounded-full bg-[#e8f5ed] px-2 py-1 text-xs text-[var(--accent)]">{movement.operation}</span></td><td className="text-right">{movement.qty} {item?.unit}</td><td>{movement.to || movement.from || "—"}</td><td>{movement.employee}</td></tr>; })}</tbody></table></div></Card>
       </Page>
     </>

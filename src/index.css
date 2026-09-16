@@ -1,17 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #f6f7f5;
+  --bg: #f3f5f3;
   --panel: #ffffff;
-  --border: #e5e8e5;
-  --text: #15201c;
-  --text-muted: #77827d;
-  --sidebar-bg: #17221f;
+  --border: #dfe4e1;
+  --text: #17211d;
+  --text-muted: #6e7974;
+  --sidebar-bg: #17231f;
   --sidebar-bg-alt: #0f1714;
   --sidebar-text: #c9d1ce;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --accent: #147449;
-  --accent-strong: #0d5d39;
+  --accent: #0f7a4d;
+  --accent-strong: #0a663f;
+  --accent-soft: #e7f5ed;
   --danger: #d64545;
   --warning: #c98a1f;
   --info: #2f6fed;
@@ -23,22 +24,29 @@
 
 body {
   margin: 0;
-  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   background: var(--bg);
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 
 .app-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-.app-table th { color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-align: left; background: #f7f8f7; }
-.app-table th, .app-table td { padding: 0.75rem 0.9rem; border-bottom: 1px solid var(--border); }
+.app-table th { color: #65716b; font-size: 0.69rem; font-weight: 700; letter-spacing: .025em; text-align: left; background: #f5f7f5; }
+.app-table th, .app-table td { padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--border); }
 .app-table tbody tr:last-child td { border-bottom: 0; }
-.app-table tbody tr:hover { background: #fbfcfb; }
-.panel-title { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
+.app-table tbody tr { transition: background-color .15s ease; }
+.app-table tbody tr:hover { background: #fafbfa; }
+.panel-title { font-size: 1.05rem; font-weight: 750; letter-spacing: -0.02em; }
 .muted { color: var(--text-muted); }
-.soft-panel { border: 1px solid var(--border); border-radius: 0.85rem; background: var(--panel); }
+.soft-panel { border: 1px solid var(--border); border-radius: 0.7rem; background: var(--panel); }
+.section-kicker { color: var(--text-muted); font-size: .72rem; font-weight: 700; letter-spacing: .065em; text-transform: uppercase; }
+.section-title { font-size: 1.25rem; font-weight: 750; letter-spacing: -.025em; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
 .act-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .act-table th, .act-table td { padding: 0.6rem 0.65rem; border: 1px solid var(--border); }
 .act-table th { background: #f4f6f4; font-weight: 700; text-align: left; }
