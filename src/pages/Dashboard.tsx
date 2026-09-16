@@ -23,7 +23,7 @@ export default function Dashboard() {
         <Metric icon={<IconPackage />} label="Выручка за запчасти" value={formatMoney(partsRevenue)} hint={`${stock.length} позиций на складе`} />
         <Metric icon={<IconUsersGroup />} label="Зарплаты" value={formatMoney(salaries)} hint="Начислено за период" />
         <Metric icon={<IconChartBar />} label="Чистая прибыль" value={formatMoney(Math.max(workRevenue + partsRevenue - salaries, 0))} hint="Расчётный показатель" />
-        <Link to="/orders/new" className="flex min-h-28 items-center justify-center rounded-xl bg-[var(--accent)] px-4 text-base font-semibold text-white shadow-sm transition hover:bg-[var(--accent-strong)]">+ Новая запись</Link>
+        <Link to="/orders/new" className="flex h-11 items-center justify-center rounded-xl bg-[var(--accent)] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-strong)] sm:min-h-28 sm:text-base">+ Новая запись</Link>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
