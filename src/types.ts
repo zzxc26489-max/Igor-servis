@@ -82,6 +82,7 @@ export interface Order {
   liftId?: number;
   status: OrderStatus;
   createdAt: string;
+  completedAt?: string;
   plannedAt?: string;
   advisor?: string;
   works: OrderLineWork[];
@@ -91,6 +92,10 @@ export interface Order {
   notes?: string;
   scheduledStart?: string;
   scheduledEnd?: string;
+  complaint?: string;
+  diagnosis?: string;
+  defects?: string;
+  guaranteeMonths?: number;
 }
 
 export interface Service {

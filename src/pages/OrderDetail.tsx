@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { IconArrowLeft, IconCar, IconFileDescription, IconNotes, IconPrinter, IconReceipt2, IconUser } from "@tabler/icons-react";
+import { IconArrowLeft, IconCar, IconClipboardText, IconFileDescription, IconNotes, IconPrinter, IconReceipt2, IconUser } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
 import { Button, Card, Page, StatusBadge, TopBar } from "../components/ui";
@@ -561,11 +561,50 @@ export default function OrderDetail() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card className="lg:col-span-2">
-            <h2 className="panel-title mb-2 flex items-center gap-2"><IconNotes size={18} /> Заметки</h2>
-            <p className="text-sm muted">
-              {order.notes || "Нет заметок"}
-            </p>
+          <Card className="lg:col-span-2 print:hidden">
+            <h2 className="panel-title mb-3 flex items-center gap-2"><IconClipboardText size={18} /> Данные для акта</h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="block text-sm">
+                <span className="mb-1 block muted">Жалоба клиента</span>
+                <div className="field-control">
+                  <textarea rows={2} defaultValue={order.complaint || ""} onBlur={(e) => updateOrder(order.id, { complaint: e.target.value })} placeholder="Со слов клиента" />
+                </div>
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block muted">Результат диагностики</span>
+                <div className="field-control">
+                  <textarea rows={2} defaultValue={order.diagnosis || ""} onBlur={(e) => updateOrder(order.id, { diagnosis: e.target.value })} placeholder="Что выявлено" />
+                </div>
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block muted">Внешние дефекты</span>
+                <div className="field-control">
+                  <textarea rows={2} defaultValue={order.defects || ""} onBlur={(e) => updateOrder(order.id, { defects: e.target.value })} placeholder="Царапины, сколы и т.п." />
+                </div>
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block muted">Гарантия, мес.</span>
+                <div className="field-control">
+                  <input inputMode="numeric" defaultValue={order.guaranteeMonths ?? ""} onBlur={(e) => updateOrder(order.id, { guaranteeMonths: Number(e.target.value.replace(/\D/g, "")) || undefined })} placeholder="Например, 6" />
+                </div>
+              </label>
+            </div>
+            <label className="mt-3 block text-sm">
+              <span className="mb-1 flex items-center gap-1.5 muted"><IconNotes size={14} /> Внутренние заметки</span>
+              <div className="field-control">
+                <textarea rows={2} defaultValue={order.notes || ""} onBlur={(e) => updateOrder(order.id, { notes: e.target.value })} placeholder="Не попадает в акт для клиента" />
+              </div>
+            </label>
+          </Card>
+
+          <Card className="lg:col-span-2 hidden print:block">
+            <h2 className="panel-title mb-2 flex items-center gap-2"><IconClipboardText size={18} /> Данные по автомобилю</h2>
+            <div className="text-sm space-y-1">
+              <div><b>Жалоба клиента:</b> {order.complaint || "—"}</div>
+              <div><b>Диагностика:</b> {order.diagnosis || "—"}</div>
+              <div><b>Внешние дефекты:</b> {order.defects || "—"}</div>
+              {order.notes && <div><b>Заметки:</b> {order.notes}</div>}
+            </div>
           </Card>
 
           <Card>
