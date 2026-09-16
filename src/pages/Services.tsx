@@ -108,8 +108,8 @@ export default function Services() {
                     <li key={service.id} className="flex items-center gap-3 px-4 py-3 text-sm">
                       <span className="min-w-0 flex-1">{service.name}</span>
                       <span className="shrink-0 font-semibold">{formatMoney(service.price)}</span>
-                      <button onClick={() => startEdit(service.id)} className="rounded-lg p-2 text-[var(--accent)] hover:bg-[#e9f5ed]" aria-label={`Изменить услугу «${service.name}»`}><IconEdit size={17} /></button>
-                      <button onClick={() => handleDelete(service.id, service.name)} className="rounded-lg p-2 text-[var(--danger)] hover:bg-[#fbe9e9]" aria-label={`Удалить услугу «${service.name}»`}><IconTrash size={17} /></button>
+                      <button onClick={() => startEdit(service.id)} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-[var(--accent)] hover:bg-[#e9f5ed] sm:h-9 sm:w-9" aria-label={`Изменить услугу «${service.name}»`}><IconEdit size={17} /></button>
+                      <button onClick={() => handleDelete(service.id, service.name)} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-[var(--danger)] hover:bg-[#fbe9e9] sm:h-9 sm:w-9" aria-label={`Удалить услугу «${service.name}»`}><IconTrash size={17} /></button>
                     </li>
                   ))}
                 </ul>

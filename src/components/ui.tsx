@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { IconBell, IconCalendarEvent, IconChevronDown, IconMenu2, IconPlus, IconSearch } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useMobileMenu } from "./MobileMenu";
@@ -17,6 +17,7 @@ export function TopBar({
 }) {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
   const { clients, vehicles, orders } = useAppStore();
   const { setOpen } = useMobileMenu();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -116,7 +117,13 @@ export function TopBar({
           <IconBell size={19} />
           <span className="absolute right-2 top-1.5 h-2 w-2 rounded-full border-2 border-white bg-[var(--danger)]" />
         </button>
-        <Link to="/orders/new" aria-label="Новая запись" className={hideNewRecordOnMobile || actions ? "hidden sm:block" : "shrink-0"}><Button size="sm"><IconPlus size={17} /><span className="hidden sm:inline">Новая запись</span></Button></Link>
+        <Link
+          to="/orders/new"
+          aria-label="Новая запись"
+          className={actions || location.pathname === "/orders/new" ? "hidden" : hideNewRecordOnMobile ? "hidden sm:block" : "shrink-0"}
+        >
+          <Button size="sm"><IconPlus size={17} /><span className="hidden sm:inline">Новая запись</span></Button>
+        </Link>
         {actions}
         {!actions && (
           <div className="hidden items-center gap-2 border-l border-[var(--border)] pl-3 min-[1440px]:flex">
@@ -205,7 +212,7 @@ export function Button({
   className?: string;
   disabled?: boolean;
 }) {
-  const dimensions = size === "icon" ? "h-9 w-9 p-0" : size === "sm" ? "min-h-9 px-3 py-1.5" : "min-h-10 px-3.5 py-2";
+  const dimensions = size === "icon" ? "h-11 w-11 p-0 sm:h-9 sm:w-9" : size === "sm" ? "min-h-11 px-3 py-2 sm:min-h-9 sm:py-1.5" : "min-h-11 px-3.5 py-2 sm:min-h-10";
   const base =
     `inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)] ${dimensions}`;
   if (variant === "secondary") {

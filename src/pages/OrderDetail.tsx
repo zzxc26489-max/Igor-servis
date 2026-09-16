@@ -321,7 +321,7 @@ export default function OrderDetail() {
               <div key={step} className="relative flex min-w-0 flex-1 flex-col items-center">
                 {idx > 0 && (
                   <div
-                    className="absolute right-1/2 top-3 h-0.5 w-full"
+                    className="absolute right-1/2 top-5 h-0.5 w-full sm:top-3"
                     style={{ background: idx <= currentStepIndex ? "var(--accent)" : "var(--border)" }}
                   />
                 )}
@@ -330,7 +330,7 @@ export default function OrderDetail() {
                     updateOrder(order.id, { status: step });
                     showToast(`Статус изменён: «${step}»`);
                   }}
-                  className="relative z-10 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-xs font-semibold text-white transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
+                  className="relative z-10 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-xs font-semibold text-white transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 sm:h-7 sm:w-7"
                   style={{ background: idx <= currentStepIndex ? "var(--accent)" : "#cfd3da" }}
                   aria-label={`Установить статус «${step}»`}
                 >
