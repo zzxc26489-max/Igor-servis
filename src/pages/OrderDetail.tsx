@@ -356,7 +356,7 @@ export default function OrderDetail() {
                 </button>
               )}
             </div>
-            <div className="overflow-x-auto"><table className="app-table min-w-[440px]">
+            <div className="table-scroll"><table className="app-table min-w-[440px]">
               <thead>
                 <tr>
                   <th>Наименование</th>
@@ -472,7 +472,7 @@ export default function OrderDetail() {
                 </button>
               )}
             </div>
-            <div className="overflow-x-auto"><table className="app-table min-w-[440px]">
+            <div className="table-scroll"><table className="app-table min-w-[440px]">
               <thead>
                 <tr>
                   <th>Наименование</th>

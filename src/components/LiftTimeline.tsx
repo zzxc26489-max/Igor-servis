@@ -9,7 +9,7 @@ export default function LiftTimeline({ hours = DEFAULT_HOURS }: { hours?: string
   const colCount = hours.length;
 
   return (
-    <div className="overflow-x-auto px-4 py-3">
+    <div className="table-scroll px-4 py-3">
       <div style={{ minWidth: `${138 + colCount * 46}px` }}>
         <div
           className="grid border-b text-xs font-medium muted"

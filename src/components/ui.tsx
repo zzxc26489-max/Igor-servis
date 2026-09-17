@@ -18,7 +18,7 @@ export function TopBar({
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
-  const { clients, vehicles, orders } = useAppStore();
+  const { clients, vehicles, orders, company } = useAppStore();
   const { setOpen } = useMobileMenu();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -59,7 +59,7 @@ export function TopBar({
   }, [clients, orders, query, vehicles]);
 
   return (
-    <header className="sticky top-0 z-30 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-3 overflow-visible border-b bg-white/95 px-3 py-3 backdrop-blur sm:px-6 lg:grid-cols-[minmax(230px,auto)_minmax(260px,1fr)_auto] lg:gap-x-4 print:hidden" style={{ borderColor: "var(--border)" }}>
+    <header className="sticky top-0 z-30 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-3 overflow-visible border-b bg-white/95 px-3 py-3 backdrop-blur sm:px-6 lg:grid-cols-[minmax(230px,360px)_minmax(260px,1fr)_auto] lg:gap-x-4 print:hidden" style={{ borderColor: "var(--border)" }}>
       <div className="flex min-w-0 items-center gap-2">
         <button
           onClick={() => setOpen(true)}
@@ -126,13 +126,13 @@ export function TopBar({
         </Link>
         {actions}
         {!actions && (
-          <div className="hidden items-center gap-2 border-l border-[var(--border)] pl-3 min-[1440px]:flex">
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-[var(--sidebar-bg)] text-sm font-bold text-white">И</span>
-            <span className="leading-tight">
-              <span className="block text-sm font-semibold">Игорь</span>
-              <span className="block text-xs text-[var(--text-muted)]">Владелец</span>
+          <div className="hidden shrink-0 items-center gap-2 border-l border-[var(--border)] pl-3 min-[1440px]:flex">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--sidebar-bg)] text-sm font-bold text-white">{company.shortName.charAt(0)}</span>
+            <span className="w-[130px] shrink-0 leading-tight">
+              <span className="block truncate text-sm font-semibold" title={company.shortName}>{company.shortName}</span>
+              <span className="block truncate text-xs text-[var(--text-muted)]">Рабочее место</span>
             </span>
-            <IconChevronDown size={16} className="text-[var(--text-muted)]" />
+            <IconChevronDown size={16} className="shrink-0 text-[var(--text-muted)]" />
           </div>
         )}
       </div>

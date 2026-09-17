@@ -35,6 +35,19 @@ body {
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 
+.table-scroll {
+  overflow-x: auto;
+  background-color: #fff;
+  background-image:
+    linear-gradient(to right, #fff, rgba(255, 255, 255, 0)),
+    linear-gradient(to left, #fff, rgba(255, 255, 255, 0)),
+    linear-gradient(to right, rgba(23, 33, 29, .14), rgba(23, 33, 29, 0)),
+    linear-gradient(to left, rgba(23, 33, 29, .14), rgba(23, 33, 29, 0));
+  background-position: left, right, left, right;
+  background-size: 24px 100%, 24px 100%, 10px 100%, 10px 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}
 .app-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
 .app-table th { color: #65716b; font-size: 0.69rem; font-weight: 700; letter-spacing: .025em; text-align: left; background: #f5f7f5; }
 .app-table th, .app-table td { padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--border); }

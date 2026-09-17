@@ -47,7 +47,7 @@ export default function Purchases() {
           <div className="p-4 border-b" style={{ borderColor: "var(--border)" }}>
             <h2 className="panel-title">Список к закупке</h2>
           </div>
-          <div className="overflow-auto">
+          <div className="table-scroll">
             <table className="app-table min-w-[680px]">
               <thead>
                 <tr>

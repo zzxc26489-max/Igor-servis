@@ -14,9 +14,11 @@ export default function Dashboard() {
   const critical = stock.filter((item) => item.qty <= item.minQty);
   const active = orders.filter((order) => order.status !== "выдан");
   const todayLabel = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date());
+  const hour = new Date().getHours();
+  const greeting = hour < 6 ? "Доброй ночи!" : hour < 12 ? "Доброе утро!" : hour < 18 ? "Добрый день!" : "Добрый вечер!";
 
   return <>
-    <TopBar title="Доброе утро, Игорь!" subtitle="Всё под контролем. Хорошего рабочего дня!" />
+    <TopBar title={greeting} subtitle="Всё под контролем. Хорошего рабочего дня!" />
     <Page>
       <div className="mb-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_230px]">
         <Card className="grid grid-cols-2 overflow-hidden p-0 lg:grid-cols-4">

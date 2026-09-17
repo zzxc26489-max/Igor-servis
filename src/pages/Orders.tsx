@@ -109,7 +109,7 @@ export default function Orders() {
               ))}
             </select>
           </div>
-          <div className="overflow-auto">
+          <div className="table-scroll">
             <table className="app-table min-w-[760px]">
               <thead>
                 <tr>

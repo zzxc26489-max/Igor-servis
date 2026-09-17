@@ -104,7 +104,7 @@ export default function Finance() {
           </form>
         )}
 
-        <div className="overflow-auto">
+        <div className="table-scroll">
           <table className="app-table min-w-[800px]">
             <thead><tr><th>Дата</th><th>Категория</th><th>Описание</th><th className="text-right">Сумма</th><th>Поставщик</th><th>Статус</th></tr></thead>
             <tbody>{expenses.map((expense) => <tr key={expense.id}><td>{formatDate(expense.date)}</td><td>{expense.category}</td><td>{expense.description}</td><td className="text-right font-medium">{formatMoney(expense.amount)}</td><td>{expense.counterparty}</td><td><StatusBadge status={expense.status} /></td></tr>)}</tbody>

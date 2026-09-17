@@ -43,7 +43,7 @@ export default function Clients() {
         </div>
 
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-auto">
+          <div className="table-scroll">
             <table className="app-table min-w-[640px]">
               <thead>
                 <tr>
