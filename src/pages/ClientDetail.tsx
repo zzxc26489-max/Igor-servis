@@ -161,10 +161,10 @@ export default function ClientDetail() {
       />
       <Page>
         <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Stat icon={<IconClipboardList size={20} />} tone="#e9f5ed" color="var(--accent)" label="Заказ-нарядов" value={String(clientOrders.length)} />
-          <Stat icon={<IconCoin size={20} />} tone="#edf4ff" color="#3978c9" label="Потрачено" value={formatMoney(stats.spent)} />
-          <Stat icon={<IconCoin size={20} />} tone="#fbe9e9" color="var(--danger)" label="Долг" value={formatMoney(stats.debt)} />
-          <Stat icon={<IconCar size={20} />} tone="#f5f0ff" color="#6656b8" label="Автомобилей" value={String(clientVehicles.length)} />
+          <Stat icon={<IconClipboardList size={18} />} tone="#e9f5ed" color="var(--accent)" label="Заказов" value={String(clientOrders.length)} />
+          <Stat icon={<IconCoin size={18} />} tone="#edf4ff" color="#3978c9" label="Потрачено" value={formatMoney(stats.spent)} />
+          <Stat icon={<IconCoin size={18} />} tone="#fbe9e9" color="var(--danger)" label="Долг" value={formatMoney(stats.debt)} />
+          <Stat icon={<IconCar size={18} />} tone="#f5f0ff" color="#6656b8" label="Авто" value={String(clientVehicles.length)} />
         </div>
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -172,7 +172,7 @@ export default function ClientDetail() {
             <div className="mb-3 flex items-start justify-between gap-2">
               <h2 className="panel-title flex items-center gap-2"><IconUser size={18} /> Контакты</h2>
               {!editingClient && (
-                <Button size="sm" variant="secondary" onClick={startEditClient}>
+                <Button size="sm" variant="secondary" onClick={startEditClient} aria-label="Изменить данные клиента" title="Изменить">
                   <IconEdit size={16} /><span className="hidden sm:inline">Изменить</span>
                 </Button>
               )}
@@ -220,7 +220,7 @@ export default function ClientDetail() {
             <div className="mb-3 flex items-start justify-between gap-2">
               <h2 className="panel-title flex items-center gap-2"><IconCar size={18} /> Автомобили</h2>
               {!vehicleFormOpen && (
-                <Button size="sm" variant="secondary" onClick={() => setVehicleFormOpen(true)}>
+                <Button size="sm" variant="secondary" onClick={() => setVehicleFormOpen(true)} aria-label="Добавить автомобиль" title="Добавить авто">
                   <IconPlus size={16} /><span className="hidden sm:inline">Добавить авто</span>
                 </Button>
               )}
@@ -263,7 +263,14 @@ export default function ClientDetail() {
                         {vehicle.vin ? ` · VIN ${vehicle.vin}` : ""}
                       </div>
                     </div>
-                    <Button size="icon" variant="secondary" onClick={() => startEditVehicle(vehicle.id)} className="shrink-0">
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      onClick={() => startEditVehicle(vehicle.id)}
+                      className="shrink-0"
+                      aria-label={`Изменить ${vehicle.make} ${vehicle.model}`}
+                      title="Изменить автомобиль"
+                    >
                       <IconEdit size={16} />
                     </Button>
                   </div>
@@ -328,13 +335,13 @@ export default function ClientDetail() {
 
 function Stat({ icon, tone, color, label, value }: { icon: React.ReactNode; tone: string; color: string; label: string; value: string }) {
   return (
-    <Card className="flex items-start gap-3">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: tone, color }}>
+    <Card className="flex items-center gap-2.5 p-3 sm:p-4">
+      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: tone, color }}>
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="muted text-xs">{label}</p>
-        <p className="mt-0.5 truncate text-lg font-semibold">{value}</p>
+        <p className="muted truncate text-xs">{label}</p>
+        <p className="truncate text-base font-semibold sm:text-lg">{value}</p>
       </div>
     </Card>
   );

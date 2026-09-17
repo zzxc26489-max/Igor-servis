@@ -203,6 +203,8 @@ export function Button({
   size = "md",
   className = "",
   disabled = false,
+  title,
+  "aria-label": ariaLabel,
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -211,6 +213,8 @@ export function Button({
   size?: "sm" | "md" | "icon";
   className?: string;
   disabled?: boolean;
+  title?: string;
+  "aria-label"?: string;
 }) {
   const dimensions = size === "icon" ? "h-11 w-11 p-0 sm:h-9 sm:w-9" : size === "sm" ? "min-h-11 px-3 py-2 sm:min-h-9 sm:py-1.5" : "min-h-11 px-3.5 py-2 sm:min-h-10";
   const base =
@@ -221,6 +225,8 @@ export function Button({
         type={type}
         onClick={onClick}
         disabled={disabled}
+        title={title}
+        aria-label={ariaLabel}
         className={`${base} border hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
         style={{ borderColor: "var(--border)", color: "var(--text)" }}
       >
@@ -233,6 +239,8 @@ export function Button({
       type={type}
       onClick={onClick}
       disabled={disabled}
+      title={title}
+      aria-label={ariaLabel}
       className={`${base} text-white shadow-[0_4px_12px_rgba(15,122,77,.16)] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={{ background: "var(--accent)" }}
     >
