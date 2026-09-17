@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconAlertCircle, IconCalendarEvent, IconCar, IconUser } from "@tabler/icons-react";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { useToast } from "../components/Toast";
-import { useAppStore } from "../store/AppStore";
+import { CODE_PREFIX, useAppStore } from "../store/AppStore";
+import { createId, nextCode } from "../lib/id";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -104,10 +105,9 @@ export default function NewOrder() {
       return;
     }
 
-    const stamp = Date.now();
-    const clientId = existingClientId || `client-${stamp}`;
-    const vehicleId = existingVehicleId || `vehicle-${stamp}`;
-    const orderId = `order-${stamp}`;
+    const clientId = existingClientId || createId("client");
+    const vehicleId = existingVehicleId || createId("vehicle");
+    const orderId = createId("order");
     const lastNumber = orders.reduce((max, item) => {
       const digits = Number(item.number.replace(/\D/g, ""));
       return Number.isNaN(digits) ? max : Math.max(max, digits);
@@ -116,9 +116,16 @@ export default function NewOrder() {
 
     setDB((previous) => ({
       ...previous,
-      clients: existingClientId ? previous.clients : [...previous.clients, { id: clientId, name: clientName.trim(), phone: phone.trim() }],
+      clients: existingClientId ? previous.clients : [...previous.clients, {
+        id: clientId,
+        code: nextCode(CODE_PREFIX.client, previous.clients.map((item) => item.code)),
+        name: clientName.trim(),
+        phone: phone.trim(),
+        createdAt: new Date().toISOString().slice(0, 10),
+      }],
       vehicles: existingVehicleId ? previous.vehicles : [...previous.vehicles, {
         id: vehicleId,
+        code: nextCode(CODE_PREFIX.vehicle, previous.vehicles.map((item) => item.code)),
         clientId,
         make: make.trim(),
         model: model.trim(),

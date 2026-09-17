@@ -68,19 +68,19 @@ export const employees: Employee[] = [
 ];
 
 export const clients: Client[] = [
-  { id: "cl-1", name: "Смирнов Алексей", phone: "+7 916 000-00-01", isRegular: true, discountPercent: 5, source: "Сарафанное радио", createdAt: "2024-03-12", birthday: "1988-06-04", notes: "Приезжает по субботам, просит звонить заранее" },
-  { id: "cl-2", name: "Кузнецова Мария", phone: "+7 916 000-00-02", isRegular: true, discountPercent: 5, source: "Яндекс Карты", createdAt: "2024-08-01", email: "kuznecova@example.com" },
-  { id: "cl-3", name: "Волков Дмитрий", phone: "+7 916 000-00-03", source: "Авито", createdAt: "2025-05-20" },
-  { id: "cl-4", name: "Лебедев Сергей", phone: "+7 916 000-00-04", createdAt: "2026-02-11" },
-  { id: "cl-5", name: "Панфилова Елена", phone: "+7 916 000-00-05", createdAt: "2026-09-01" },
+  { id: "cl-1", code: "К-0001", name: "Смирнов Алексей", phone: "+7 916 000-00-01", isRegular: true, discountPercent: 5, source: "Сарафанное радио", createdAt: "2024-03-12", birthday: "1988-06-04", notes: "Приезжает по субботам, просит звонить заранее" },
+  { id: "cl-2", code: "К-0002", name: "Кузнецова Мария", phone: "+7 916 000-00-02", isRegular: true, discountPercent: 5, source: "Яндекс Карты", createdAt: "2024-08-01", email: "kuznecova@example.com" },
+  { id: "cl-3", code: "К-0003", name: "Волков Дмитрий", phone: "+7 916 000-00-03", source: "Авито", createdAt: "2025-05-20" },
+  { id: "cl-4", code: "К-0004", name: "Лебедев Сергей", phone: "+7 916 000-00-04", createdAt: "2026-02-11" },
+  { id: "cl-5", code: "К-0005", name: "Панфилова Елена", phone: "+7 916 000-00-05", createdAt: "2026-09-01" },
 ];
 
 export const vehicles: Vehicle[] = [
-  { id: "veh-1", clientId: "cl-1", make: "Toyota", model: "Camry", plate: "A123BC 797", mileage: 82000, year: 2019, color: "Чёрный", engine: "2.5 бензин", transmission: "АКПП", nextServiceMileage: 92000, nextServiceDate: "2026-12-01" },
-  { id: "veh-2", clientId: "cl-2", make: "Kia", model: "Sportage", plate: "H456MK 799", mileage: 78460, vin: "XWEPH81ADMN123456", year: 2021, color: "Белый", engine: "2.0 дизель", transmission: "АКПП" },
-  { id: "veh-3", clientId: "cl-3", make: "BMW", model: "X5", plate: "O789KX 777", mileage: 145000, year: 2016, color: "Синий", engine: "3.0 дизель", transmission: "АКПП" },
-  { id: "veh-4", clientId: "cl-4", make: "Hyundai", model: "Solaris", plate: "K222TT 750" },
-  { id: "veh-5", clientId: "cl-5", make: "Skoda", model: "Octavia", plate: "M333EE 197" },
+  { id: "veh-1", code: "А-0001", clientId: "cl-1", make: "Toyota", model: "Camry", plate: "A123BC 797", mileage: 82000, year: 2019, color: "Чёрный", engine: "2.5 бензин", transmission: "АКПП", nextServiceMileage: 92000, nextServiceDate: "2026-12-01" },
+  { id: "veh-2", code: "А-0002", clientId: "cl-2", make: "Kia", model: "Sportage", plate: "H456MK 799", mileage: 78460, vin: "XWEPH81ADMN123456", year: 2021, color: "Белый", engine: "2.0 дизель", transmission: "АКПП" },
+  { id: "veh-3", code: "А-0003", clientId: "cl-3", make: "BMW", model: "X5", plate: "O789KX 777", mileage: 145000, year: 2016, color: "Синий", engine: "3.0 дизель", transmission: "АКПП" },
+  { id: "veh-4", code: "А-0004", clientId: "cl-4", make: "Hyundai", model: "Solaris", plate: "K222TT 750" },
+  { id: "veh-5", code: "А-0005", clientId: "cl-5", make: "Skoda", model: "Octavia", plate: "M333EE 197" },
 ];
 
 export const services: Service[] = [
@@ -94,13 +94,13 @@ export const services: Service[] = [
 ];
 
 export const stock: StockItem[] = [
-  { id: "st-1", name: "Тормозные колодки (передние)", sku: "GDB1956", brand: "TRW", category: "Тормозная система", qty: 2, minQty: 5, purchasePrice: 3250, cell: "A-03-02", unit: "компл." },
-  { id: "st-2", name: "Масляный фильтр (VAG)", sku: "26300-35505", brand: "MANN", category: "Фильтры", qty: 3, minQty: 5, purchasePrice: 980, cell: "A-01-02", unit: "шт." },
-  { id: "st-3", name: "Моторное масло 5W-30", sku: "Shell 5W-30", brand: "Shell", category: "Масла", qty: 4, minQty: 10, purchasePrice: 850, cell: "B-04-01", unit: "л" },
-  { id: "st-4", name: "Свечи зажигания (NGK)", sku: "BKR6E", brand: "NGK", category: "Электрика", qty: 2, minQty: 10, purchasePrice: 350, cell: "B-02-01", unit: "шт." },
-  { id: "st-5", name: "Антифриз G12+", sku: "G12+", brand: "Felix", category: "Жидкости", qty: 5, minQty: 10, purchasePrice: 650, cell: "B-04-02", unit: "л" },
-  { id: "st-6", name: "Воздушный фильтр", sku: "28113-D3100", brand: "MANN", category: "Фильтры", qty: 1, minQty: 5, purchasePrice: 1250, cell: "A-04-01", unit: "шт." },
-  { id: "st-7", name: "Тормозной диск передний", sku: "DF4271", brand: "TRW", category: "Тормозная система", qty: 2, minQty: 4, purchasePrice: 4900, cell: "A-02-02", unit: "шт." },
+  { id: "st-1", code: "С-0001", name: "Тормозные колодки (передние)", sku: "GDB1956", brand: "TRW", category: "Тормозная система", qty: 2, minQty: 5, purchasePrice: 3250, cell: "A-03-02", unit: "компл." },
+  { id: "st-2", code: "С-0002", name: "Масляный фильтр (VAG)", sku: "26300-35505", brand: "MANN", category: "Фильтры", qty: 3, minQty: 5, purchasePrice: 980, cell: "A-01-02", unit: "шт." },
+  { id: "st-3", code: "С-0003", name: "Моторное масло 5W-30", sku: "Shell 5W-30", brand: "Shell", category: "Масла", qty: 4, minQty: 10, purchasePrice: 850, cell: "B-04-01", unit: "л" },
+  { id: "st-4", code: "С-0004", name: "Свечи зажигания (NGK)", sku: "BKR6E", brand: "NGK", category: "Электрика", qty: 2, minQty: 10, purchasePrice: 350, cell: "B-02-01", unit: "шт." },
+  { id: "st-5", code: "С-0005", name: "Антифриз G12+", sku: "G12+", brand: "Felix", category: "Жидкости", qty: 5, minQty: 10, purchasePrice: 650, cell: "B-04-02", unit: "л" },
+  { id: "st-6", code: "С-0006", name: "Воздушный фильтр", sku: "28113-D3100", brand: "MANN", category: "Фильтры", qty: 1, minQty: 5, purchasePrice: 1250, cell: "A-04-01", unit: "шт." },
+  { id: "st-7", code: "С-0007", name: "Тормозной диск передний", sku: "DF4271", brand: "TRW", category: "Тормозная система", qty: 2, minQty: 4, purchasePrice: 4900, cell: "A-02-02", unit: "шт." },
 ];
 
 export const stockMovements: StockMovement[] = [
@@ -195,9 +195,9 @@ export const orders: Order[] = [
 ];
 
 export const expenses: Expense[] = [
-  { id: "ex-1", date: "2026-09-14", category: "Закупка запчастей", description: "Поставка тормозных дисков и колодок", amount: 85400, counterparty: "Exist.ru", status: "Оплачено", comment: "Накладная №24567" },
-  { id: "ex-2", date: "2026-09-12", category: "Аренда", description: "Аренда гаража за сентябрь", amount: 120000, counterparty: "Аренда 42Г", status: "Оплачено" },
-  { id: "ex-3", date: "2026-09-10", category: "Закупка запчастей", description: "Масла, фильтры, техжидкости", amount: 63200, counterparty: "Автодок", status: "Оплачено", comment: "Накладная №22345" },
+  { id: "ex-1", code: "Р-0001", date: "2026-09-14", category: "Закупка запчастей", description: "Поставка тормозных дисков и колодок", amount: 85400, counterparty: "Exist.ru", status: "Оплачено", comment: "Накладная №24567" },
+  { id: "ex-2", code: "Р-0002", date: "2026-09-12", category: "Аренда", description: "Аренда гаража за сентябрь", amount: 120000, counterparty: "Аренда 42Г", status: "Оплачено" },
+  { id: "ex-3", code: "Р-0003", date: "2026-09-10", category: "Закупка запчастей", description: "Масла, фильтры, техжидкости", amount: 63200, counterparty: "Автодок", status: "Оплачено", comment: "Накладная №22345" },
 ];
 
 export const invoices: Invoice[] = [

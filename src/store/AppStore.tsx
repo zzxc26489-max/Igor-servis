@@ -15,8 +15,17 @@ import type {
 } from "../types";
 import * as seed from "../data/seed";
 import { company as companySeed } from "../data/company";
+import { nextCode } from "../lib/id";
 
 const STORAGE_KEY = "igor-servis-db-v1";
+
+export const CODE_PREFIX = {
+  client: "К",
+  vehicle: "А",
+  stock: "С",
+  expense: "Р",
+  order: "№АИ",
+} as const;
 
 interface DB {
   company: CompanyInfo;
@@ -54,22 +63,43 @@ function seedDB(): DB {
   };
 }
 
+/** Записи, заведённые до появления сквозной нумерации, получают номера при первой загрузке. */
+function withCodes<T extends { code?: string }>(items: T[], prefix: string): T[] {
+  let next = items.reduce((max, item) => {
+    const digits = Number((item.code ?? "").replace(/\D/g, ""));
+    return Number.isNaN(digits) ? max : Math.max(max, digits);
+  }, 0);
+  return items.map((item) =>
+    item.code ? item : { ...item, code: `${prefix}-${String(++next).padStart(4, "0")}` },
+  );
+}
+
+function migrate(db: DB): DB {
+  return {
+    ...db,
+    clients: withCodes(db.clients, CODE_PREFIX.client),
+    vehicles: withCodes(db.vehicles, CODE_PREFIX.vehicle),
+    stock: withCodes(db.stock, CODE_PREFIX.stock),
+    expenses: withCodes(db.expenses, CODE_PREFIX.expense),
+  };
+}
+
 function loadInitial(): DB {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as DB;
-      return {
+      return migrate({
         ...seedDB(),
         ...parsed,
         company: { ...companySeed, ...parsed.company },
         settings: { ...defaultSettings, ...parsed.settings },
-      };
+      });
     }
   } catch {
     // ignore corrupted storage and fall back to seed data
   }
-  return seedDB();
+  return migrate(seedDB());
 }
 
 export interface ReceiveStockInput {
@@ -129,13 +159,21 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           orders: prev.orders.map((o) => (o.id === id ? { ...o, ...patch } : o)),
         })),
       deleteOrder: (id) => setDB((prev) => ({ ...prev, orders: prev.orders.filter((o) => o.id !== id) })),
-      addClient: (client) => setDB((prev) => ({ ...prev, clients: [...prev.clients, client] })),
+      addClient: (client) =>
+        setDB((prev) => ({
+          ...prev,
+          clients: [...prev.clients, { ...client, code: client.code ?? nextCode(CODE_PREFIX.client, prev.clients.map((item) => item.code)) }],
+        })),
       updateClient: (id, patch) =>
         setDB((prev) => ({
           ...prev,
           clients: prev.clients.map((c) => (c.id === id ? { ...c, ...patch } : c)),
         })),
-      addVehicle: (vehicle) => setDB((prev) => ({ ...prev, vehicles: [...prev.vehicles, vehicle] })),
+      addVehicle: (vehicle) =>
+        setDB((prev) => ({
+          ...prev,
+          vehicles: [...prev.vehicles, { ...vehicle, code: vehicle.code ?? nextCode(CODE_PREFIX.vehicle, prev.vehicles.map((item) => item.code)) }],
+        })),
       updateVehicle: (id, patch) =>
         setDB((prev) => ({
           ...prev,
@@ -149,7 +187,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ...prev,
           stock: prev.stock.map((s) => (s.id === id ? { ...s, ...patch } : s)),
         })),
-      addExpense: (e) => setDB((prev) => ({ ...prev, expenses: [e, ...prev.expenses] })),
+      addExpense: (e) =>
+        setDB((prev) => ({
+          ...prev,
+          expenses: [{ ...e, code: e.code ?? nextCode(CODE_PREFIX.expense, prev.expenses.map((item) => item.code)) }, ...prev.expenses],
+        })),
       receiveStock: (input) =>
         setDB((prev) => {
           const stamp = Date.now();
@@ -181,6 +223,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 ...prev.stock,
                 {
                   id: itemId,
+                  code: nextCode(CODE_PREFIX.stock, prev.stock.map((item) => item.code)),
                   name: input.name,
                   sku: input.sku,
                   brand: input.brand,
@@ -213,6 +256,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             ? [
                 {
                   id: `exp-${stamp}`,
+                  code: nextCode(CODE_PREFIX.expense, prev.expenses.map((item) => item.code)),
                   date: now,
                   category: "Закупка запчастей",
                   description: `Приёмка: ${input.name} — ${input.qty} ${input.unit}`,

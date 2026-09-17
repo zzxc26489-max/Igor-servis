@@ -6,6 +6,7 @@ import {
   IconPlus, IconStar, IconStarFilled, IconTool, IconTrash, IconUser, IconX,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
+import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
 import { Button, Card, EmptyState, ListCard, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney, plural } from "../lib/format";
@@ -215,7 +216,7 @@ export default function ClientDetail() {
       updateVehicle(editingVehicleId, patch);
       showToast("Автомобиль обновлён");
     } else {
-      addVehicle({ id: `vehicle-${Date.now()}`, clientId: client.id, ...patch });
+      addVehicle({ id: createId("vehicle"), clientId: client.id, ...patch });
       showToast("Автомобиль добавлен");
     }
     resetVehicleForm();
@@ -240,17 +241,19 @@ export default function ClientDetail() {
   }
 
   const subtitleParts = [
+    client.code ?? "",
     `${clientOrders.length} ${plural(clientOrders.length, "заказ-наряд", "заказ-наряда", "заказ-нарядов")}`,
     `${clientVehicles.length} ${plural(clientVehicles.length, "авто", "авто", "авто")}`,
   ];
   if (client.isRegular) subtitleParts.push("постоянный");
   if (client.discountPercent) subtitleParts.push(`скидка ${client.discountPercent}%`);
+  const subtitle = subtitleParts.filter(Boolean).join(" · ");
 
   return (
     <>
       <TopBar
         title={client.name}
-        subtitle={subtitleParts.join(" · ")}
+        subtitle={subtitle}
         hideNewRecordOnMobile
         actions={
           <>
@@ -411,6 +414,7 @@ export default function ClientDetail() {
                           </div>
                           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs muted">
                             <span className="font-semibold text-[var(--text)]">{vehicle.plate}</span>
+                            {vehicle.code ? <span>{vehicle.code}</span> : null}
                             {vehicle.mileage ? <span>{vehicle.mileage.toLocaleString("ru-RU")} км</span> : null}
                             {vehicle.engine ? <span>{vehicle.engine}</span> : null}
                             {vehicle.transmission ? <span>{vehicle.transmission}</span> : null}

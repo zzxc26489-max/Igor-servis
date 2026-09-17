@@ -13,7 +13,7 @@ export default function Clients() {
   const filteredClients = useMemo(() => clients.filter((client) => {
     if (!query) return true;
     const clientVehicles = vehicles.filter((vehicle) => vehicle.clientId === client.id);
-    return `${client.name} ${client.phone} ${clientVehicles.map((vehicle) => `${vehicle.make} ${vehicle.model} ${vehicle.plate} ${vehicle.vin ?? ""}`).join(" ")}`
+    return `${client.code ?? ""} ${client.name} ${client.phone} ${clientVehicles.map((vehicle) => `${vehicle.code ?? ""} ${vehicle.make} ${vehicle.model} ${vehicle.plate} ${vehicle.vin ?? ""}`).join(" ")}`
       .toLocaleLowerCase("ru-RU")
       .includes(query);
   }), [clients, query, vehicles]);
@@ -53,7 +53,7 @@ export default function Clients() {
                 <ListCard
                   key={c.id}
                   onClick={() => navigate(`/clients/${c.id}`)}
-                  title={c.name}
+                  title={<>{c.name} <span className="muted font-normal">· {c.code}</span></>}
                   amount={c.isRegular ? <span className="text-xs font-semibold text-[var(--accent)]">постоянный</span> : undefined}
                   lines={[
                     c.phone,
@@ -72,6 +72,7 @@ export default function Clients() {
             <table className="app-table min-w-[640px]">
               <thead>
                 <tr>
+                  <th>№</th>
                   <th>Клиент</th>
                   <th>Телефон</th>
                   <th>Автомобили</th>
@@ -85,6 +86,7 @@ export default function Clients() {
                   const clientOrders = orders.filter((o) => o.clientId === c.id);
                   return (
                     <tr key={c.id} onClick={() => navigate(`/clients/${c.id}`)} className="cursor-pointer">
+                      <td className="muted whitespace-nowrap">{c.code}</td>
                       <td>
                         <span className="inline-flex items-center gap-2">
                           <span className="grid h-8 w-8 place-items-center rounded-full bg-[#e9f4ed] text-xs font-bold text-[var(--accent)]">
@@ -113,7 +115,7 @@ export default function Clients() {
                 })}
                 {filteredClients.length === 0 && (
                   <tr>
-                    <td colSpan={5}>
+                    <td colSpan={6}>
                       <EmptyState icon={<IconUsers size={22} />} title="Ничего не найдено" hint="Проверьте написание или попробуйте другой запрос" />
                     </td>
                   </tr>

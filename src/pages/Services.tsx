@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { IconEdit, IconPlus, IconSearch, IconTool, IconTrash } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
+import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { formatMoney, plural } from "../lib/format";
@@ -54,7 +55,7 @@ export default function Services() {
       updateService(editingId, { name: cleanName, category: cleanCategory, price: numericPrice });
       showToast("Услуга обновлена");
     } else {
-      addService({ id: `sv-${Date.now()}`, name: cleanName, category: cleanCategory, price: numericPrice });
+      addService({ id: createId("sv"), name: cleanName, category: cleanCategory, price: numericPrice });
       showToast("Услуга добавлена");
     }
     resetForm();

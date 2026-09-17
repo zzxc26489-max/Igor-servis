@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { IconArrowLeft, IconCar, IconClipboardText, IconFileDescription, IconNotes, IconPrinter, IconReceipt2, IconTrash, IconUser } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
+import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
 import { Button, Card, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDateTime, formatMoney } from "../lib/format";
@@ -123,7 +124,7 @@ export default function OrderDetail() {
       price = service.price;
     }
     const newWork: OrderLineWork = {
-      id: `work-${Date.now()}`,
+      id: createId("work"),
       name,
       qty,
       price,
@@ -165,7 +166,7 @@ export default function OrderDetail() {
     const price = Number(partPrice) || stockItem.purchasePrice;
 
     const newPart: OrderLinePart = {
-      id: `part-${Date.now()}`,
+      id: createId("part"),
       name: stockItem.name,
       sku: stockItem.sku,
       qty,
@@ -181,7 +182,7 @@ export default function OrderDetail() {
     });
     updateStockItem(stockItem.id, { qty: stockItem.qty - qty });
     addStockMovement({
-      id: `mv-${Date.now()}`,
+      id: createId("mv"),
       date: new Date().toISOString(),
       itemId: stockItem.id,
       operation: "Резерв",
@@ -206,7 +207,7 @@ export default function OrderDetail() {
     if (stockItem) {
       updateStockItem(stockItem.id, { qty: stockItem.qty + part.qty });
       addStockMovement({
-        id: `mv-${Date.now()}`,
+        id: createId("mv"),
         date: new Date().toISOString(),
         itemId: stockItem.id,
         operation: "Возврат",

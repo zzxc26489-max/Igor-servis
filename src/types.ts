@@ -32,6 +32,7 @@ export interface Employee {
 
 export interface Client {
   id: string;
+  code?: string;
   name: string;
   phone: string;
   phone2?: string;
@@ -46,6 +47,7 @@ export interface Client {
 
 export interface Vehicle {
   id: string;
+  code?: string;
   clientId: string;
   make: string;
   model: string;
@@ -118,6 +120,7 @@ export interface Service {
 
 export interface StockItem {
   id: string;
+  code?: string;
   name: string;
   sku: string;
   brand?: string;
@@ -148,6 +151,7 @@ export interface StockMovement {
 
 export interface Expense {
   id: string;
+  code?: string;
   date: string;
   category: string;
   description: string;

@@ -5,6 +5,7 @@ import {
   IconChevronRight, IconCoin, IconCreditCardPay, IconPlus, IconUsers,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
+import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
 import { Button, Card, ListCard, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatMoney, plural } from "../lib/format";
@@ -83,7 +84,7 @@ export default function Finance() {
     const value = Number(amount);
     if (!description.trim() || value <= 0) return;
     addExpense({
-      id: `ex-${Date.now()}`,
+      id: createId("ex"),
       date: new Date().toISOString().slice(0, 10),
       category,
       description: description.trim(),
@@ -324,7 +325,7 @@ export default function Finance() {
                 key={expense.id}
                 title={expense.description}
                 amount={formatMoney(expense.amount)}
-                lines={[expense.category, expense.counterparty || null]}
+                lines={[`${expense.code ? `${expense.code} · ` : ""}${expense.category}`, expense.counterparty || null]}
                 badge={<StatusBadge status={expense.status} />}
                 meta={formatDate(expense.date)}
               />
@@ -335,11 +336,12 @@ export default function Finance() {
           <div className="table-scroll hidden lg:block">
             <table className="app-table min-w-[800px]">
               <thead>
-                <tr><th>Дата</th><th>Категория</th><th>Описание</th><th className="text-right">Сумма</th><th>Поставщик</th><th>Статус</th></tr>
+                <tr><th>№</th><th>Дата</th><th>Категория</th><th>Описание</th><th className="text-right">Сумма</th><th>Поставщик</th><th>Статус</th></tr>
               </thead>
               <tbody>
                 {periodExpenses.map((expense) => (
                   <tr key={expense.id}>
+                    <td className="muted whitespace-nowrap">{expense.code}</td>
                     <td className="whitespace-nowrap">{formatDate(expense.date)}</td>
                     <td>{expense.category}</td>
                     <td>{expense.description}</td>
@@ -349,7 +351,7 @@ export default function Finance() {
                   </tr>
                 ))}
                 {periodExpenses.length === 0 && (
-                  <tr><td colSpan={6} className="muted text-center">За этот период расходов нет.</td></tr>
+                  <tr><td colSpan={7} className="muted text-center">За этот период расходов нет.</td></tr>
                 )}
               </tbody>
             </table>

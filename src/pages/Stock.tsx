@@ -46,7 +46,7 @@ export default function Stock() {
       if (filter !== "all" && stockState(item) !== filter) return false;
       if (category !== "all" && item.category !== category) return false;
       if (!term) return true;
-      return `${item.name} ${item.sku} ${item.brand ?? ""} ${item.cell ?? ""}`.toLocaleLowerCase("ru-RU").includes(term);
+      return `${item.code ?? ""} ${item.name} ${item.sku} ${item.brand ?? ""} ${item.cell ?? ""}`.toLocaleLowerCase("ru-RU").includes(term);
     });
     return [...filtered].sort((a, b) => {
       if (sortKey === "qty") return a.qty - b.qty;
@@ -146,7 +146,7 @@ export default function Stock() {
                 title={item.name}
                 amount={<span style={{ color: item.qty <= item.minQty ? "var(--danger)" : undefined }}>{item.qty} {item.unit}</span>}
                 lines={[
-                  `${item.brand ? `${item.brand} · ` : ""}${item.sku}`,
+                  `${item.code ? `${item.code} · ` : ""}${item.brand ? `${item.brand} · ` : ""}${item.sku}`,
                   <>
                     {item.cell ? <><IconMapPin size={13} className="inline" /> {item.cell} · </> : null}
                     {formatMoney(item.purchasePrice)} за {item.unit} · мин. {item.minQty}
@@ -162,6 +162,7 @@ export default function Stock() {
             <table className="app-table min-w-[820px]">
               <thead>
                 <tr>
+                  <th>№</th>
                   <th>Запчасть</th>
                   <th>Категория</th>
                   <th>Ячейка</th>
@@ -175,6 +176,7 @@ export default function Stock() {
               <tbody>
                 {shown.map((item) => (
                   <tr key={item.id}>
+                    <td className="muted whitespace-nowrap">{item.code}</td>
                     <td>
                       <b className="block">{item.name}</b>
                       <span className="muted text-xs">{item.brand ? `${item.brand} · ` : ""}{item.sku}</span>
@@ -196,7 +198,7 @@ export default function Stock() {
                 ))}
                 {shown.length === 0 && (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                       <EmptyState icon={<IconBox size={22} />} title="Ничего не найдено" hint="Смените фильтр или поисковый запрос" />
                     </td>
                   </tr>
