@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { IconBell, IconCalendarEvent, IconChevronDown, IconMenu2, IconPlus, IconSearch } from "@tabler/icons-react";
+import { IconBell, IconCalendarEvent, IconChevronDown, IconMenu2, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useMobileMenu } from "./MobileMenu";
 
@@ -245,6 +245,107 @@ export function Button({
       style={{ background: "var(--accent)" }}
     >
       {children}
+    </button>
+  );
+}
+
+export function Modal({
+  title,
+  subtitle,
+  onClose,
+  children,
+  wide = false,
+}: {
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center print:hidden">
+      <button className="absolute inset-0 bg-black/40" aria-label="Закрыть окно" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={`relative flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
+      >
+        <div className="flex items-start justify-between gap-3 border-b p-4" style={{ borderColor: "var(--border)" }}>
+          <div className="min-w-0">
+            <h2 className="panel-title truncate">{title}</h2>
+            {subtitle && <p className="muted mt-0.5 text-sm">{subtitle}</p>}
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Закрыть"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+          >
+            <IconX size={20} />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-4">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+export function ListCard({
+  title,
+  amount,
+  lines,
+  badge,
+  meta,
+  onClick,
+  accent,
+}: {
+  title: ReactNode;
+  amount?: ReactNode;
+  lines?: ReactNode[];
+  badge?: ReactNode;
+  meta?: ReactNode;
+  onClick?: () => void;
+  accent?: boolean;
+}) {
+  const inner = (
+    <>
+      <div className="flex items-start justify-between gap-3">
+        <span className={`min-w-0 text-sm font-semibold ${accent ? "text-[var(--accent)]" : ""}`}>{title}</span>
+        {amount !== undefined && <span className="shrink-0 text-sm font-semibold tabular-nums">{amount}</span>}
+      </div>
+      {lines?.filter(Boolean).map((line, index) => (
+        <div key={index} className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
+          {line}
+        </div>
+      ))}
+      {(badge || meta) && (
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <span className="min-w-0">{badge}</span>
+          {meta && <span className="shrink-0 text-xs" style={{ color: "var(--text-muted)" }}>{meta}</span>}
+        </div>
+      )}
+    </>
+  );
+
+  const className = "w-full rounded-xl border bg-white p-3 text-left shadow-[0_2px_8px_rgba(23,34,30,0.045)]";
+  if (!onClick) {
+    return <div className={className} style={{ borderColor: "var(--border)" }}>{inner}</div>;
+  }
+  return (
+    <button onClick={onClick} className={`${className} transition active:scale-[0.99]`} style={{ borderColor: "var(--border)" }}>
+      {inner}
     </button>
   );
 }

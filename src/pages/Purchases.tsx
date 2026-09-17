@@ -1,6 +1,6 @@
 import { IconAlertTriangle, IconCheck, IconShoppingCart, IconStack2 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
-import { Card, EmptyState, Page, TopBar } from "../components/ui";
+import { Card, EmptyState, ListCard, Page, TopBar } from "../components/ui";
 import { formatMoney } from "../lib/format";
 
 export default function Purchases() {
@@ -47,7 +47,29 @@ export default function Purchases() {
           <div className="p-4 border-b" style={{ borderColor: "var(--border)" }}>
             <h2 className="panel-title">Список к закупке</h2>
           </div>
-          <div className="table-scroll">
+          <div className="space-y-2 p-3 lg:hidden">
+            {toOrder.map((item) => {
+              const toBuy = item.minQty * 2 - item.qty;
+              return (
+                <ListCard
+                  key={item.id}
+                  title={item.name}
+                  amount={formatMoney(toBuy * item.purchasePrice)}
+                  lines={[
+                    item.sku,
+                    <>
+                      Остаток <span style={{ color: "var(--danger)" }}>{item.qty} {item.unit}</span> · минимум {item.minQty} · купить <b>{toBuy} {item.unit}</b>
+                    </>,
+                  ]}
+                />
+              );
+            })}
+            {toOrder.length === 0 && (
+              <EmptyState icon={<IconCheck size={22} />} title="Все запчасти в наличии" hint="Закупка не требуется" />
+            )}
+          </div>
+
+          <div className="table-scroll hidden lg:block">
             <table className="app-table min-w-[680px]">
               <thead>
                 <tr>

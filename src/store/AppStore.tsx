@@ -72,6 +72,23 @@ function loadInitial(): DB {
   return seedDB();
 }
 
+export interface ReceiveStockInput {
+  itemId?: string;
+  name: string;
+  sku: string;
+  brand?: string;
+  category: string;
+  unit: string;
+  minQty: number;
+  qty: number;
+  unitPrice: number;
+  cell: string;
+  supplier?: string;
+  employee: string;
+  note?: string;
+  createExpense: boolean;
+}
+
 interface AppStoreValue extends DB {
   setDB: React.Dispatch<React.SetStateAction<DB>>;
   updateOrder: (id: string, patch: Partial<Order>) => void;
@@ -83,6 +100,7 @@ interface AppStoreValue extends DB {
   deleteVehicle: (id: string) => void;
   addStockMovement: (m: StockMovement) => void;
   updateStockItem: (id: string, patch: Partial<StockItem>) => void;
+  receiveStock: (input: ReceiveStockInput) => void;
   addExpense: (e: Expense) => void;
   updateCompany: (patch: Partial<CompanyInfo>) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
@@ -132,6 +150,84 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           stock: prev.stock.map((s) => (s.id === id ? { ...s, ...patch } : s)),
         })),
       addExpense: (e) => setDB((prev) => ({ ...prev, expenses: [e, ...prev.expenses] })),
+      receiveStock: (input) =>
+        setDB((prev) => {
+          const stamp = Date.now();
+          const now = new Date().toISOString();
+          const total = Math.round(input.qty * input.unitPrice);
+          const existing = input.itemId ? prev.stock.find((item) => item.id === input.itemId) : undefined;
+          const itemId = existing?.id ?? `st-${stamp}`;
+
+          // Средневзвешенная закупочная цена: старый остаток по старой цене плюс новый приход.
+          const nextStock = existing
+            ? prev.stock.map((item) => {
+                if (item.id !== existing.id) return item;
+                const qty = item.qty + input.qty;
+                const purchasePrice = input.unitPrice > 0 && qty > 0
+                  ? Math.round((item.qty * item.purchasePrice + total) / qty)
+                  : item.purchasePrice;
+                return {
+                  ...item,
+                  qty,
+                  purchasePrice,
+                  cell: input.cell || item.cell,
+                  minQty: input.minQty || item.minQty,
+                  supplier: input.supplier || item.supplier,
+                  lastPurchasePrice: input.unitPrice > 0 ? input.unitPrice : item.lastPurchasePrice,
+                  lastPurchaseAt: input.unitPrice > 0 ? now : item.lastPurchaseAt,
+                };
+              })
+            : [
+                ...prev.stock,
+                {
+                  id: itemId,
+                  name: input.name,
+                  sku: input.sku,
+                  brand: input.brand,
+                  category: input.category,
+                  qty: input.qty,
+                  minQty: input.minQty,
+                  purchasePrice: input.unitPrice,
+                  cell: input.cell,
+                  unit: input.unit,
+                  supplier: input.supplier,
+                  lastPurchasePrice: input.unitPrice,
+                  lastPurchaseAt: now,
+                },
+              ];
+
+          const movement: StockMovement = {
+            id: `mv-${stamp}`,
+            date: now,
+            itemId,
+            operation: "Приёмка",
+            qty: input.qty,
+            to: input.cell,
+            employee: input.employee,
+            unitPrice: input.unitPrice,
+            amount: total,
+            note: input.note,
+          };
+
+          const expenses = input.createExpense && total > 0
+            ? [
+                {
+                  id: `exp-${stamp}`,
+                  date: now,
+                  category: "Закупка запчастей",
+                  description: `Приёмка: ${input.name} — ${input.qty} ${input.unit}`,
+                  amount: total,
+                  counterparty: input.supplier || "Поставщик",
+                  status: "Оплачено" as const,
+                  source: "stock_purchase" as const,
+                  itemId,
+                },
+                ...prev.expenses,
+              ]
+            : prev.expenses;
+
+          return { ...prev, stock: nextStock, stockMovements: [movement, ...prev.stockMovements], expenses };
+        }),
       updateCompany: (patch) => setDB((prev) => ({ ...prev, company: { ...prev.company, ...patch } })),
       updateSettings: (patch) => setDB((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } })),
       addService: (service) => setDB((prev) => ({ ...prev, services: [...prev.services, service] })),

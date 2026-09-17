@@ -7,7 +7,7 @@ import {
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
-import { Button, Card, EmptyState, Page, StatusBadge, TopBar } from "../components/ui";
+import { Button, Card, EmptyState, ListCard, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney, plural } from "../lib/format";
 import { orderTotals } from "../lib/order";
 import type { Vehicle } from "../types";
@@ -452,7 +452,33 @@ export default function ClientDetail() {
           <div className="border-b p-4" style={{ borderColor: "var(--border)" }}>
             <h2 className="panel-title flex items-center gap-2"><IconClipboardList size={18} /> История обслуживания</h2>
           </div>
-          <div className="table-scroll">
+          <div className="space-y-2 p-3 lg:hidden">
+            {clientOrders.map((order) => {
+              const vehicle = vehicles.find((item) => item.id === order.vehicleId);
+              const { due, debt } = orderTotals(order);
+              return (
+                <ListCard
+                  key={order.id}
+                  onClick={() => navigate(`/orders/${order.id}`)}
+                  accent
+                  title={order.number}
+                  amount={formatMoney(due)}
+                  lines={[
+                    vehicle ? `${vehicle.make} ${vehicle.model}` : null,
+                    order.works.map((work) => work.name).join(", ") || null,
+                    debt > 0 ? <span style={{ color: "var(--danger)" }}>Долг {formatMoney(debt)}</span> : null,
+                  ]}
+                  badge={<StatusBadge status={order.status} />}
+                  meta={formatDateTime(order.createdAt)}
+                />
+              );
+            })}
+            {clientOrders.length === 0 && (
+              <EmptyState icon={<IconClipboardList size={22} />} title="Заказ-нарядов пока нет" hint="Создайте первую запись для этого клиента" />
+            )}
+          </div>
+
+          <div className="table-scroll hidden lg:block">
             <table className="app-table min-w-[720px]">
               <thead>
                 <tr>

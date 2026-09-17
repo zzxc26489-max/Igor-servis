@@ -127,6 +127,9 @@ export interface StockItem {
   purchasePrice: number;
   cell?: string;
   unit: string;
+  lastPurchasePrice?: number;
+  lastPurchaseAt?: string;
+  supplier?: string;
 }
 
 export interface StockMovement {
@@ -138,6 +141,9 @@ export interface StockMovement {
   from?: string;
   to?: string;
   employee: string;
+  unitPrice?: number;
+  amount?: number;
+  note?: string;
 }
 
 export interface Expense {
@@ -149,6 +155,8 @@ export interface Expense {
   counterparty: string;
   status: "Оплачено" | "Ожидает";
   comment?: string;
+  source?: "stock_purchase";
+  itemId?: string;
 }
 
 export interface Invoice {

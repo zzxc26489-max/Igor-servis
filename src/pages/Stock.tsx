@@ -1,82 +1,297 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { IconBarcode, IconBox, IconCamera, IconMapPin, IconPlus, IconShoppingCart } from "@tabler/icons-react";
+import {
+  IconAlertTriangle, IconBox, IconCoin, IconMapPin, IconPackageImport,
+  IconSearch, IconShoppingCart, IconX,
+} from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
-import { useToast } from "../components/Toast";
-import { Button, Card, Page, TopBar } from "../components/ui";
-import { formatDateTime, formatMoney } from "../lib/format";
+import { Button, Card, EmptyState, ListCard, Page, TopBar } from "../components/ui";
+import { formatDateTime, formatMoney, plural } from "../lib/format";
+import StockReceive from "./StockReceive";
+import type { StockItem } from "../types";
 
-const CELLS = ["A-01-01", "A-01-02", "A-02-01", "A-02-02", "A-03-01", "A-03-02", "A-04-01", "A-04-02", "B-01-01", "B-01-02", "B-02-01", "B-02-02", "B-03-01", "B-03-02", "B-04-01", "B-04-02"];
+type StockFilter = "all" | "low" | "out" | "ok";
+type SortKey = "name" | "qty" | "value";
+
+const FILTERS: { value: StockFilter; label: string }[] = [
+  { value: "all", label: "Все" },
+  { value: "low", label: "Заканчивается" },
+  { value: "out", label: "Закончилось" },
+  { value: "ok", label: "В наличии" },
+];
+
+function stockState(item: StockItem): StockFilter {
+  if (item.qty <= 0) return "out";
+  if (item.qty <= item.minQty) return "low";
+  return "ok";
+}
 
 export default function Stock() {
-  const { stock, stockMovements, updateStockItem, addStockMovement } = useAppStore();
-  const { showToast } = useToast();
+  const { stock, stockMovements } = useAppStore();
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState(stock[0]?.id ?? "");
-  const [qty, setQty] = useState("1");
-  const [cell, setCell] = useState(stock[0]?.cell || "A-03-02");
-  const critical = stock.filter((i) => i.qty <= i.minQty);
-  const selected = useMemo(() => stock.find((item) => item.id === selectedId) ?? stock[0], [selectedId, stock]);
-  const shownStock = stock.filter((item) => `${item.name} ${item.sku} ${item.brand ?? ""}`.toLowerCase().includes(query.toLowerCase()));
-  const occupiedCells = new Set(stock.map((item) => item.cell).filter(Boolean));
+  const [filter, setFilter] = useState<StockFilter>("all");
+  const [category, setCategory] = useState("all");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [receiveFor, setReceiveFor] = useState<string | null>(null);
+  const [receiveOpen, setReceiveOpen] = useState(false);
 
-  function receive() {
-    if (!selected) return;
-    const received = Math.max(1, Number(qty) || 1);
-    updateStockItem(selected.id, { qty: selected.qty + received, cell });
-    addStockMovement({ id: `mv-${Date.now()}`, date: new Date().toISOString(), itemId: selected.id, operation: "Приёмка", qty: received, to: cell, employee: "Юра" });
-    showToast(`${selected.name}: принято ${received} ${selected.unit} в ячейку ${cell}`);
+  const categories = useMemo(() => Array.from(new Set(stock.map((item) => item.category))).sort(), [stock]);
+  const lowCount = stock.filter((item) => item.qty > 0 && item.qty <= item.minQty).length;
+  const outCount = stock.filter((item) => item.qty <= 0).length;
+  const totalValue = stock.reduce((sum, item) => sum + item.qty * item.purchasePrice, 0);
+
+  const shown = useMemo(() => {
+    const term = query.trim().toLocaleLowerCase("ru-RU");
+    const filtered = stock.filter((item) => {
+      if (filter !== "all" && stockState(item) !== filter) return false;
+      if (category !== "all" && item.category !== category) return false;
+      if (!term) return true;
+      return `${item.name} ${item.sku} ${item.brand ?? ""} ${item.cell ?? ""}`.toLocaleLowerCase("ru-RU").includes(term);
+    });
+    return [...filtered].sort((a, b) => {
+      if (sortKey === "qty") return a.qty - b.qty;
+      if (sortKey === "value") return b.qty * b.purchasePrice - a.qty * a.purchasePrice;
+      return a.name.localeCompare(b.name, "ru");
+    });
+  }, [category, filter, query, sortKey, stock]);
+
+  function openReceive(itemId?: string) {
+    setReceiveFor(itemId ?? null);
+    setReceiveOpen(true);
   }
 
   return (
     <>
-      <TopBar title="Склад — приёмка запчастей" subtitle="Отсканируйте штрихкод, укажите ячейку хранения и оприходуйте деталь." />
+      <TopBar
+        title="Склад"
+        subtitle={`${stock.length} ${plural(stock.length, "позиция", "позиции", "позиций")} · остаток на ${formatMoney(totalValue)}`}
+        hideNewRecordOnMobile
+        actions={
+          <Button size="sm" onClick={() => openReceive()} aria-label="Приёмка на склад" title="Приёмка">
+            <IconPackageImport size={18} /><span className="hidden sm:inline">Приёмка</span>
+          </Button>
+        }
+      />
       <Page>
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.45fr_.86fr_.64fr]">
-          <Card className="p-0 overflow-hidden">
-            <div className="p-5 border-b" style={{ borderColor: "var(--border)" }}>
-              <h2 className="panel-title">Сканируйте штрихкод или найдите запчасть</h2>
-              <div className="mt-4 flex gap-2">
-                <div className="relative flex-1">
-                  <IconBarcode className="absolute left-3 top-3" size={22} color="var(--text-muted)" />
-                  <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full rounded-lg border py-3 pl-11 pr-3 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]" style={{ borderColor: "var(--accent)" }} placeholder="Введите артикул или название…" />
-                </div>
-                <button className="rounded-lg border px-3 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" style={{ borderColor: "var(--border)" }} aria-label="Сканировать камерой" onClick={() => showToast("Камера будет подключена после запуска серверной версии CRM.", "info")}><IconCamera size={22} /></button>
-              </div>
-              <p className="muted mt-2 text-xs">Сканер штрихкода работает как клавиатура: наведите его в это поле.</p>
-            </div>
-            <div className="max-h-64 overflow-auto divide-y" style={{ borderColor: "var(--border)" }}>
-              {shownStock.map((item) => (
-                <button
-                  key={item.id}
-                  aria-pressed={item.id === selected?.id}
-                  className={`relative flex w-full items-center gap-3 p-4 text-left transition hover:bg-[#f7faf8] focus-visible:outline-none focus-visible:bg-[#f7faf8] ${item.id === selected?.id ? "bg-[#f1f8f4] after:absolute after:inset-y-0 after:left-0 after:w-1 after:bg-[var(--accent)]" : ""}`}
-                  onClick={() => { setSelectedId(item.id); setCell(item.cell || "A-03-02"); }}
-                >
-                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-[#edf5f0] text-[var(--accent)]"><IconBox size={28} /></div>
-                  <span className="min-w-0 flex-1"><b className="block">{item.name}</b><span className="muted text-xs">{item.brand || "Без бренда"} · {item.sku}</span></span>
-                  <span className="text-right text-xs"><b className="block">{item.qty} {item.unit}</b><span className={item.qty <= item.minQty ? "text-red-500" : "muted"}>мин. {item.minQty}</span></span>
-                </button>
-              ))}
-            </div>
-            {selected && <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-[1fr_auto] sm:items-end">
-              <div><div className="text-sm font-semibold">{selected.name}</div><div className="muted mt-1 text-sm">Закупочная цена: {formatMoney(selected.purchasePrice)} · {selected.category}</div></div>
-              <label className="text-sm">Количество к приёмке<div className="field-control mt-1 w-32"><input value={qty} inputMode="numeric" onChange={(e) => setQty(e.target.value.replace(/\D/g, ""))} /></div></label>
-            </div>}
-          </Card>
-
-          <Card className="xl:min-h-full">
-            <div className="flex items-start justify-between gap-3"><div><h2 className="panel-title">Куда положить</h2><p className="muted mt-1 text-xs">Ячейка хранения детали</p></div><IconMapPin size={22} color="var(--accent)" /></div>
-            <div className="mt-5 rounded-lg bg-[#edf7f0] p-4"><span className="muted text-xs">Рекомендуемая ячейка</span><b className="mt-1 block text-xl">{cell}</b><span className="mt-2 inline-block rounded-full bg-white px-2 py-1 text-xs text-[var(--accent)]">Свободна</span></div>
-            <label className="mt-4 block text-sm font-medium">Или выберите другую ячейку<select className="mt-2 w-full rounded-lg border bg-white px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }} value={cell} onChange={(e) => setCell(e.target.value)}>{CELLS.map((value) => <option value={value} key={value}>{value} {occupiedCells.has(value) && value !== selected?.cell ? "(занята)" : "(свободна)"}</option>)}</select></label>
-            <div className="mt-5 grid grid-cols-4 gap-1 text-center text-[10px]">{CELLS.map((value) => <button onClick={() => setCell(value)} key={value} className="min-h-10 rounded border px-1 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" style={{ borderColor: value === cell ? "var(--accent)" : "var(--border)", background: value === cell ? "var(--accent)" : occupiedCells.has(value) ? "#f1f3f2" : "white", color: value === cell ? "white" : "var(--text)" }}>{value}</button>)}</div>
-          </Card>
-
-          <Card className="overflow-hidden p-0"><div className="flex items-center justify-between border-b p-4" style={{ borderColor: "var(--border)" }}><h2 className="panel-title">Остатки и закупка</h2><Link to="/purchases" className="text-sm font-semibold text-[var(--accent)]">Все</Link></div><div className="p-2">{critical.map((item) => <div key={item.id} className="flex items-center justify-between gap-2 border-b p-3 last:border-0" style={{ borderColor: "var(--border)" }}><span className="text-sm"><b className="block">{item.name}</b><span className="text-xs text-red-500">Мин. остаток: {item.minQty}</span></span><b className="text-red-500">{item.qty}</b></div>)}</div><div className="p-3"><Link to="/purchases" className="block"><Button variant="secondary" className="w-full"><IconShoppingCart size={18} /> К закупкам</Button></Link></div></Card>
+        <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Metric icon={<IconBox size={18} />} tone="#e9f5ed" color="var(--accent)" label="Позиций" value={String(stock.length)} />
+          <Metric icon={<IconCoin size={18} />} tone="#edf4ff" color="#3978c9" label="Стоимость остатка" value={formatMoney(totalValue)} />
+          <Metric icon={<IconAlertTriangle size={18} />} tone="#fdf3e0" color="var(--warning)" label="Заканчивается" value={String(lowCount)} onClick={() => setFilter("low")} />
+          <Metric icon={<IconX size={18} />} tone="#fbe9e9" color="var(--danger)" label="Закончилось" value={String(outCount)} onClick={() => setFilter("out")} />
         </div>
-        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.45fr_.86fr_.64fr]"><Button className="w-full xl:col-span-2" onClick={receive}><IconPlus size={18} /> Оприходовать на склад</Button></div>
-        <Card className="mt-4 p-0 overflow-hidden"><div className="flex items-center justify-between p-4"><h2 className="panel-title">Последние движения по складу</h2><span className="text-sm text-[var(--accent)]">Все движения</span></div><div className="overflow-auto"><table className="app-table min-w-[720px]"><thead><tr><th>Дата и время</th><th>Запчасть</th><th>Операция</th><th className="text-right">Кол-во</th><th>Куда</th><th>Сотрудник</th></tr></thead><tbody>{stockMovements.map((movement) => { const item = stock.find((i) => i.id === movement.itemId); return <tr key={movement.id}><td>{formatDateTime(movement.date)}</td><td><b>{item?.name || "—"}</b><div className="muted text-xs">{item?.sku}</div></td><td><span className="rounded-full bg-[#e8f5ed] px-2 py-1 text-xs text-[var(--accent)]">{movement.operation}</span></td><td className="text-right">{movement.qty} {item?.unit}</td><td>{movement.to || movement.from || "—"}</td><td>{movement.employee}</td></tr>; })}</tbody></table></div></Card>
+
+        <Card className="mb-3">
+          <div className="relative">
+            <IconSearch className="pointer-events-none absolute left-3 top-3" size={18} color="var(--text-muted)" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Поиск: название, артикул, бренд, ячейка"
+              className="w-full rounded-lg border py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[var(--accent)]"
+              style={{ borderColor: "var(--border)" }}
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {FILTERS.map((item) => (
+              <button
+                key={item.value}
+                onClick={() => setFilter(item.value)}
+                className="rounded-lg border px-3 py-1.5 text-sm transition"
+                style={{
+                  borderColor: filter === item.value ? "var(--accent)" : "var(--border)",
+                  background: filter === item.value ? "var(--accent)" : "white",
+                  color: filter === item.value ? "white" : "var(--text)",
+                }}
+              >
+                {item.label}
+                {item.value === "low" && lowCount > 0 ? ` · ${lowCount}` : ""}
+                {item.value === "out" && outCount > 0 ? ` · ${outCount}` : ""}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <label className="block text-sm">
+              <span className="mb-1 block muted">Категория</span>
+              <div className="field-control">
+                <select value={category} onChange={(event) => setCategory(event.target.value)}>
+                  <option value="all">Все категории</option>
+                  {categories.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </div>
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block muted">Сортировка</span>
+              <div className="field-control">
+                <select value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)}>
+                  <option value="name">По названию</option>
+                  <option value="qty">Сначала с малым остатком</option>
+                  <option value="value">По стоимости остатка</option>
+                </select>
+              </div>
+            </label>
+          </div>
+        </Card>
+
+        <Card className="overflow-hidden p-0">
+          <div className="flex items-center justify-between gap-2 border-b p-4" style={{ borderColor: "var(--border)" }}>
+            <h2 className="panel-title">Позиции{shown.length !== stock.length ? `: ${shown.length}` : ""}</h2>
+            <Link to="/purchases" className="text-sm font-semibold text-[var(--accent)]">К закупкам</Link>
+          </div>
+
+          <div className="space-y-2 p-3 lg:hidden">
+            {shown.map((item) => (
+              <ListCard
+                key={item.id}
+                onClick={() => openReceive(item.id)}
+                title={item.name}
+                amount={<span style={{ color: item.qty <= item.minQty ? "var(--danger)" : undefined }}>{item.qty} {item.unit}</span>}
+                lines={[
+                  `${item.brand ? `${item.brand} · ` : ""}${item.sku}`,
+                  <>
+                    {item.cell ? <><IconMapPin size={13} className="inline" /> {item.cell} · </> : null}
+                    {formatMoney(item.purchasePrice)} за {item.unit} · мин. {item.minQty}
+                  </>,
+                ]}
+                meta={formatMoney(item.qty * item.purchasePrice)}
+              />
+            ))}
+            {shown.length === 0 && <EmptyState icon={<IconBox size={22} />} title="Ничего не найдено" hint="Смените фильтр или поисковый запрос" />}
+          </div>
+
+          <div className="table-scroll hidden lg:block">
+            <table className="app-table min-w-[820px]">
+              <thead>
+                <tr>
+                  <th>Запчасть</th>
+                  <th>Категория</th>
+                  <th>Ячейка</th>
+                  <th className="text-right">Остаток</th>
+                  <th className="text-right">Мин.</th>
+                  <th className="text-right">Цена закупки</th>
+                  <th className="text-right">Сумма</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <b className="block">{item.name}</b>
+                      <span className="muted text-xs">{item.brand ? `${item.brand} · ` : ""}{item.sku}</span>
+                    </td>
+                    <td className="muted">{item.category}</td>
+                    <td>{item.cell || "—"}</td>
+                    <td className="text-right font-medium" style={{ color: item.qty <= item.minQty ? "var(--danger)" : undefined }}>
+                      {item.qty} {item.unit}
+                    </td>
+                    <td className="muted text-right">{item.minQty}</td>
+                    <td className="text-right">{formatMoney(item.purchasePrice)}</td>
+                    <td className="text-right font-medium">{formatMoney(item.qty * item.purchasePrice)}</td>
+                    <td className="text-right">
+                      <Button size="sm" variant="secondary" onClick={() => openReceive(item.id)} aria-label={`Принять ${item.name}`}>
+                        <IconPackageImport size={16} /> Принять
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                {shown.length === 0 && (
+                  <tr>
+                    <td colSpan={8}>
+                      <EmptyState icon={<IconBox size={22} />} title="Ничего не найдено" hint="Смените фильтр или поисковый запрос" />
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        <Card className="mt-3 overflow-hidden p-0">
+          <div className="flex items-center justify-between gap-3 border-b p-4" style={{ borderColor: "var(--border)" }}>
+            <h2 className="panel-title">Последние движения</h2>
+            <Link to="/purchases" className="shrink-0 text-sm font-semibold text-[var(--accent)]">
+              <IconShoppingCart size={14} className="inline" /> Закупки
+            </Link>
+          </div>
+
+          <div className="space-y-2 p-3 lg:hidden">
+            {stockMovements.slice(0, 15).map((movement) => {
+              const item = stock.find((entry) => entry.id === movement.itemId);
+              return (
+                <ListCard
+                  key={movement.id}
+                  title={item?.name || "Позиция удалена"}
+                  amount={movement.amount ? formatMoney(movement.amount) : undefined}
+                  lines={[`${movement.operation} · ${movement.qty} ${item?.unit ?? "шт."}${movement.to ? ` → ${movement.to}` : ""}`]}
+                  meta={`${formatDateTime(movement.date)} · ${movement.employee}`}
+                />
+              );
+            })}
+            {stockMovements.length === 0 && <p className="muted p-3 text-sm">Движений пока не было.</p>}
+          </div>
+
+          <div className="table-scroll hidden lg:block">
+            <table className="app-table min-w-[760px]">
+              <thead>
+                <tr>
+                  <th>Дата и время</th>
+                  <th>Запчасть</th>
+                  <th>Операция</th>
+                  <th className="text-right">Кол-во</th>
+                  <th className="text-right">Сумма</th>
+                  <th>Ячейка</th>
+                  <th>Сотрудник</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stockMovements.slice(0, 20).map((movement) => {
+                  const item = stock.find((entry) => entry.id === movement.itemId);
+                  return (
+                    <tr key={movement.id}>
+                      <td className="muted whitespace-nowrap">{formatDateTime(movement.date)}</td>
+                      <td>
+                        <b>{item?.name || "Позиция удалена"}</b>
+                        <div className="muted text-xs">{item?.sku}</div>
+                      </td>
+                      <td>
+                        <span className="rounded-full bg-[#e8f5ed] px-2 py-1 text-xs text-[var(--accent)]">{movement.operation}</span>
+                      </td>
+                      <td className="text-right">{movement.qty} {item?.unit}</td>
+                      <td className="text-right">{movement.amount ? formatMoney(movement.amount) : "—"}</td>
+                      <td>{movement.to || movement.from || "—"}</td>
+                      <td className="muted">{movement.employee}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       </Page>
+
+      {receiveOpen && <StockReceive onClose={() => setReceiveOpen(false)} presetItemId={receiveFor ?? undefined} />}
     </>
   );
+}
+
+function Metric({ icon, tone, color, label, value, onClick }: {
+  icon: React.ReactNode; tone: string; color: string; label: string; value: string; onClick?: () => void;
+}) {
+  const content = (
+    <>
+      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: tone, color }}>{icon}</div>
+      <div className="min-w-0 text-left">
+        <p className="muted truncate text-xs">{label}</p>
+        <p className="truncate text-base font-semibold sm:text-lg">{value}</p>
+      </div>
+    </>
+  );
+  if (onClick) {
+    return (
+      <button onClick={onClick} className="flex items-center gap-2.5 rounded-xl border bg-white p-3 shadow-[0_2px_8px_rgba(23,34,30,0.045)] transition hover:bg-gray-50 sm:p-4" style={{ borderColor: "var(--border)" }}>
+        {content}
+      </button>
+    );
+  }
+  return <Card className="flex items-center gap-2.5 p-3 sm:p-4">{content}</Card>;
 }

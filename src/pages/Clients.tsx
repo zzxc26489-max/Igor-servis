@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconChevronRight, IconStar, IconUsers } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
-import { Card, EmptyState, Page, TopBar } from "../components/ui";
+import { Card, EmptyState, ListCard, Page, TopBar } from "../components/ui";
+import { plural } from "../lib/format";
 
 export default function Clients() {
   const { clients, vehicles, orders } = useAppStore();
@@ -44,7 +45,30 @@ export default function Clients() {
         </div>
 
         <Card className="p-0 overflow-hidden">
-          <div className="table-scroll">
+          <div className="space-y-2 p-3 lg:hidden">
+            {filteredClients.map((c) => {
+              const clientVehicles = vehicles.filter((v) => v.clientId === c.id);
+              const clientOrders = orders.filter((o) => o.clientId === c.id);
+              return (
+                <ListCard
+                  key={c.id}
+                  onClick={() => navigate(`/clients/${c.id}`)}
+                  title={c.name}
+                  amount={c.isRegular ? <span className="text-xs font-semibold text-[var(--accent)]">постоянный</span> : undefined}
+                  lines={[
+                    c.phone,
+                    clientVehicles.map((v) => `${v.make} ${v.model}`).join(", ") || "Автомобилей нет",
+                  ]}
+                  meta={`${clientOrders.length} ${plural(clientOrders.length, "заказ", "заказа", "заказов")}`}
+                />
+              );
+            })}
+            {filteredClients.length === 0 && (
+              <EmptyState icon={<IconUsers size={22} />} title="Ничего не найдено" hint="Проверьте написание или попробуйте другой запрос" />
+            )}
+          </div>
+
+          <div className="table-scroll hidden lg:block">
             <table className="app-table min-w-[640px]">
               <thead>
                 <tr>
