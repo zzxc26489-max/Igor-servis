@@ -8,7 +8,7 @@ import {
 import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
-import { Button, Card, EmptyState, ListCard, Page, StatusBadge, TopBar } from "../components/ui";
+import { Button, Card, EmptyState, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney, plural } from "../lib/format";
 import { orderTotals } from "../lib/order";
 import type { Vehicle } from "../types";
@@ -271,10 +271,10 @@ export default function ClientDetail() {
       />
       <Page>
         <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Stat icon={<IconClipboardList size={18} />} tone="#e9f5ed" color="var(--accent)" label="Заказов" value={String(clientOrders.length)} />
-          <Stat icon={<IconCoin size={18} />} tone="#edf4ff" color="#3978c9" label="Потрачено" value={formatMoney(stats.spent)} />
-          <Stat icon={<IconCoin size={18} />} tone="#f5f0ff" color="#6656b8" label="Средний чек" value={formatMoney(stats.average)} />
-          <Stat icon={<IconCoin size={18} />} tone="#fbe9e9" color="var(--danger)" label="Долг" value={formatMoney(stats.debt)} />
+          <Metric icon={<IconClipboardList size={18} />} label="Заказов" value={String(clientOrders.length)} />
+          <Metric icon={<IconCoin size={18} />} tone="blue" label="Потрачено" value={formatMoney(stats.spent)} />
+          <Metric icon={<IconCoin size={18} />} tone="violet" label="Средний чек" value={formatMoney(stats.average)} />
+          <Metric icon={<IconCoin size={18} />} tone="danger" label="Долг" value={formatMoney(stats.debt)} />
         </div>
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
@@ -530,19 +530,6 @@ export default function ClientDetail() {
   );
 }
 
-function Stat({ icon, tone, color, label, value }: { icon: ReactNode; tone: string; color: string; label: string; value: string }) {
-  return (
-    <Card className="flex items-center gap-2.5 p-3 sm:p-4">
-      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: tone, color }}>
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="muted truncate text-xs">{label}</p>
-        <p className="truncate text-base font-semibold sm:text-lg">{value}</p>
-      </div>
-    </Card>
-  );
-}
 
 function InfoRow({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
   return (

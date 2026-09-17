@@ -155,7 +155,7 @@ export default function NewOrder() {
 
   return (
     <>
-      <TopBar title="Новая запись" subtitle="Создайте клиента, автомобиль и предварительный заказ-наряд" />
+      <TopBar title="Новая запись" subtitle="Клиент, автомобиль и время визита" />
       <Page>
         <form onSubmit={handleSubmit} className="mx-auto max-w-4xl space-y-4">
           <Card>

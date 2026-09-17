@@ -155,18 +155,79 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
   );
 }
 
-export function StatTile({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: "up" | "down" }) {
-  return (
-    <Card className="flex-1 min-w-[180px]">
-      <div className="text-sm" style={{ color: "var(--text-muted)" }}>{label}</div>
-      <div className="text-2xl font-semibold mt-1">{value}</div>
-      {hint && (
-        <div className="text-xs mt-1" style={{ color: tone === "down" ? "var(--danger)" : "var(--accent)" }}>
-          {hint}
-        </div>
+const METRIC_TONES = {
+  accent: { bg: "#e9f5ed", color: "var(--accent)" },
+  blue: { bg: "#edf4ff", color: "#3978c9" },
+  violet: { bg: "#f5f0ff", color: "#6656b8" },
+  warning: { bg: "#fdf3e0", color: "var(--warning)" },
+  danger: { bg: "#fbe9e9", color: "var(--danger)" },
+} as const;
+
+export type MetricTone = keyof typeof METRIC_TONES;
+
+/** Единая плитка показателя: используется на всех страницах, чтобы цифры выглядели одинаково. */
+export function Metric({
+  icon,
+  label,
+  value,
+  hint,
+  tone = "accent",
+  onClick,
+  current,
+  previous,
+  lowerIsBetter = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: MetricTone;
+  onClick?: () => void;
+  /** Числовое значение для сравнения с прошлым периодом. */
+  current?: number;
+  previous?: number;
+  lowerIsBetter?: boolean;
+}) {
+  const palette = METRIC_TONES[tone];
+  const delta =
+    current !== undefined && previous !== undefined && previous !== 0
+      ? Math.round(((current - previous) / Math.abs(previous)) * 100)
+      : null;
+  const deltaIsGood = lowerIsBetter ? (delta ?? 0) < 0 : (delta ?? 0) > 0;
+
+  const body = (
+    <>
+      <div className="flex items-center gap-2.5">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: palette.bg, color: palette.color }}>
+          {icon}
+        </span>
+        <span className="min-w-0 text-left">
+          <span className="muted block truncate text-xs">{label}</span>
+          <span className="block truncate text-base font-semibold tabular-nums sm:text-lg">{value}</span>
+        </span>
+      </div>
+      {(hint || delta) && (
+        <p className="mt-2 flex items-center gap-2 text-xs">
+          {delta !== null && delta !== 0 && (
+            <span className="shrink-0 font-semibold" style={{ color: deltaIsGood ? "var(--accent)" : "var(--danger)" }}>
+              {delta > 0 ? "↑" : "↓"} {Math.abs(delta) > 999 ? ">999" : Math.abs(delta)}%
+            </span>
+          )}
+          {hint && <span className="muted truncate">{hint}</span>}
+        </p>
       )}
-    </Card>
+    </>
   );
+
+  const base = "rounded-xl border bg-white p-3 shadow-[0_2px_8px_rgba(23,34,30,0.045)] sm:p-4";
+  if (onClick) {
+    return (
+      <button onClick={onClick} className={`${base} text-left transition hover:bg-gray-50`} style={{ borderColor: "var(--border)" }}>
+        {body}
+      </button>
+    );
+  }
+  return <div className={base} style={{ borderColor: "var(--border)" }}>{body}</div>;
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {

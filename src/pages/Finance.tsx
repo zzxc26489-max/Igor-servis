@@ -1,13 +1,13 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
-  IconArrowDown, IconArrowUp, IconBox, IconBriefcase, IconChartBar, IconChevronLeft,
+  IconBox, IconBriefcase, IconChartBar, IconChevronLeft,
   IconChevronRight, IconCoin, IconCreditCardPay, IconPlus, IconUsers,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
-import { Button, Card, ListCard, Page, StatusBadge, TopBar } from "../components/ui";
+import { Button, Card, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatMoney, plural } from "../lib/format";
 import { computePayroll } from "../lib/payroll";
 import {
@@ -105,7 +105,7 @@ export default function Finance() {
 
   return (
     <>
-      <TopBar title="Финансы" subtitle="Выручка, расходы, зарплаты и прибыль за выбранный период" hideNewRecordOnMobile />
+      <TopBar title="Финансы" subtitle="Деньги за выбранный период" hideNewRecordOnMobile />
       <Page>
         <Card className="mb-3">
           <div className="flex flex-wrap gap-1.5">
@@ -141,10 +141,10 @@ export default function Finance() {
         </Card>
 
         <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <MoneyCard icon={<IconCreditCardPay size={20} />} label="Выручка" value={metrics.revenue} previous={previous?.revenue} hint={`${metrics.orders.length} ${plural(metrics.orders.length, "заказ", "заказа", "заказов")}`} />
-          <MoneyCard icon={<IconBriefcase size={20} />} label="Расходы" value={metrics.expenses} previous={previous?.expenses} hint="Закупки и прочее" tone="blue" invert />
-          <MoneyCard icon={<IconCoin size={20} />} label="Зарплаты" value={metrics.salaries} hint="Начислено мастерам" tone="violet" invert />
-          <MoneyCard icon={<IconChartBar size={20} />} label="Прибыль" value={metrics.profit} previous={previous?.profit} hint="После расходов и зарплат" />
+          <Metric icon={<IconCreditCardPay size={18} />} label="Выручка" value={formatMoney(metrics.revenue)} current={metrics.revenue} previous={previous?.revenue} hint={`${metrics.orders.length} ${plural(metrics.orders.length, "заказ", "заказа", "заказов")}`} />
+          <Metric icon={<IconBriefcase size={18} />} tone="blue" label="Расходы" value={formatMoney(metrics.expenses)} current={metrics.expenses} previous={previous?.expenses} lowerIsBetter hint="Закупки и прочее" />
+          <Metric icon={<IconCoin size={18} />} tone="violet" label="Зарплаты" value={formatMoney(metrics.salaries)} hint="Начислено мастерам" />
+          <Metric icon={<IconChartBar size={18} />} label="Прибыль" value={formatMoney(metrics.profit)} current={metrics.profit} previous={previous?.profit} hint="После расходов и зарплат" />
         </div>
 
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.4fr_1fr]">
@@ -393,34 +393,6 @@ export default function Finance() {
   );
 }
 
-function MoneyCard({ icon, label, value, hint, previous, tone = "green", invert = false }: {
-  icon: ReactNode; label: string; value: number; hint: string; previous?: number; tone?: "green" | "blue" | "violet"; invert?: boolean;
-}) {
-  const colors = { green: "bg-[#e9f5ed] text-[#147449]", blue: "bg-[#edf4ff] text-[#3978c9]", violet: "bg-[#f0efff] text-[#6656b8]" };
-  const delta = previous !== undefined && previous !== 0 ? Math.round(((value - previous) / Math.abs(previous)) * 100) : null;
-  const positive = invert ? (delta ?? 0) < 0 : (delta ?? 0) > 0;
-
-  return (
-    <Card className="p-3 sm:p-4">
-      <div className="flex items-center gap-2.5">
-        <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${colors[tone]}`}>{icon}</div>
-        <div className="min-w-0">
-          <p className="muted truncate text-xs">{label}</p>
-          <p className="truncate text-lg font-bold tabular-nums">{formatMoney(value)}</p>
-        </div>
-      </div>
-      <div className="mt-2 flex items-center gap-2 text-xs">
-        {delta !== null && delta !== 0 && (
-          <span className="inline-flex items-center gap-0.5 font-semibold" style={{ color: positive ? "var(--accent)" : "var(--danger)" }}>
-            {delta > 0 ? <IconArrowUp size={12} /> : <IconArrowDown size={12} />}
-            {Math.abs(delta) > 999 ? ">999" : Math.abs(delta)}%
-          </span>
-        )}
-        <span className="muted truncate">{hint}</span>
-      </div>
-    </Card>
-  );
-}
 
 function Row({ label, value, tone, raw = false }: { label: string; value: number; tone?: "accent" | "danger"; raw?: boolean }) {
   const color = tone === "accent" ? "var(--accent)" : tone === "danger" ? "var(--danger)" : undefined;

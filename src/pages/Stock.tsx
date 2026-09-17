@@ -5,7 +5,7 @@ import {
   IconSearch, IconShoppingCart, IconX,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
-import { Button, Card, EmptyState, ListCard, Page, TopBar } from "../components/ui";
+import { Button, Card, EmptyState, ListCard, Metric, Page, TopBar } from "../components/ui";
 import { formatDateTime, formatMoney, plural } from "../lib/format";
 import StockReceive from "./StockReceive";
 import type { StockItem } from "../types";
@@ -74,10 +74,10 @@ export default function Stock() {
       />
       <Page>
         <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Metric icon={<IconBox size={18} />} tone="#e9f5ed" color="var(--accent)" label="Позиций" value={String(stock.length)} />
-          <Metric icon={<IconCoin size={18} />} tone="#edf4ff" color="#3978c9" label="Стоимость остатка" value={formatMoney(totalValue)} />
-          <Metric icon={<IconAlertTriangle size={18} />} tone="#fdf3e0" color="var(--warning)" label="Заканчивается" value={String(lowCount)} onClick={() => setFilter("low")} />
-          <Metric icon={<IconX size={18} />} tone="#fbe9e9" color="var(--danger)" label="Закончилось" value={String(outCount)} onClick={() => setFilter("out")} />
+          <Metric icon={<IconBox size={18} />} label="Позиций" value={String(stock.length)} />
+          <Metric icon={<IconCoin size={18} />} tone="blue" label="Стоимость остатка" value={formatMoney(totalValue)} />
+          <Metric icon={<IconAlertTriangle size={18} />} tone="warning" label="Заканчивается" value={String(lowCount)} onClick={() => setFilter("low")} />
+          <Metric icon={<IconX size={18} />} tone="danger" label="Закончилось" value={String(outCount)} onClick={() => setFilter("out")} />
         </div>
 
         <Card className="mb-3">
@@ -276,24 +276,3 @@ export default function Stock() {
   );
 }
 
-function Metric({ icon, tone, color, label, value, onClick }: {
-  icon: React.ReactNode; tone: string; color: string; label: string; value: string; onClick?: () => void;
-}) {
-  const content = (
-    <>
-      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: tone, color }}>{icon}</div>
-      <div className="min-w-0 text-left">
-        <p className="muted truncate text-xs">{label}</p>
-        <p className="truncate text-base font-semibold sm:text-lg">{value}</p>
-      </div>
-    </>
-  );
-  if (onClick) {
-    return (
-      <button onClick={onClick} className="flex items-center gap-2.5 rounded-xl border bg-white p-3 shadow-[0_2px_8px_rgba(23,34,30,0.045)] transition hover:bg-gray-50 sm:p-4" style={{ borderColor: "var(--border)" }}>
-        {content}
-      </button>
-    );
-  }
-  return <Card className="flex items-center gap-2.5 p-3 sm:p-4">{content}</Card>;
-}

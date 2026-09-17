@@ -1,6 +1,6 @@
 import { IconAlertTriangle, IconCheck, IconShoppingCart, IconStack2 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
-import { Card, EmptyState, ListCard, Page, TopBar } from "../components/ui";
+import { Card, EmptyState, ListCard, Metric, Page, TopBar } from "../components/ui";
 import { formatMoney } from "../lib/format";
 
 export default function Purchases() {
@@ -12,35 +12,10 @@ export default function Purchases() {
     <>
       <TopBar title="Закупки" subtitle="Позиции склада, которые пора пополнить" />
       <Page>
-        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Card className="flex items-start gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#fdf3e0] text-[var(--warning)]">
-              <IconAlertTriangle size={22} />
-            </div>
-            <div>
-              <p className="muted text-sm">К заказу</p>
-              <p className="mt-1 text-2xl font-semibold">{toOrder.length}</p>
-              <p className="mt-1 text-xs muted">позиций ниже минимума</p>
-            </div>
-          </Card>
-          <Card className="flex items-start gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#edf4ff] text-[#3978c9]">
-              <IconStack2 size={22} />
-            </div>
-            <div>
-              <p className="muted text-sm">Всего позиций на складе</p>
-              <p className="mt-1 text-2xl font-semibold">{stock.length}</p>
-            </div>
-          </Card>
-          <Card className="flex items-start gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e9f5ed] text-[var(--accent)]">
-              <IconShoppingCart size={22} />
-            </div>
-            <div>
-              <p className="muted text-sm">Ориентировочная сумма закупки</p>
-              <p className="mt-1 text-2xl font-semibold">{formatMoney(totalSum)}</p>
-            </div>
-          </Card>
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Metric icon={<IconAlertTriangle size={18} />} tone="warning" label="К заказу" value={String(toOrder.length)} hint="позиций ниже минимума" />
+          <Metric icon={<IconStack2 size={18} />} tone="blue" label="Всего на складе" value={String(stock.length)} hint="позиций в номенклатуре" />
+          <Metric icon={<IconShoppingCart size={18} />} label="Сумма закупки" value={formatMoney(totalSum)} hint="ориентировочно" />
         </div>
 
         <Card className="p-0 overflow-hidden">
