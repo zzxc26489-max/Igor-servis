@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconAlertCircle, IconCalendarEvent, IconCar, IconUser } from "@tabler/icons-react";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { useToast } from "../components/Toast";
@@ -30,14 +30,20 @@ export default function NewOrder() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { clients, vehicles, lifts, orders, setDB } = useAppStore();
-  const [existingClientId, setExistingClientId] = useState("");
-  const [existingVehicleId, setExistingVehicleId] = useState("");
-  const [clientName, setClientName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [make, setMake] = useState("");
-  const [model, setModel] = useState("");
-  const [plate, setPlate] = useState("");
-  const [mileage, setMileage] = useState("");
+  const [searchParams] = useSearchParams();
+  const presetClient = clients.find((item) => item.id === searchParams.get("clientId"));
+  const presetVehicle = vehicles.find(
+    (item) => item.id === searchParams.get("vehicleId") && item.clientId === presetClient?.id,
+  );
+
+  const [existingClientId, setExistingClientId] = useState(presetClient?.id ?? "");
+  const [existingVehicleId, setExistingVehicleId] = useState(presetVehicle?.id ?? "");
+  const [clientName, setClientName] = useState(presetClient?.name ?? "");
+  const [phone, setPhone] = useState(presetClient?.phone ?? "");
+  const [make, setMake] = useState(presetVehicle?.make ?? "");
+  const [model, setModel] = useState(presetVehicle?.model ?? "");
+  const [plate, setPlate] = useState(presetVehicle?.plate ?? "");
+  const [mileage, setMileage] = useState(presetVehicle?.mileage ? String(presetVehicle.mileage) : "");
   const [date, setDate] = useState(today);
   const [time, setTime] = useState("10:00");
   const [liftId, setLiftId] = useState("");

@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { IconChevronDown, IconChevronUp, IconClipboardList, IconClockHour4, IconAlertTriangle, IconCoin } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { EmptyState, Page, StatusBadge, TopBar, Card } from "../components/ui";
@@ -21,6 +21,7 @@ type SortKey = "date" | "client" | "amount" | "debt";
 
 export default function Orders() {
   const { orders, clients, vehicles } = useAppStore();
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -121,7 +122,7 @@ export default function Orders() {
                   const vehicle = vehicles.find((v) => v.id === o.vehicleId);
                   const { due, debt } = orderTotals(o);
                   return (
-                    <tr key={o.id}>
+                    <tr key={o.id} onClick={() => navigate(`/orders/${o.id}`)} className="cursor-pointer">
                       <td>
                         <Link to={`/orders/${o.id}`} className="font-semibold" style={{ color: "var(--accent)" }}>
                           {o.number}

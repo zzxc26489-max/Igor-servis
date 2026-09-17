@@ -68,17 +68,17 @@ export const employees: Employee[] = [
 ];
 
 export const clients: Client[] = [
-  { id: "cl-1", name: "Смирнов Алексей", phone: "+7 916 000-00-01", isRegular: true },
-  { id: "cl-2", name: "Кузнецова Мария", phone: "+7 916 000-00-02", isRegular: true },
-  { id: "cl-3", name: "Волков Дмитрий", phone: "+7 916 000-00-03" },
-  { id: "cl-4", name: "Лебедев Сергей", phone: "+7 916 000-00-04" },
-  { id: "cl-5", name: "Панфилова Елена", phone: "+7 916 000-00-05" },
+  { id: "cl-1", name: "Смирнов Алексей", phone: "+7 916 000-00-01", isRegular: true, discountPercent: 5, source: "Сарафанное радио", createdAt: "2024-03-12", birthday: "1988-06-04", notes: "Приезжает по субботам, просит звонить заранее" },
+  { id: "cl-2", name: "Кузнецова Мария", phone: "+7 916 000-00-02", isRegular: true, discountPercent: 5, source: "Яндекс Карты", createdAt: "2024-08-01", email: "kuznecova@example.com" },
+  { id: "cl-3", name: "Волков Дмитрий", phone: "+7 916 000-00-03", source: "Авито", createdAt: "2025-05-20" },
+  { id: "cl-4", name: "Лебедев Сергей", phone: "+7 916 000-00-04", createdAt: "2026-02-11" },
+  { id: "cl-5", name: "Панфилова Елена", phone: "+7 916 000-00-05", createdAt: "2026-09-01" },
 ];
 
 export const vehicles: Vehicle[] = [
-  { id: "veh-1", clientId: "cl-1", make: "Toyota", model: "Camry", plate: "A123BC 797", mileage: 82000 },
-  { id: "veh-2", clientId: "cl-2", make: "Kia", model: "Sportage", plate: "H456MK 799", mileage: 78460, vin: "XWEPH81ADMN123456" },
-  { id: "veh-3", clientId: "cl-3", make: "BMW", model: "X5", plate: "O789KX 777", mileage: 145000 },
+  { id: "veh-1", clientId: "cl-1", make: "Toyota", model: "Camry", plate: "A123BC 797", mileage: 82000, year: 2019, color: "Чёрный", engine: "2.5 бензин", transmission: "АКПП", nextServiceMileage: 92000, nextServiceDate: "2026-12-01" },
+  { id: "veh-2", clientId: "cl-2", make: "Kia", model: "Sportage", plate: "H456MK 799", mileage: 78460, vin: "XWEPH81ADMN123456", year: 2021, color: "Белый", engine: "2.0 дизель", transmission: "АКПП" },
+  { id: "veh-3", clientId: "cl-3", make: "BMW", model: "X5", plate: "O789KX 777", mileage: 145000, year: 2016, color: "Синий", engine: "3.0 дизель", transmission: "АКПП" },
   { id: "veh-4", clientId: "cl-4", make: "Hyundai", model: "Solaris", plate: "K222TT 750" },
   { id: "veh-5", clientId: "cl-5", make: "Skoda", model: "Octavia", plate: "M333EE 197" },
 ];

@@ -80,6 +80,7 @@ interface AppStoreValue extends DB {
   updateClient: (id: string, patch: Partial<Client>) => void;
   addVehicle: (vehicle: Vehicle) => void;
   updateVehicle: (id: string, patch: Partial<Vehicle>) => void;
+  deleteVehicle: (id: string) => void;
   addStockMovement: (m: StockMovement) => void;
   updateStockItem: (id: string, patch: Partial<StockItem>) => void;
   addExpense: (e: Expense) => void;
@@ -122,6 +123,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ...prev,
           vehicles: prev.vehicles.map((v) => (v.id === id ? { ...v, ...patch } : v)),
         })),
+      deleteVehicle: (id) => setDB((prev) => ({ ...prev, vehicles: prev.vehicles.filter((v) => v.id !== id) })),
       addStockMovement: (m) =>
         setDB((prev) => ({ ...prev, stockMovements: [m, ...prev.stockMovements] })),
       updateStockItem: (id, patch) =>

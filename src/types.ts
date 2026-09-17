@@ -34,6 +34,12 @@ export interface Client {
   id: string;
   name: string;
   phone: string;
+  phone2?: string;
+  email?: string;
+  birthday?: string;
+  source?: string;
+  discountPercent?: number;
+  createdAt?: string;
   notes?: string;
   isRegular?: boolean;
 }
@@ -47,6 +53,11 @@ export interface Vehicle {
   plate: string;
   vin?: string;
   mileage?: number;
+  color?: string;
+  engine?: string;
+  transmission?: string;
+  nextServiceDate?: string;
+  nextServiceMileage?: number;
 }
 
 export type OrderStatus =

@@ -65,6 +65,9 @@ export default function OrderDetail() {
   const worksTotal = order.works.reduce((s, w) => s + w.price * w.qty, 0);
   const partsTotal = order.parts.reduce((s, p) => s + p.price * p.qty, 0);
   const discount = order.discount ?? 0;
+  const clientDiscount = client?.discountPercent
+    ? Math.round(((worksTotal + partsTotal) * client.discountPercent) / 100)
+    : 0;
   const due = worksTotal + partsTotal - discount;
   const paid = order.paid ?? 0;
   const debt = due - paid;
@@ -682,6 +685,15 @@ export default function OrderDetail() {
                 </>
               )}
             </div>
+            {clientDiscount > 0 && discount !== clientDiscount && (
+              <button
+                onClick={() => updateOrder(order.id, { discount: clientDiscount })}
+                className="mb-1 w-full rounded-lg border border-dashed px-2 py-1.5 text-xs transition hover:bg-[var(--bg)] print:hidden"
+                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+              >
+                Скидка клиента {client?.discountPercent}% — применить {formatMoney(clientDiscount)}
+              </button>
+            )}
             <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2" style={{ borderColor: "var(--border)" }}>
               <span>К оплате</span>
               <span>{formatMoney(due)}</span>
