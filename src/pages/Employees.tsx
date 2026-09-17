@@ -1,6 +1,6 @@
 import { useAppStore } from "../store/AppStore";
 import { Card, Page, TopBar } from "../components/ui";
-import { formatMoney } from "../lib/format";
+import { formatMoney, plural } from "../lib/format";
 import { computePayroll } from "../lib/payroll";
 
 export default function Employees() {
@@ -10,7 +10,7 @@ export default function Employees() {
 
   return (
     <>
-      <TopBar title="Сотрудники" subtitle={`${employees.length} человек · начислено за период ${formatMoney(totalAccrued)}`} />
+      <TopBar title="Сотрудники" subtitle={`${employees.length} ${plural(employees.length, "сотрудник", "сотрудника", "сотрудников")} · начислено за период ${formatMoney(totalAccrued)}`} />
       <Page>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {employees.map((e) => (

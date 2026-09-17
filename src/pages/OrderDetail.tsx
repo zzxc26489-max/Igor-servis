@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { IconArrowLeft, IconCar, IconClipboardText, IconFileDescription, IconNotes, IconPrinter, IconReceipt2, IconUser } from "@tabler/icons-react";
+import { IconArrowLeft, IconCar, IconClipboardText, IconFileDescription, IconNotes, IconPrinter, IconReceipt2, IconTrash, IconUser } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
 import { Button, Card, Page, StatusBadge, TopBar } from "../components/ui";
@@ -23,6 +23,7 @@ export default function OrderDetail() {
     company,
     settings,
     updateOrder,
+    deleteOrder,
     updateStockItem,
     addStockMovement,
   } = useAppStore();
@@ -226,6 +227,14 @@ export default function OrderDetail() {
     showToast("Скидка обновлена");
   }
 
+  function handleDeleteOrder() {
+    if (!order) return;
+    if (!window.confirm(`Удалить заказ-наряд ${order.number}? Действие нельзя отменить.`)) return;
+    deleteOrder(order.id);
+    showToast(`Заказ-наряд ${order.number} удалён`, "error");
+    navigate("/orders");
+  }
+
   function handleAcceptPayment(amount: number) {
     if (!order || amount <= 0) return;
     updateOrder(order.id, { paid: (order.paid ?? 0) + amount });
@@ -278,8 +287,18 @@ export default function OrderDetail() {
               </div>
               <div className="min-w-0">
                 <div className="muted text-[11px]">Клиент</div>
-                <div className="truncate text-sm font-semibold">{client?.name}</div>
-                <div className="muted truncate text-xs">{client?.phone}</div>
+                {client ? (
+                  <Link to={`/clients/${client.id}`} className="block truncate text-sm font-semibold hover:text-[var(--accent)] print:text-inherit">
+                    {client.name}
+                  </Link>
+                ) : (
+                  <div className="truncate text-sm font-semibold">—</div>
+                )}
+                {client && (
+                  <a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`} className="muted block truncate text-xs hover:text-[var(--accent)] print:text-inherit">
+                    {client.phone}
+                  </a>
+                )}
               </div>
             </div>
             <div className="flex min-w-0 items-center gap-3 p-3.5">
@@ -710,6 +729,16 @@ export default function OrderDetail() {
               </div>
             )}
           </Card>
+        </div>
+
+        <div className="mt-4 flex justify-end print:hidden">
+          <button
+            onClick={handleDeleteOrder}
+            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:bg-[#fff7f7]"
+            style={{ borderColor: "#f1c2c2", color: "var(--danger)" }}
+          >
+            <IconTrash size={16} /> Удалить заказ-наряд
+          </button>
         </div>
       </Page>
     </>

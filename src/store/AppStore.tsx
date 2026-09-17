@@ -75,6 +75,11 @@ function loadInitial(): DB {
 interface AppStoreValue extends DB {
   setDB: React.Dispatch<React.SetStateAction<DB>>;
   updateOrder: (id: string, patch: Partial<Order>) => void;
+  deleteOrder: (id: string) => void;
+  addClient: (client: Client) => void;
+  updateClient: (id: string, patch: Partial<Client>) => void;
+  addVehicle: (vehicle: Vehicle) => void;
+  updateVehicle: (id: string, patch: Partial<Vehicle>) => void;
   addStockMovement: (m: StockMovement) => void;
   updateStockItem: (id: string, patch: Partial<StockItem>) => void;
   addExpense: (e: Expense) => void;
@@ -103,6 +108,19 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         setDB((prev) => ({
           ...prev,
           orders: prev.orders.map((o) => (o.id === id ? { ...o, ...patch } : o)),
+        })),
+      deleteOrder: (id) => setDB((prev) => ({ ...prev, orders: prev.orders.filter((o) => o.id !== id) })),
+      addClient: (client) => setDB((prev) => ({ ...prev, clients: [...prev.clients, client] })),
+      updateClient: (id, patch) =>
+        setDB((prev) => ({
+          ...prev,
+          clients: prev.clients.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+        })),
+      addVehicle: (vehicle) => setDB((prev) => ({ ...prev, vehicles: [...prev.vehicles, vehicle] })),
+      updateVehicle: (id, patch) =>
+        setDB((prev) => ({
+          ...prev,
+          vehicles: prev.vehicles.map((v) => (v.id === id ? { ...v, ...patch } : v)),
         })),
       addStockMovement: (m) =>
         setDB((prev) => ({ ...prev, stockMovements: [m, ...prev.stockMovements] })),

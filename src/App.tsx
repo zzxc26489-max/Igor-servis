@@ -11,6 +11,7 @@ import Stock from "./pages/Stock";
 import Purchases from "./pages/Purchases";
 import Services from "./pages/Services";
 import Clients from "./pages/Clients";
+import ClientDetail from "./pages/ClientDetail";
 import Employees from "./pages/Employees";
 import Finance from "./pages/Finance";
 import Reports from "./pages/Reports";
@@ -36,6 +37,7 @@ function App() {
                 <Route path="purchases" element={<Purchases />} />
                 <Route path="services" element={<Services />} />
                 <Route path="clients" element={<Clients />} />
+                <Route path="clients/:clientId" element={<ClientDetail />} />
                 <Route path="employees" element={<Employees />} />
                 <Route path="finance" element={<Finance />} />
                 <Route path="reports" element={<Reports />} />

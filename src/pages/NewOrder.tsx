@@ -102,7 +102,11 @@ export default function NewOrder() {
     const clientId = existingClientId || `client-${stamp}`;
     const vehicleId = existingVehicleId || `vehicle-${stamp}`;
     const orderId = `order-${stamp}`;
-    const orderNumber = `АИ-${String(orders.length + 1).padStart(4, "0")}`;
+    const lastNumber = orders.reduce((max, item) => {
+      const digits = Number(item.number.replace(/\D/g, ""));
+      return Number.isNaN(digits) ? max : Math.max(max, digits);
+    }, 0);
+    const orderNumber = `№АИ-${String(lastNumber + 1).padStart(4, "0")}`;
 
     setDB((previous) => ({
       ...previous,

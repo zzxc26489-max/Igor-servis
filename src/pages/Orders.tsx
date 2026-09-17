@@ -4,15 +4,8 @@ import { IconChevronDown, IconChevronUp, IconClipboardList, IconClockHour4, Icon
 import { useAppStore } from "../store/AppStore";
 import { EmptyState, Page, StatusBadge, TopBar, Card } from "../components/ui";
 import { formatDateTime, formatMoney } from "../lib/format";
+import { orderTotals } from "../lib/order";
 import type { Order, OrderStatus } from "../types";
-
-function orderTotals(o: { works: { price: number; qty: number }[]; parts: { price: number; qty: number }[]; discount?: number; paid?: number }) {
-  const works = o.works.reduce((s, w) => s + w.price * w.qty, 0);
-  const parts = o.parts.reduce((s, p) => s + p.price * p.qty, 0);
-  const due = works + parts - (o.discount ?? 0);
-  const debt = due - (o.paid ?? 0);
-  return { due, debt };
-}
 
 const STATUS_FILTERS: { value: OrderStatus | "all"; label: string }[] = [
   { value: "all", label: "Все статусы" },

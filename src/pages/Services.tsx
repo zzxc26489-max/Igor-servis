@@ -3,7 +3,7 @@ import { IconEdit, IconPlus, IconSearch, IconTool, IconTrash } from "@tabler/ico
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
 import { Button, Card, Page, TopBar } from "../components/ui";
-import { formatMoney } from "../lib/format";
+import { formatMoney, plural } from "../lib/format";
 
 export default function Services() {
   const { services, addService, updateService, deleteService } = useAppStore();
@@ -71,7 +71,7 @@ export default function Services() {
     <>
       <TopBar
         title="Услуги"
-        subtitle={`${services.length} позиций в прайс-листе`}
+        subtitle={`${services.length} ${plural(services.length, "позиция", "позиции", "позиций")} в прайс-листе`}
         actions={<Button onClick={() => { resetForm(); setShowForm(true); }}><span className="inline-flex items-center gap-2"><IconPlus size={18} /> Добавить услугу</span></Button>}
       />
       <Page>
@@ -97,14 +97,16 @@ export default function Services() {
           <Card><p className="muted text-sm">Услуги не найдены.</p></Card>
         ) : (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            {categories.map((currentCategory) => (
+            {categories.map((currentCategory) => {
+              const categoryServices = filtered.filter((service) => service.category === currentCategory);
+              return (
               <Card key={currentCategory} className="p-0 overflow-hidden">
                 <div className="flex items-center gap-3 border-b p-4" style={{ borderColor: "var(--border)" }}>
                   <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#e9f5ed] text-[var(--accent)]"><IconTool size={18} /></div>
-                  <div><h2 className="panel-title">{currentCategory}</h2><p className="muted text-xs">{filtered.filter((service) => service.category === currentCategory).length} услуг</p></div>
+                  <div><h2 className="panel-title">{currentCategory}</h2><p className="muted text-xs">{categoryServices.length} {plural(categoryServices.length, "услуга", "услуги", "услуг")}</p></div>
                 </div>
                 <ul className="divide-y" style={{ borderColor: "var(--border)" }}>
-                  {filtered.filter((service) => service.category === currentCategory).map((service) => (
+                  {categoryServices.map((service) => (
                     <li key={service.id} className="flex items-center gap-3 px-4 py-3 text-sm">
                       <span className="min-w-0 flex-1">{service.name}</span>
                       <span className="shrink-0 font-semibold">{formatMoney(service.price)}</span>
@@ -114,7 +116,8 @@ export default function Services() {
                   ))}
                 </ul>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </Page>

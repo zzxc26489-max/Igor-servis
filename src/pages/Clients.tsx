@@ -1,11 +1,12 @@
 import { useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
-import { IconStar, IconUsers } from "@tabler/icons-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { IconChevronRight, IconStar, IconUsers } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { Card, EmptyState, Page, TopBar } from "../components/ui";
 
 export default function Clients() {
   const { clients, vehicles, orders } = useAppStore();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const query = (searchParams.get("q") ?? "").toLocaleLowerCase("ru-RU");
   const filteredClients = useMemo(() => clients.filter((client) => {
@@ -51,6 +52,7 @@ export default function Clients() {
                   <th>Телефон</th>
                   <th>Автомобили</th>
                   <th className="text-right">Заказов</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -58,7 +60,7 @@ export default function Clients() {
                   const clientVehicles = vehicles.filter((v) => v.clientId === c.id);
                   const clientOrders = orders.filter((o) => o.clientId === c.id);
                   return (
-                    <tr key={c.id}>
+                    <tr key={c.id} onClick={() => navigate(`/clients/${c.id}`)} className="cursor-pointer">
                       <td>
                         <span className="inline-flex items-center gap-2">
                           <span className="grid h-8 w-8 place-items-center rounded-full bg-[#e9f4ed] text-xs font-bold text-[var(--accent)]">
@@ -70,15 +72,24 @@ export default function Clients() {
                           </span>
                         </span>
                       </td>
-                      <td className="muted">{c.phone}</td>
+                      <td>
+                        <a
+                          href={`tel:${c.phone.replace(/[^\d+]/g, "")}`}
+                          onClick={(event) => event.stopPropagation()}
+                          className="text-[var(--accent)] hover:underline"
+                        >
+                          {c.phone}
+                        </a>
+                      </td>
                       <td>{clientVehicles.map((v) => `${v.make} ${v.model}`).join(", ") || "—"}</td>
                       <td className="text-right font-medium">{clientOrders.length}</td>
+                      <td className="text-right"><IconChevronRight size={16} className="muted inline" /></td>
                     </tr>
                   );
                 })}
                 {filteredClients.length === 0 && (
                   <tr>
-                    <td colSpan={4}>
+                    <td colSpan={5}>
                       <EmptyState icon={<IconUsers size={22} />} title="Ничего не найдено" hint="Проверьте написание или попробуйте другой запрос" />
                     </td>
                   </tr>

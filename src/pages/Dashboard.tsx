@@ -4,7 +4,7 @@ import { IconChartBar, IconCoin, IconPackage, IconPlus, IconUsersGroup } from "@
 import { Card, Page, StatusBadge, TopBar } from "../components/ui";
 import LiftTimeline from "../components/LiftTimeline";
 import { useAppStore } from "../store/AppStore";
-import { formatMoney } from "../lib/format";
+import { formatMoney, plural } from "../lib/format";
 
 export default function Dashboard() {
   const { orders, stock, clients, vehicles, employees } = useAppStore();
@@ -22,7 +22,7 @@ export default function Dashboard() {
     <Page>
       <div className="mb-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_230px]">
         <Card className="grid grid-cols-2 overflow-hidden p-0 lg:grid-cols-4">
-          <Metric icon={<IconCoin />} label="Выручка сегодня" value={formatMoney(workRevenue + partsRevenue)} hint={`${orders.length} заказ-нарядов`} />
+          <Metric icon={<IconCoin />} label="Выручка сегодня" value={formatMoney(workRevenue + partsRevenue)} hint={`${orders.length} ${plural(orders.length, "заказ-наряд", "заказ-наряда", "заказ-нарядов")}`} />
           <Metric icon={<IconPackage />} label="Запчасти" value={formatMoney(partsRevenue)} hint={`${stock.length} позиций на складе`} />
           <Metric icon={<IconUsersGroup />} label="Зарплаты" value={formatMoney(salaries)} hint="Начислено за период" />
           <Metric icon={<IconChartBar />} label="Чистая прибыль" value={formatMoney(Math.max(workRevenue + partsRevenue - salaries, 0))} hint="Расчётный показатель" />
