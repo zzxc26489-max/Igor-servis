@@ -6,7 +6,8 @@ import { formatMoney } from "../lib/format";
 import { isValidMoney, moneyInput } from "../lib/formats";
 import { clientPrice, margin } from "../lib/price";
 import { reservedByItem } from "../lib/stock";
-import type { StockItem } from "../types";
+import { formatQuantity, isValidQuantity, parseQuantity } from "../lib/quantity";
+import type { StockItem, Vehicle } from "../types";
 
 /**
  * Подбор запчасти для заказ-наряда: сначала выбираем позицию поиском и
@@ -17,10 +18,12 @@ export default function AddPart({
   onClose,
   onSubmit,
   error,
+  vehicle,
 }: {
   onClose: () => void;
   onSubmit: (itemId: string, qty: number, price: number) => void;
   error?: string;
+  vehicle?: Vehicle;
 }) {
   const { stock, orders, settings } = useAppStore();
   const reserved = useMemo(() => reservedByItem(orders, stock), [orders, stock]);
@@ -44,7 +47,7 @@ export default function AddPart({
       .filter((item) => {
         if (category !== "all" && item.category !== category) return false;
         if (!term) return true;
-        return `${item.name} ${item.sku} ${item.brand ?? ""} ${item.cell ?? ""}`
+        return `${item.name} ${item.sku} ${item.brand ?? ""} ${item.cell ?? ""} ${(item.crossNumbers ?? []).join(" ")} ${(item.oeNumbers ?? []).join(" ")} ${(item.fitments ?? []).join(" ")}`
           .toLocaleLowerCase("ru-RU")
           .includes(term);
       })
@@ -58,8 +61,8 @@ export default function AddPart({
     setQty("1");
   }
 
-  const numericQty = Number(qty);
-  const validQty = Number.isInteger(numericQty) && numericQty > 0;
+  const numericQty = Number(qty.replace(",", "."));
+  const validQty = isValidQuantity(numericQty);
   const count = validQty ? numericQty : 0;
   const validPrice = isValidMoney(price);
   const clientSum = (Number(price) || 0) * count;
@@ -84,7 +87,7 @@ export default function AddPart({
                 autoFocus
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Название, артикул, бренд или ячейка"
+                placeholder="Название, артикул, OE/кросс-номер, авто или ячейка"
                 aria-label="Поиск запчасти"
                 className="w-full rounded-lg border py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[var(--accent)]"
                 style={{ borderColor: "var(--border)" }}
@@ -126,15 +129,28 @@ export default function AddPart({
                     <span className="block truncate text-sm font-semibold">{item.name}</span>
                     <span className="muted block truncate text-xs">
                       {item.brand ? `${item.brand} · ` : ""}{item.sku}
-                      {item.cell ? <> · <IconMapPin size={11} className="inline" /> {item.cell}</> : null}
+                      {item.cell ? <> · <IconMapPin size={11} className="inline" /> {item.cell}</> : " · без ячейки"}
                     </span>
+                    {(item.crossNumbers?.length || item.oeNumbers?.length) ? (
+                      <span className="muted mt-0.5 block truncate text-[11px]">
+                        аналоги: {[...(item.oeNumbers ?? []), ...(item.crossNumbers ?? [])].slice(0, 4).join(" · ")}
+                      </span>
+                    ) : null}
+                    {vehicle && item.fitments?.some((fitment) =>
+                      fitment.toLocaleLowerCase("ru-RU").includes(vehicle.make.toLocaleLowerCase("ru-RU"))
+                      || fitment.toLocaleLowerCase("ru-RU").includes(vehicle.model.toLocaleLowerCase("ru-RU"))
+                    ) && (
+                      <span className="mt-1 block text-[11px] font-semibold text-[var(--accent)]">
+                        Есть применяемость для {vehicle.make} {vehicle.model} · всё равно проверить по VIN
+                      </span>
+                    )}
                   </span>
                   <span className="shrink-0 text-right">
                     <span
                       className="block text-sm font-semibold tabular-nums"
                       style={{ color: free <= 0 ? "var(--danger)" : free <= item.minQty ? "var(--warning)" : "var(--accent)" }}
                     >
-                      {free <= 0 ? "нет в наличии" : `${free} ${item.unit}`}
+                      {free <= 0 ? "нет в наличии" : `${formatQuantity(free)} ${item.unit}`}
                     </span>
                     <span className="muted block text-xs tabular-nums">
                       закупка {formatMoney(item.purchasePrice)}
@@ -149,7 +165,7 @@ export default function AddPart({
         <div className="space-y-3 p-4">
           <div className="rounded-lg p-3 text-sm" style={{ background: "var(--bg)" }}>
             <div className="flex justify-between gap-3"><span className="muted">Ячейка</span><b>{selected.cell || "—"}</b></div>
-            <div className="flex justify-between gap-3"><span className="muted">Свободно на складе</span><b>{free} {selected.unit}</b></div>
+            <div className="flex justify-between gap-3"><span className="muted">Свободно на складе</span><b>{formatQuantity(free)} {selected.unit}</b></div>
             <div className="flex justify-between gap-3"><span className="muted">Цена закупки</span><b>{formatMoney(selected.purchasePrice)}</b></div>
           </div>
 
@@ -159,13 +175,13 @@ export default function AddPart({
               <div className="field-control">
                 <input
                   autoFocus
-                  inputMode="numeric"
+                  inputMode="decimal"
                   aria-label="Количество"
                   value={qty}
-                  onChange={(event) => setQty(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                  onChange={(event) => setQty(parseQuantity(event.target.value))}
                 />
               </div>
-              {tooMany && <span className="mt-1 block text-xs" style={{ color: "var(--danger)" }}>Свободно только {free}</span>}
+              {tooMany && <span className="mt-1 block text-xs" style={{ color: "var(--danger)" }}>Свободно только {formatQuantity(free)} {selected.unit}</span>}
               {!tooMany && qty !== "" && !validQty && <span className="mt-1 block text-xs" style={{ color: "var(--danger)" }}>Количество должно быть больше нуля</span>}
             </label>
             <label className="block text-sm">
