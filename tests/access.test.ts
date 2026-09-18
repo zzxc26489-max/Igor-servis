@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canManageSettings, canOpenPath, canSeeFinance } from "../src/lib/access.ts";
+import { canManageSettings, canManageStock, canOpenPath, canSeeFinance } from "../src/lib/access.ts";
 
 test("owner and partner see management sections", () => {
   for (const role of ["owner", "partner"] as const) {
@@ -22,4 +22,12 @@ test("parts user is limited to stock, purchases and linked orders", () => {
   assert.equal(canOpenPath("parts", "/purchases"), true);
   assert.equal(canOpenPath("parts", "/orders/123"), true);
   assert.equal(canOpenPath("parts", "/employees"), false);
+});
+
+
+test("stock management is limited to owner, partner and parts", () => {
+  assert.equal(canManageStock("owner"), true);
+  assert.equal(canManageStock("partner"), true);
+  assert.equal(canManageStock("parts"), true);
+  assert.equal(canManageStock("advisor"), false);
 });
