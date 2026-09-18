@@ -35,6 +35,7 @@ export default function OrderDetail() {
     lifts,
     company,
     settings,
+    payments,
     updateOrder,
     deleteOrder,
     updateVehicle,
@@ -100,6 +101,9 @@ export default function OrderDetail() {
   const due = worksTotal + partsTotal - discount;
   const paid = order.paid ?? 0;
   const debt = due - paid;
+  const orderPayments = payments
+    .filter((payment) => payment.orderId === order.id)
+    .sort((a, b) => b.at.localeCompare(a.at));
 
   // Норматив и фактическое время: видно сразу в карточке, а не только в отчётах.
   const orderNorm = normMinutes(order);
@@ -125,6 +129,10 @@ export default function OrderDetail() {
 
   function applyTargetTotal() {
     if (!order) return;
+    if (order.status === "выдан") {
+      showToast("Выданный заказ нельзя менять. Сначала верните автомобиль в работу.", "error");
+      return;
+    }
     const target = Number(targetTotal);
     if (!settings.autoPriceAdjustment || target <= 0) return;
     if (order.works.length === 0) {
@@ -244,6 +252,10 @@ export default function OrderDetail() {
 
   function handleSaveDiscount() {
     if (!order) return;
+    if (order.status === "выдан") {
+      showToast("Выданный заказ нельзя менять. Сначала верните автомобиль в работу.", "error");
+      return;
+    }
     // Скидка не может быть больше суммы заказа, иначе «к оплате» уходит в минус.
     const value = Math.min(worksTotal + partsTotal, Math.max(0, Number(discountInput) || 0));
     const target = Number(targetTotal);
@@ -272,7 +284,11 @@ export default function OrderDetail() {
       danger: true,
     });
     if (!ok) return;
-    deleteOrder(order.id);
+    const error = deleteOrder(order.id);
+    if (error) {
+      showToast(error, "error");
+      return;
+    }
     showToast(`Заказ-наряд ${order.number} удалён`, "error");
     navigate("/orders");
   }
@@ -400,7 +416,13 @@ export default function OrderDetail() {
 
             {clientDiscount > 0 && discount !== clientDiscount && (
               <button
-                onClick={() => updateOrder(order.id, { discount: clientDiscount })}
+                onClick={() => {
+                  if (order.status === "выдан") {
+                    showToast("Выданный заказ нельзя менять. Сначала верните автомобиль в работу.", "error");
+                    return;
+                  }
+                  updateOrder(order.id, { discount: clientDiscount });
+                }}
                 className="mt-2 w-full rounded-lg border border-dashed px-2 py-1.5 text-xs transition hover:bg-[var(--bg)]"
                 style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
               >
@@ -690,6 +712,9 @@ export default function OrderDetail() {
                                     <span style={{ color: profit.rub > 0 ? "var(--accent)" : "var(--danger)" }}>
                                       {" "}· наценка до скидки {formatMoney(profit.rub)}
                                     </span>
+                                    {p.purchasePriceEstimated && (
+                                      <span className="ml-1">· себестоимость восстановлена</span>
+                                    )}
                                   </>
                                 );
                               })()}
@@ -802,6 +827,28 @@ export default function OrderDetail() {
                     </tbody>
                   </table>
                 </Card>
+
+                <Card className="mt-3 overflow-hidden p-0 print:hidden">
+                  <div className="border-b p-4" style={{ borderColor: "var(--border)" }}>
+                    <h2 className="panel-title">История оплат</h2>
+                    <p className="muted mt-1 text-xs">Новые оплаты фиксируются по фактической дате приёма денег.</p>
+                  </div>
+                  {orderPayments.length === 0 ? (
+                    <p className="muted p-4 text-sm">Оплат по заказу пока нет.</p>
+                  ) : (
+                    <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                      {orderPayments.map((payment) => (
+                        <div key={payment.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                          <span>
+                            <b>{formatDateTime(payment.at)}</b>
+                            {payment.estimated && <span className="muted ml-2 text-xs">дата восстановлена</span>}
+                          </span>
+                          <b className="tabular-nums" style={{ color: "var(--accent)" }}>+{formatMoney(payment.amount)}</b>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
               </>
             )}
 
@@ -816,13 +863,19 @@ export default function OrderDetail() {
                 </div>
                 <p className="muted mt-3 text-sm">Акт печатается в альбомной ориентации и старается уместиться на один лист.</p>
                 <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--border)" }}>
-                  <button
-                    onClick={handleDeleteOrder}
-                    className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:bg-[#fff7f7]"
-                    style={{ borderColor: "#f1c2c2", color: "var(--danger)" }}
-                  >
-                    <IconTrash size={16} /> Удалить заказ-наряд
-                  </button>
+                  {order.status === "выдан" || paid > 0 ? (
+                    <p className="muted text-sm">
+                      Закрытый или оплаченный заказ не удаляется: история склада и денег должна сохраниться.
+                    </p>
+                  ) : (
+                    <button
+                      onClick={handleDeleteOrder}
+                      className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:bg-[#fff7f7]"
+                      style={{ borderColor: "#f1c2c2", color: "var(--danger)" }}
+                    >
+                      <IconTrash size={16} /> Удалить заказ-наряд
+                    </button>
+                  )}
                 </div>
               </Card>
             )}
