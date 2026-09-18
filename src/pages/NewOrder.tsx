@@ -22,7 +22,7 @@ export default function NewOrder() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const confirm = useConfirm();
-  const { clients, vehicles, lifts, orders, setDB } = useAppStore();
+  const { clients, vehicles, lifts, orders, company, setDB } = useAppStore();
   const [searchParams] = useSearchParams();
   const presetClient = clients.find((item) => item.id === searchParams.get("clientId"));
   const presetVehicle = vehicles.find(
@@ -183,6 +183,9 @@ export default function NewOrder() {
         notes: note.trim() || undefined,
         scheduledStart: time,
         scheduledEnd: endTime,
+        workDayStart: company.openTime,
+        workDayEnd: company.closeTime,
+        workDayEstimated: false,
       }],
     }));
     showToast(`Заказ-наряд ${orderNumber} создан`);
