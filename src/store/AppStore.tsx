@@ -273,7 +273,7 @@ interface AppStoreValue extends DB {
   /** Возврат запчасти поставщику: списывает со склада и заводит ожидание денег. */
   returnToSupplier: (input: ReturnToSupplierInput) => void;
   /** Деньги от поставщика пришли — возврат идёт в расчёты. */
-  confirmRefund: (expenseId: string) => void;
+  confirmRefund: (expenseId: string, method: PaymentMethod) => void;
   /** Выплата зарплаты сотруднику. */
   payEmployee: (employeeId: string, amount: number, note?: string, method?: PaymentMethod) => void;
   /** Открыть кассовую смену. */
@@ -1020,7 +1020,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             ],
           };
         }),
-      confirmRefund: (expenseId) =>
+      confirmRefund: (expenseId, method) =>
         setDB((prev) => {
           const shift = activeCashShift(prev.cashShifts);
           return {
@@ -1031,7 +1031,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                     ...expense,
                     status: "Возвращено" as const,
                     refundConfirmedAt: nowISO(),
-                    shiftId: expense.paymentMethod && shift ? shift.id : expense.shiftId,
+                    paymentMethod: method,
+                    shiftId: shift ? shift.id : undefined,
                   }
                 : expense,
             ),
