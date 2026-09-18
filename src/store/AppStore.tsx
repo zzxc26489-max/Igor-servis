@@ -20,6 +20,7 @@ import { createId, nextCode } from "../lib/id";
 import { orderTotals } from "../lib/order";
 import { reservedByItem } from "../lib/stock";
 import { formatPhone, formatPlate, looksRussian } from "../lib/formats";
+import { nowISO } from "../lib/date";
 
 const STORAGE_KEY = "igor-servis-db-v1";
 
@@ -342,9 +343,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
           const wasIssued = order.status === "выдан";
           const willIssue = status === "выдан";
-          const now = new Date().toISOString();
+          const now = nowISO();
 
-          const patch: Partial<Order> = { status };
+          // Пишем историю статусов: из неё считается фактическое время на подъёмнике.
+          const timeline = [
+            ...(order.timeline ?? (order.createdAt ? [{ status: "запись" as const, at: order.createdAt }] : [])),
+            { status, at: now },
+          ];
+          const patch: Partial<Order> = { status, timeline };
           if (status === "готово" && !order.completedAt) patch.completedAt = now;
           if (status !== "готово" && status !== "выдан") patch.completedAt = undefined;
 

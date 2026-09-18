@@ -5,6 +5,7 @@ import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
 import { isValidMoney, moneyInput } from "../lib/formats";
+import { formatDuration } from "../lib/worktime";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { formatMoney, plural } from "../lib/format";
 
@@ -18,6 +19,7 @@ export default function Services() {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
+  const [norm, setNorm] = useState("");
 
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("ru-RU");
@@ -32,6 +34,7 @@ export default function Services() {
     setName("");
     setCategory("");
     setPrice("");
+    setNorm("");
   }
 
   function startEdit(id: string) {
@@ -41,6 +44,7 @@ export default function Services() {
     setName(service.name);
     setCategory(service.category);
     setPrice(String(service.price));
+    setNorm(service.normMinutes ? String(service.normMinutes) : "");
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -55,10 +59,10 @@ export default function Services() {
       return;
     }
     if (editingId) {
-      updateService(editingId, { name: cleanName, category: cleanCategory, price: numericPrice });
+      updateService(editingId, { name: cleanName, category: cleanCategory, price: numericPrice, normMinutes: Number(norm) || undefined });
       showToast("Услуга обновлена");
     } else {
-      addService({ id: createId("sv"), name: cleanName, category: cleanCategory, price: numericPrice });
+      addService({ id: createId("sv"), name: cleanName, category: cleanCategory, price: numericPrice, normMinutes: Number(norm) || undefined });
       showToast("Услуга добавлена");
     }
     resetForm();
@@ -99,11 +103,12 @@ export default function Services() {
         {showForm && (
           <Card className="mb-4">
             <h2 className="panel-title mb-4">{editingId ? "Изменить услугу" : "Новая услуга"}</h2>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_180px_auto] lg:items-end">
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_150px_150px_auto] lg:items-end">
               <label className="text-sm"><span className="mb-1 block muted">Название</span><div className="field-control"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Например, замена ступичного подшипника" autoFocus required /></div></label>
               <label className="text-sm"><span className="mb-1 block muted">Категория</span><div className="field-control"><input value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Ходовая часть" list="service-categories" required /></div></label>
               <datalist id="service-categories">{Array.from(new Set(services.map((service) => service.category))).map((item) => <option value={item} key={item} />)}</datalist>
               <label className="text-sm"><span className="mb-1 block muted">Цена, ₽</span><div className="field-control"><input value={price} onChange={(event) => setPrice(moneyInput(event.target.value))} inputMode="numeric" placeholder="2500" required /></div></label>
+              <label className="text-sm"><span className="mb-1 block muted">Норматив, мин</span><div className="field-control"><input value={norm} onChange={(event) => setNorm(event.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" placeholder="60" /></div><span className="muted mt-1 block text-xs">Сколько по нормам должна занимать работа</span></label>
               <div className="flex gap-2"><Button type="submit">{editingId ? "Сохранить" : "Добавить"}</Button><Button variant="secondary" onClick={resetForm}>Отмена</Button></div>
             </form>
           </Card>
@@ -124,7 +129,10 @@ export default function Services() {
                 <ul className="divide-y" style={{ borderColor: "var(--border)" }}>
                   {categoryServices.map((service) => (
                     <li key={service.id} className="flex items-center gap-3 px-4 py-3 text-sm">
-                      <span className="min-w-0 flex-1">{service.name}</span>
+                      <span className="min-w-0 flex-1">
+                        {service.name}
+                        {service.normMinutes ? <span className="muted block text-xs">Норматив {formatDuration(service.normMinutes)}</span> : null}
+                      </span>
                       <span className="shrink-0 font-semibold">{formatMoney(service.price)}</span>
                       <button onClick={() => startEdit(service.id)} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-[var(--accent)] hover:bg-[#e9f5ed] sm:h-9 sm:w-9" aria-label={`Изменить услугу «${service.name}»`}><IconEdit size={17} /></button>
                       <button onClick={() => handleDelete(service.id, service.name)} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-[var(--danger)] hover:bg-[#fbe9e9] sm:h-9 sm:w-9" aria-label={`Удалить услугу «${service.name}»`}><IconTrash size={17} /></button>

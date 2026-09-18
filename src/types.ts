@@ -78,6 +78,14 @@ export interface OrderLineWork {
   qty: number;
   price: number;
   executor?: string;
+  /** Норматив времени на единицу работы, минут. Берётся из прайса при добавлении. */
+  normMinutes?: number;
+}
+
+/** Отметка смены статуса — из них считается фактическое время на подъёмнике. */
+export interface StatusEvent {
+  status: OrderStatus;
+  at: string;
 }
 
 export interface OrderLinePart {
@@ -108,6 +116,8 @@ export interface Order {
   scheduledStart?: string;
   scheduledEnd?: string;
   complaint?: string;
+  /** История статусов: когда машина встала на подъёмник и когда сошла. */
+  timeline?: StatusEvent[];
   diagnosis?: string;
   defects?: string;
   guaranteeMonths?: number;
@@ -118,6 +128,8 @@ export interface Service {
   name: string;
   category: string;
   price: number;
+  /** Нормативное время работы, минут. */
+  normMinutes?: number;
 }
 
 export interface StockItem {

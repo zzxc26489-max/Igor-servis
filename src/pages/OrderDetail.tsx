@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   IconArrowBackUp, IconArrowLeft, IconCalendarTime, IconCar, IconCheck, IconClipboardText,
-  IconFileDescription, IconNotes, IconPrinter, IconTool, IconTrash, IconUser,
+  IconFileDescription, IconNotes, IconPrinter, IconStopwatch, IconTool, IconTrash, IconUser,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
@@ -11,6 +11,7 @@ import { useConfirm } from "../components/Confirm";
 import RowMenu from "../components/RowMenu";
 import { reservedByItem } from "../lib/stock";
 import { isValidMoney, moneyInput } from "../lib/formats";
+import { actualMinutes, deviationPercent, formatDuration, normMinutes } from "../lib/worktime";
 import { Button, Card, Modal, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
 import type { OrderLinePart, OrderLineWork, OrderStatus } from "../types";
@@ -68,6 +69,7 @@ export default function OrderDetail() {
   const [workServiceId, setWorkServiceId] = useState("");
   const [workCustomName, setWorkCustomName] = useState("");
   const [workCustomPrice, setWorkCustomPrice] = useState("");
+  const [workCustomNorm, setWorkCustomNorm] = useState("");
   const [workQty, setWorkQty] = useState("1");
   const [workExecutor, setWorkExecutor] = useState("");
 
@@ -108,6 +110,11 @@ export default function OrderDetail() {
   const paid = order.paid ?? 0;
   const debt = due - paid;
 
+  // Норматив и фактическое время: видно сразу в карточке, а не только в отчётах.
+  const orderNorm = normMinutes(order);
+  const orderActual = actualMinutes(order);
+  const orderDeviation = deviationPercent(orderNorm, orderActual);
+
   const currentStepIndex = STATUS_FLOW.indexOf(order.status);
   const nextStatus = currentStepIndex >= 0 && currentStepIndex < STATUS_FLOW.length - 1
     ? STATUS_FLOW[currentStepIndex + 1]
@@ -146,6 +153,7 @@ export default function OrderDetail() {
     setWorkServiceId("");
     setWorkCustomName("");
     setWorkCustomPrice("");
+    setWorkCustomNorm("");
     setWorkQty("1");
     setWorkExecutor("");
   }
@@ -155,8 +163,10 @@ export default function OrderDetail() {
     const qty = Math.max(1, Number(workQty) || 1);
     let name = "";
     let price = 0;
+    let norm: number | undefined;
     if (workServiceId === CUSTOM_SERVICE) {
       name = workCustomName.trim();
+      norm = Number(workCustomNorm) || undefined;
       price = Number(workCustomPrice) || 0;
       if (!name) {
         showToast("Укажите название работы", "error");
@@ -171,8 +181,9 @@ export default function OrderDetail() {
       if (!service) return;
       name = service.name;
       price = service.price;
+      norm = service.normMinutes;
     }
-    const newWork: OrderLineWork = { id: createId("work"), name, qty, price, executor: workExecutor || undefined };
+    const newWork: OrderLineWork = { id: createId("work"), name, qty, price, executor: workExecutor || undefined, normMinutes: norm };
     const nextWorks = [...order.works, newWork];
     const target = Number(targetTotal);
     updateOrder(order.id, { works: settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(nextWorks, target) : nextWorks });
@@ -509,7 +520,7 @@ export default function OrderDetail() {
         </div>
 
         <div
-          className="order-facts mb-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border shadow-[0_2px_8px_rgba(23,34,30,0.045)] sm:grid-cols-2 lg:grid-cols-4"
+          className="order-facts mb-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border shadow-[0_2px_8px_rgba(23,34,30,0.045)] sm:grid-cols-2 lg:grid-cols-5"
           style={{ background: "var(--border)", borderColor: "var(--border)" }}
         >
           <InfoCell icon={<IconUser size={18} />} tone="#e9f5ed" color="var(--accent)" label="Клиент">
@@ -533,6 +544,22 @@ export default function OrderDetail() {
             <div className="truncate text-sm font-semibold">{lift?.name ?? "Не назначен"}</div>
             <div className="muted truncate text-xs">
               {order.scheduledStart ? `${order.scheduledStart}–${order.scheduledEnd ?? "…"}` : "Время не задано"}
+            </div>
+          </InfoCell>
+          <InfoCell icon={<IconStopwatch size={18} />} tone="#f0f4f1" color="var(--text)" label="Время на подъёмнике">
+            <div className="truncate text-sm font-semibold">
+              {orderActual > 0 ? formatDuration(orderActual) : "ещё не был"}
+              {orderNorm > 0 && orderDeviation !== null && (
+                <span
+                  className="ml-1.5 text-xs font-semibold"
+                  style={{ color: orderDeviation > 0 ? "var(--danger)" : "var(--accent)" }}
+                >
+                  {orderDeviation > 0 ? "+" : ""}{orderDeviation}%
+                </span>
+              )}
+            </div>
+            <div className="muted truncate text-xs">
+              {orderNorm > 0 ? `Норматив ${formatDuration(orderNorm)}` : "Норматив не задан"}
             </div>
           </InfoCell>
           <InfoCell icon={<IconCalendarTime size={18} />} tone="#fdf3e0" color="var(--warning)" label="Обещано клиенту">
@@ -615,7 +642,11 @@ export default function OrderDetail() {
                         <tr key={w.id} className="group">
                           <td>
                             {w.name}
-                            {w.executor && <div className="muted text-xs">Исполнитель: {w.executor}</div>}
+                            <div className="muted text-xs">
+                              {w.executor ? `Исполнитель: ${w.executor}` : ""}
+                              {w.executor && w.normMinutes ? " · " : ""}
+                              {w.normMinutes ? `норматив ${formatDuration(w.normMinutes * w.qty)}` : ""}
+                            </div>
                           </td>
                           <td className="text-right tabular-nums">{w.qty}</td>
                           <td className="whitespace-nowrap text-right tabular-nums">{formatMoney(w.price * w.qty)}</td>
@@ -641,18 +672,21 @@ export default function OrderDetail() {
                         <select value={workServiceId} onChange={(e) => setWorkServiceId(e.target.value)} aria-label="Услуга">
                           <option value="">Выберите услугу…</option>
                           {services.map((s) => (
-                            <option key={s.id} value={s.id}>{s.name} · {formatMoney(s.price)}</option>
+                            <option key={s.id} value={s.id}>{s.name} · {formatMoney(s.price)}{s.normMinutes ? ` · ${s.normMinutes} мин` : ""}</option>
                           ))}
                           <option value={CUSTOM_SERVICE}>Другое (ввести вручную)</option>
                         </select>
                       </div>
                       {workServiceId === CUSTOM_SERVICE && (
-                        <div className="mb-2 grid grid-cols-2 gap-2">
+                        <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
                           <div className="field-control">
                             <input placeholder="Название работы" value={workCustomName} onChange={(e) => setWorkCustomName(e.target.value)} />
                           </div>
                           <div className="field-control">
                             <input placeholder="Цена, ₽" inputMode="numeric" value={workCustomPrice} onChange={(e) => setWorkCustomPrice(moneyInput(e.target.value))} />
+                          </div>
+                          <div className="field-control">
+                            <input placeholder="Норматив, мин" inputMode="numeric" aria-label="Норматив, минут" value={workCustomNorm} onChange={(e) => setWorkCustomNorm(e.target.value.replace(/\D/g, "").slice(0, 4))} />
                           </div>
                         </div>
                       )}

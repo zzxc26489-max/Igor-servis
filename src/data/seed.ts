@@ -24,6 +24,13 @@ function at(offset: number, time: string) {
   return `${day(offset)}T${time}:00`;
 }
 
+/** Метка «N минут назад» — активные демо-заказы выглядят живыми в любое время. */
+function ago(minutes: number) {
+  const date = new Date(Date.now() - minutes * 60_000);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${toISODate(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+}
+
 export const lifts: Lift[] = [
   { id: 1, name: "Подъёмник 1", status: "busy" },
   { id: 2, name: "Подъёмник 2", status: "busy" },
@@ -118,26 +125,26 @@ export const vehicles: Vehicle[] = [
 ];
 
 export const services: Service[] = [
-  { id: "sv-1", name: "Компьютерная диагностика", category: "Диагностика", price: 1500 },
-  { id: "sv-2", name: "Замена масла в ДВС", category: "ТО", price: 1200 },
-  { id: "sv-3", name: "Замена масляного фильтра", category: "ТО", price: 600 },
-  { id: "sv-4", name: "Замена воздушного фильтра", category: "ТО", price: 400 },
-  { id: "sv-5", name: "Замена передних тормозных колодок", category: "Тормозная система", price: 2000 },
-  { id: "sv-6", name: "Замена термостата", category: "Охлаждение", price: 1800 },
-  { id: "sv-7", name: "Развал-схождение", category: "Ходовая", price: 2500 },
-  { id: "sv-8", name: "Замена тормозных дисков (пара)", category: "Тормозная система", price: 3000 },
-  { id: "sv-9", name: "Замена свечей зажигания", category: "Электрика", price: 450 },
-  { id: "sv-10", name: "Замена салонного фильтра", category: "ТО", price: 500 },
-  { id: "sv-11", name: "Замена антифриза", category: "Охлаждение", price: 1600 },
-  { id: "sv-12", name: "Замена тормозной жидкости", category: "Тормозная система", price: 1800 },
-  { id: "sv-13", name: "Замена передних амортизаторов", category: "Ходовая", price: 4500 },
-  { id: "sv-14", name: "Замена ремня ГРМ", category: "Двигатель", price: 9500 },
-  { id: "sv-15", name: "Замена сцепления", category: "Трансмиссия", price: 12000 },
-  { id: "sv-16", name: "Замена масла в АКПП", category: "Трансмиссия", price: 4200 },
-  { id: "sv-17", name: "Шиномонтаж (4 колеса)", category: "Шиномонтаж", price: 2400 },
-  { id: "sv-18", name: "Заправка кондиционера", category: "Климат", price: 3200 },
-  { id: "sv-19", name: "Замена ступичного подшипника", category: "Ходовая", price: 3800 },
-  { id: "sv-20", name: "Замена аккумулятора", category: "Электрика", price: 700 },
+  { id: "sv-1", name: "Компьютерная диагностика", category: "Диагностика", price: 1500 , normMinutes: 45 },
+  { id: "sv-2", name: "Замена масла в ДВС", category: "ТО", price: 1200 , normMinutes: 30 },
+  { id: "sv-3", name: "Замена масляного фильтра", category: "ТО", price: 600 , normMinutes: 15 },
+  { id: "sv-4", name: "Замена воздушного фильтра", category: "ТО", price: 400 , normMinutes: 15 },
+  { id: "sv-5", name: "Замена передних тормозных колодок", category: "Тормозная система", price: 2000 , normMinutes: 60 },
+  { id: "sv-6", name: "Замена термостата", category: "Охлаждение", price: 1800 , normMinutes: 90 },
+  { id: "sv-7", name: "Развал-схождение", category: "Ходовая", price: 2500 , normMinutes: 60 },
+  { id: "sv-8", name: "Замена тормозных дисков (пара)", category: "Тормозная система", price: 3000 , normMinutes: 75 },
+  { id: "sv-9", name: "Замена свечей зажигания", category: "Электрика", price: 450 , normMinutes: 30 },
+  { id: "sv-10", name: "Замена салонного фильтра", category: "ТО", price: 500 , normMinutes: 15 },
+  { id: "sv-11", name: "Замена антифриза", category: "Охлаждение", price: 1600 , normMinutes: 45 },
+  { id: "sv-12", name: "Замена тормозной жидкости", category: "Тормозная система", price: 1800 , normMinutes: 45 },
+  { id: "sv-13", name: "Замена передних амортизаторов", category: "Ходовая", price: 4500 , normMinutes: 120 },
+  { id: "sv-14", name: "Замена ремня ГРМ", category: "Двигатель", price: 9500 , normMinutes: 240 },
+  { id: "sv-15", name: "Замена сцепления", category: "Трансмиссия", price: 12000 , normMinutes: 300 },
+  { id: "sv-16", name: "Замена масла в АКПП", category: "Трансмиссия", price: 4200 , normMinutes: 90 },
+  { id: "sv-17", name: "Шиномонтаж (4 колеса)", category: "Шиномонтаж", price: 2400 , normMinutes: 45 },
+  { id: "sv-18", name: "Заправка кондиционера", category: "Климат", price: 3200 , normMinutes: 40 },
+  { id: "sv-19", name: "Замена ступичного подшипника", category: "Ходовая", price: 3800 , normMinutes: 90 },
+  { id: "sv-20", name: "Замена аккумулятора", category: "Электрика", price: 700 , normMinutes: 15 },
 ];
 
 export const stock: StockItem[] = [
@@ -161,6 +168,7 @@ export const stock: StockItem[] = [
 const activeOrders: Order[] = [
   {
     id: "ord-268",
+    timeline: [{ status: "запись" as const, at: ago(220) }, { status: "диагностика" as const, at: ago(190) }, { status: "в работе" as const, at: ago(150) }],
     number: "№АИ-0268",
     clientId: "cl-2",
     vehicleId: "veh-2",
@@ -171,9 +179,9 @@ const activeOrders: Order[] = [
     scheduledStart: "10:00",
     scheduledEnd: "14:00",
     works: [
-      { id: "w1", name: "Компьютерная диагностика", qty: 1, price: 1500, executor: "Игорь" },
-      { id: "w2", name: "Замена масла в ДВС", qty: 1, price: 1200, executor: "Механик 1" },
-      { id: "w3", name: "Замена передних тормозных колодок", qty: 1, price: 2000, executor: "Механик 1" },
+      { id: "w1", name: "Компьютерная диагностика", normMinutes: 45, qty: 1, price: 1500, executor: "Игорь" },
+      { id: "w2", name: "Замена масла в ДВС", normMinutes: 30, qty: 1, price: 1200, executor: "Механик 1" },
+      { id: "w3", name: "Замена передних тормозных колодок", normMinutes: 60, qty: 1, price: 2000, executor: "Механик 1" },
     ],
     parts: [
       { id: "p1", name: "Масляный фильтр", sku: "26300-35505", qty: 1, price: 980, availability: "reserved" },
@@ -185,6 +193,7 @@ const activeOrders: Order[] = [
   },
   {
     id: "ord-267",
+    timeline: [{ status: "запись" as const, at: ago(160) }, { status: "в работе" as const, at: ago(130) }],
     number: "№АИ-0267",
     clientId: "cl-3",
     vehicleId: "veh-3",
@@ -194,12 +203,13 @@ const activeOrders: Order[] = [
     advisor: "Юра",
     scheduledStart: "09:30",
     scheduledEnd: "12:30",
-    works: [{ id: "w1", name: "Замена термостата", qty: 1, price: 1800, executor: "Механик 2" }],
+    works: [{ id: "w1", name: "Замена термостата", normMinutes: 90, qty: 1, price: 1800, executor: "Механик 2" }],
     parts: [],
     paid: 0,
   },
   {
     id: "ord-265",
+    timeline: [{ status: "запись" as const, at: ago(95) }, { status: "в работе" as const, at: ago(80) }],
     number: "№АИ-0265",
     clientId: "cl-1",
     vehicleId: "veh-1",
@@ -210,14 +220,15 @@ const activeOrders: Order[] = [
     scheduledStart: "09:00",
     scheduledEnd: "12:00",
     works: [
-      { id: "w1", name: "Замена масла в ДВС", qty: 1, price: 1200 },
-      { id: "w2", name: "Компьютерная диагностика", qty: 1, price: 1500 },
+      { id: "w1", name: "Замена масла в ДВС", normMinutes: 30, qty: 1, price: 1200 },
+      { id: "w2", name: "Компьютерная диагностика", normMinutes: 45, qty: 1, price: 1500 },
     ],
     parts: [],
     paid: 0,
   },
   {
     id: "ord-264",
+    timeline: [{ status: "запись" as const, at: at(0, "08:30") }, { status: "в работе" as const, at: at(0, "08:40") }, { status: "готово" as const, at: at(0, "10:10") }],
     number: "№АИ-0264",
     clientId: "cl-4",
     vehicleId: "veh-4",
@@ -228,8 +239,8 @@ const activeOrders: Order[] = [
     scheduledStart: "08:40",
     scheduledEnd: "10:10",
     works: [
-      { id: "w1", name: "Замена масла в ДВС", qty: 1, price: 1200, executor: "Механик 2" },
-      { id: "w2", name: "Замена масляного фильтра", qty: 1, price: 600, executor: "Механик 2" },
+      { id: "w1", name: "Замена масла в ДВС", normMinutes: 30, qty: 1, price: 1200, executor: "Механик 2" },
+      { id: "w2", name: "Замена масляного фильтра", normMinutes: 15, qty: 1, price: 600, executor: "Механик 2" },
     ],
     parts: [{ id: "p1", name: "Моторное масло 5W-30", sku: "Shell 5W-30", qty: 4, price: 1100, availability: "in_stock" }],
     paid: 0,
@@ -238,26 +249,28 @@ const activeOrders: Order[] = [
   },
   {
     id: "ord-263",
+    timeline: [{ status: "запись" as const, at: at(0, "11:00") }, { status: "диагностика" as const, at: at(0, "11:10") }, { status: "ожидает запчасти" as const, at: at(0, "12:05") }],
     number: "№АИ-0263",
     clientId: "cl-5",
     vehicleId: "veh-5",
     status: "ожидает запчасти",
     createdAt: at(-1, "11:00"), plannedAt: day(0),
     advisor: "Игорь",
-    works: [{ id: "w1", name: "Замена передних тормозных колодок", qty: 1, price: 2000 }],
+    works: [{ id: "w1", name: "Замена передних тормозных колодок", normMinutes: 60, qty: 1, price: 2000 }],
     parts: [{ id: "p1", name: "Тормозной диск передний", sku: "DF4271", qty: 2, price: 6200, availability: "ordered" }],
     paid: 0,
     notes: "Диски в пути, поставщик обещал завтра к обеду.",
   },
   {
     id: "ord-262",
+    timeline: [{ status: "запись" as const, at: at(-1, "09:20") }, { status: "в работе" as const, at: at(-1, "09:30") }, { status: "готово" as const, at: at(-1, "12:40") }],
     number: "№АИ-0262",
     clientId: "cl-1",
     vehicleId: "veh-1",
     status: "готово",
     createdAt: at(-1, "09:20"), plannedAt: day(-1),
     advisor: "Игорь",
-    works: [{ id: "w1", name: "Развал-схождение", qty: 1, price: 2500, executor: "Механик 1" }],
+    works: [{ id: "w1", name: "Развал-схождение", normMinutes: 60, qty: 1, price: 2500, executor: "Механик 1" }],
     parts: [],
     paid: 1000,
     completedAt: at(-1, "12:40"),
@@ -367,6 +380,17 @@ const CLOSED_PAIRS: { clientId: string; vehicleId: string; since: number }[] = [
 
 const MECHANICS = ["Механик 1", "Механик 2"];
 
+/** Нормативы из прайса — держим рядом, чтобы демо-заказы совпадали с услугами. */
+const NORM_MINUTES: Record<string, number> = Object.fromEntries(
+  services.map((service) => [service.name, service.normMinutes ?? 60]),
+);
+
+/**
+ * Темп мастеров: первый чуть растягивает работы, второй укладывается быстрее
+ * норматива. Так в отчёте видно разницу, ради которой всё и затевалось.
+ */
+const PACE: Record<string, number> = { "Механик 1": 1.18, "Механик 2": 0.92 };
+
 interface History {
   closed: Order[];
   expenses: Expense[];
@@ -401,6 +425,7 @@ function buildHistory(): History {
         qty: 1,
         price,
         executor: name === "Компьютерная диагностика" ? "Игорь" : mechanic,
+        normMinutes: NORM_MINUTES[name],
       }));
       const parts = template.parts.map(([name, sku, qty, price], i) => ({
         id: `p${i + 1}`,
@@ -420,6 +445,15 @@ function buildHistory(): History {
       const paid = step % 11 === 0 ? Math.round(due / 2 / 100) * 100 : due;
 
       const startHour = 9 + index * 3;
+      // Фактическое время: у каждого мастера свой темп, плюс разброс по заказам.
+      const norm = works.reduce((sum, work) => sum + (work.normMinutes ?? 0), 0);
+      const pace = PACE[works.find((work) => work.executor !== "Игорь")?.executor ?? "Механик 1"] ?? 1;
+      const spread = 1 + ((step % 7) - 3) * 0.06;
+      const actual = Math.max(20, Math.round((norm * pace * spread) / 5) * 5);
+      const startMinutes = startHour * 60;
+      const clock = (minutes: number) =>
+        `${String(Math.floor(Math.min(minutes, 20 * 60) / 60)).padStart(2, "0")}:${String(Math.min(minutes, 20 * 60) % 60).padStart(2, "0")}`;
+
       closed.push({
         id: `ord-h${step}`,
         number: "",
@@ -429,7 +463,13 @@ function buildHistory(): History {
         status: "выдан",
         createdAt: at(-back, `${String(startHour).padStart(2, "0")}:00`),
         plannedAt: day(-back),
-        completedAt: at(-back, `${String(Math.min(19, startHour + 2)).padStart(2, "0")}:40`),
+        completedAt: at(-back, clock(startMinutes + actual)),
+        timeline: [
+          { status: "запись" as const, at: at(-back, clock(startMinutes - 30)) },
+          { status: "в работе" as const, at: at(-back, clock(startMinutes)) },
+          { status: "готово" as const, at: at(-back, clock(startMinutes + actual)) },
+          { status: "выдан" as const, at: at(-back, clock(startMinutes + actual + 20)) },
+        ],
         advisor: step % 2 === 0 ? "Игорь" : "Юра",
         scheduledStart: back === 0 ? undefined : `${String(startHour).padStart(2, "0")}:00`,
         scheduledEnd: back === 0 ? undefined : `${String(Math.min(20, startHour + 3)).padStart(2, "0")}:00`,

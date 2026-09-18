@@ -1,9 +1,23 @@
+import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
-  IconCar, IconChartBar, IconClipboardList, IconClockHour4, IconCoin, IconGauge, IconTool, IconUsersGroup,
+  IconAlertTriangle, IconCar, IconChartBar, IconClipboardList, IconClockHour4, IconCoin,
+  IconGauge, IconStopwatch, IconTool, IconTrendingUp, IconUsersGroup,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { liftState } from "../lib/lift";
+import { getRange, ordersInRange, type PeriodKey } from "../lib/analytics";
+
+const PERIODS: { value: PeriodKey; label: string }[] = [
+  { value: "week", label: "Неделя" },
+  { value: "month", label: "Месяц" },
+  { value: "year", label: "Год" },
+  { value: "all", label: "Всё время" },
+];
+import {
+  biggestDeviations, formatDuration, loadByLift, runningOrders,
+  timingByExecutor, timingByService, timingSummary,
+} from "../lib/worktime";
 import { isCostExpense } from "../lib/analytics";
 import { Card, EmptyState, Metric, Page, TopBar } from "../components/ui";
 import { formatMoney, plural } from "../lib/format";
@@ -11,9 +25,58 @@ import { computePayroll } from "../lib/payroll";
 import { orderTotals } from "../lib/order";
 import { todayISO } from "../lib/date";
 
+/** Компактная строка времени для телефона: таблица на 390px нечитаема. */
+function TimeRow({
+  title, subtitle, norm, actual, deviation, right,
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  norm: number;
+  actual: number;
+  deviation: number | null;
+  right?: ReactNode;
+}) {
+  return (
+    <div className="border-b px-4 py-3 last:border-b-0" style={{ borderColor: "var(--border)" }}>
+      <div className="flex items-start justify-between gap-3">
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold">{title}</span>
+          {subtitle && <span className="muted block text-xs">{subtitle}</span>}
+        </span>
+        <span
+          className="shrink-0 text-sm font-semibold tabular-nums"
+          style={{ color: deviation === null ? undefined : deviation > 0 ? "var(--danger)" : "var(--accent)" }}
+        >
+          {deviation === null ? "—" : `${deviation > 0 ? "+" : ""}${deviation}%`}
+        </span>
+      </div>
+      <div className="muted mt-1 flex flex-wrap gap-x-3 text-xs tabular-nums">
+        <span>норматив {norm > 0 ? formatDuration(norm) : "—"}</span>
+        <span>факт {formatDuration(actual)}</span>
+        {right}
+      </div>
+    </div>
+  );
+}
+
 export default function Reports() {
   const { orders, employees: rawEmployees, vehicles, lifts, clients, expenses } = useAppStore();
   const today = todayISO();
+  const [period, setPeriod] = useState<PeriodKey>("month");
+
+  // Время считаем за выбранный период: за всё время цифры теряют смысл.
+  const range = useMemo(() => getRange(period, 0), [period]);
+  const periodOrders = useMemo(() => ordersInRange(range, orders), [orders, range]);
+  const summary = useMemo(() => timingSummary(periodOrders), [periodOrders]);
+  const serviceTiming = useMemo(() => timingByService(periodOrders), [periodOrders]);
+  const executorTiming = useMemo(() => timingByExecutor(periodOrders), [periodOrders]);
+  const liftLoad = useMemo(
+    () => loadByLift(periodOrders, lifts.map((lift) => lift.id), range.from, range.to),
+    [lifts, periodOrders, range],
+  );
+  const deviations = useMemo(() => biggestDeviations(periodOrders), [periodOrders]);
+  // Машины, которые стоят на подъёмнике прямо сейчас: видно, где уже перебор.
+  const running = useMemo(() => runningOrders(orders), [orders]);
   const employees = computePayroll(rawEmployees, orders);
 
   const active = orders.filter((order) => order.status !== "выдан");
@@ -202,6 +265,312 @@ export default function Reports() {
               ))}
               {statusCounts.size === 0 && <p className="muted">Заказ-нарядов пока нет.</p>}
             </div>
+          </Card>
+        </div>
+
+
+        {/* --- Время на подъёмнике и темп работы ------------------------- */}
+        <div
+          className="mb-3 mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border bg-white px-3 py-2"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <span className="text-sm font-semibold">Время и выработка</span>
+          <div className="flex flex-wrap gap-1">
+            {PERIODS.map((item) => (
+              <button
+                key={item.value}
+                onClick={() => setPeriod(item.value)}
+                className="rounded-lg px-2.5 py-1.5 text-sm font-medium transition"
+                style={{
+                  background: period === item.value ? "var(--accent)" : "transparent",
+                  color: period === item.value ? "white" : "var(--text-muted)",
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <span className="muted ml-auto text-xs">{range.title}</span>
+        </div>
+
+        <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <Metric
+            icon={<IconClockHour4 size={18} />}
+            label="Норматив"
+            value={formatDuration(summary.normMinutes)}
+            hint={`${summary.orders} ${plural(summary.orders, "заказ", "заказа", "заказов")} со временем`}
+          />
+          <Metric
+            icon={<IconStopwatch size={18} />}
+            tone="blue"
+            label="Фактически на подъёмнике"
+            value={formatDuration(summary.actualMinutes)}
+            hint="По закрытым заказам, машины в работе не в счёт"
+          />
+          <Metric
+            icon={<IconTrendingUp size={18} />}
+            tone={summary.deviation !== null && summary.deviation > 10 ? "danger" : "accent"}
+            label="Отклонение от норматива"
+            value={summary.deviation === null ? "—" : `${summary.deviation > 0 ? "+" : ""}${summary.deviation}%`}
+            hint={summary.deviation !== null && summary.deviation > 0 ? "Дольше норматива" : "Быстрее норматива"}
+          />
+          <Metric
+            icon={<IconGauge size={18} />}
+            tone="violet"
+            label="Средняя загрузка подъёмника"
+            value={`${liftLoad.length ? Math.round(liftLoad.reduce((sum, item) => sum + item.loadPercent, 0) / liftLoad.length) : 0}%`}
+            hint="От рабочего времени в дни с машинами"
+          />
+        </div>
+
+        {running.length > 0 && (
+          <Card className="mb-3 overflow-hidden p-0">
+            <div className="p-4">
+              <h2 className="panel-title flex items-center gap-2"><IconStopwatch size={18} /> Сейчас на подъёмнике</h2>
+              <p className="muted mt-1 text-xs">Время идёт с момента постановки. Красное — уже дольше норматива</p>
+            </div>
+            <div className="lg:hidden">
+              {running.map(({ order, minutes, norm, deviation }) => {
+                const vehicle = vehicles.find((item) => item.id === order.vehicleId);
+                const lift = lifts.find((item) => item.id === order.liftId);
+                return (
+                  <TimeRow
+                    key={order.id}
+                    title={<Link to={`/orders/${order.id}`} className="text-[var(--accent)]">{vehicle ? `${vehicle.make} ${vehicle.model}` : order.number}</Link>}
+                    subtitle={`${order.number} · ${lift?.name ?? "без подъёмника"}`}
+                    norm={norm}
+                    actual={minutes}
+                    deviation={deviation}
+                  />
+                );
+              })}
+            </div>
+            <table className="app-table hidden lg:table">
+              <thead>
+                <tr>
+                  <th>Автомобиль</th>
+                  <th className="w-40">Подъёмник</th>
+                  <th className="w-28 text-right">Норматив</th>
+                  <th className="w-28 text-right">Уже стоит</th>
+                  <th className="w-20 text-right">Разница</th>
+                </tr>
+              </thead>
+              <tbody>
+                {running.map(({ order, minutes, norm, deviation }) => {
+                  const vehicle = vehicles.find((item) => item.id === order.vehicleId);
+                  const lift = lifts.find((item) => item.id === order.liftId);
+                  return (
+                    <tr key={order.id}>
+                      <td>
+                        <Link to={`/orders/${order.id}`} className="font-medium text-[var(--accent)]">
+                          {vehicle ? `${vehicle.make} ${vehicle.model}` : order.number}
+                        </Link>
+                        <div className="muted text-xs">{order.number}</div>
+                      </td>
+                      <td className="muted">{lift?.name ?? "Без подъёмника"}</td>
+                      <td className="muted text-right tabular-nums">{norm > 0 ? formatDuration(norm) : "—"}</td>
+                      <td className="text-right font-semibold tabular-nums">{formatDuration(minutes)}</td>
+                      <td
+                        className="text-right font-semibold tabular-nums"
+                        style={{ color: deviation === null ? undefined : deviation > 0 ? "var(--danger)" : "var(--accent)" }}
+                      >
+                        {deviation === null ? "—" : `${deviation > 0 ? "+" : ""}${deviation}%`}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+        )}
+
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <Card className="overflow-hidden p-0">
+            <div className="p-4">
+              <h2 className="panel-title flex items-center gap-2"><IconTool size={18} /> Работы: норматив против факта</h2>
+              <p className="muted mt-1 text-xs">Время заказа делится между работами пропорционально нормативу</p>
+            </div>
+            {serviceTiming.length === 0 ? (
+              <p className="muted px-4 pb-4 text-sm">За период нет заказов с указанным нормативом.</p>
+            ) : (
+              <>
+              <div className="lg:hidden">
+                {serviceTiming.map((row) => (
+                  <TimeRow
+                    key={row.name}
+                    title={row.name}
+                    subtitle={`${row.count} ${plural(row.count, "раз", "раза", "раз")}`}
+                    norm={row.normMinutes}
+                    actual={row.actualMinutes}
+                    deviation={row.deviation}
+                  />
+                ))}
+              </div>
+              <table className="app-table hidden lg:table">
+                <thead>
+                  <tr>
+                    <th>Работа</th>
+                    <th className="w-16 text-right">Раз</th>
+                    <th className="w-24 text-right">Норматив</th>
+                    <th className="w-24 text-right">Факт</th>
+                    <th className="w-20 text-right">Разница</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {serviceTiming.map((row) => (
+                    <tr key={row.name}>
+                      <td>{row.name}</td>
+                      <td className="text-right tabular-nums">{row.count}</td>
+                      <td className="muted text-right tabular-nums">{formatDuration(row.normMinutes)}</td>
+                      <td className="text-right tabular-nums">{formatDuration(row.actualMinutes)}</td>
+                      <td
+                        className="text-right font-semibold tabular-nums"
+                        style={{ color: row.deviation === null ? undefined : row.deviation > 0 ? "var(--danger)" : "var(--accent)" }}
+                      >
+                        {row.deviation === null ? "—" : `${row.deviation > 0 ? "+" : ""}${row.deviation}%`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              </>
+            )}
+          </Card>
+
+          <Card className="overflow-hidden p-0">
+            <div className="p-4">
+              <h2 className="panel-title flex items-center gap-2"><IconStopwatch size={18} /> Мастера: темп и вовлечённость</h2>
+              <p className="muted mt-1 text-xs">Минус в разнице — укладывается быстрее норматива</p>
+            </div>
+            {executorTiming.length === 0 ? (
+              <p className="muted px-4 pb-4 text-sm">За период нет работ с нормативом.</p>
+            ) : (
+              <>
+              <div className="lg:hidden">
+                {executorTiming.map((row) => (
+                  <TimeRow
+                    key={row.name}
+                    title={row.name}
+                    subtitle={`${row.orders} ${plural(row.orders, "заказ", "заказа", "заказов")} · ${row.works} ${plural(row.works, "работа", "работы", "работ")}`}
+                    norm={row.normMinutes}
+                    actual={row.actualMinutes}
+                    deviation={row.deviation}
+                    right={<span>{formatMoney(row.revenuePerHour)} в час</span>}
+                  />
+                ))}
+              </div>
+              <table className="app-table hidden lg:table">
+                <thead>
+                  <tr>
+                    <th>Мастер</th>
+                    <th className="w-20 text-right">Заказов</th>
+                    <th className="w-24 text-right">Норматив</th>
+                    <th className="w-24 text-right">Факт</th>
+                    <th className="w-20 text-right">Разница</th>
+                    <th className="w-24 text-right">₽ в час</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {executorTiming.map((row) => (
+                    <tr key={row.name}>
+                      <td className="font-medium">{row.name}</td>
+                      <td className="text-right tabular-nums">{row.orders}</td>
+                      <td className="muted text-right tabular-nums">{formatDuration(row.normMinutes)}</td>
+                      <td className="text-right tabular-nums">{formatDuration(row.actualMinutes)}</td>
+                      <td
+                        className="text-right font-semibold tabular-nums"
+                        style={{ color: row.deviation === null ? undefined : row.deviation > 0 ? "var(--danger)" : "var(--accent)" }}
+                      >
+                        {row.deviation === null ? "—" : `${row.deviation > 0 ? "+" : ""}${row.deviation}%`}
+                      </td>
+                      <td className="text-right tabular-nums">{formatMoney(row.revenuePerHour)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              </>
+            )}
+          </Card>
+
+          <Card>
+            <h2 className="panel-title mb-3 flex items-center gap-2"><IconGauge size={18} /> Загрузка подъёмников за период</h2>
+            <div className="space-y-2 text-sm">
+              {liftLoad.map((row) => {
+                const lift = lifts.find((item) => item.id === row.liftId);
+                return (
+                  <div key={row.liftId}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate">{lift?.name ?? `Подъёмник ${row.liftId}`}</span>
+                      <span className="muted shrink-0 tabular-nums">
+                        {formatDuration(row.minutes)} · {row.orders} {plural(row.orders, "заказ", "заказа", "заказов")} · {row.loadPercent}%
+                      </span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full" style={{ background: "var(--bg)" }}>
+                      <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${row.loadPercent}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card className="overflow-hidden p-0">
+            <div className="p-4">
+              <h2 className="panel-title flex items-center gap-2"><IconAlertTriangle size={18} /> Сильнее всего разошлось с нормативом</h2>
+              <p className="muted mt-1 text-xs">Куда смотреть в первую очередь: или норматив занижен, или работу растянули</p>
+            </div>
+            {deviations.length === 0 ? (
+              <p className="muted px-4 pb-4 text-sm">Отклонений за период нет.</p>
+            ) : (
+              <>
+              <div className="lg:hidden">
+                {deviations.map(({ order, norm, actual, deviation }) => {
+                  const vehicle = vehicles.find((item) => item.id === order.vehicleId);
+                  return (
+                    <TimeRow
+                      key={order.id}
+                      title={<Link to={`/orders/${order.id}`} className="text-[var(--accent)]">{order.number}</Link>}
+                      subtitle={vehicle ? `${vehicle.make} ${vehicle.model}` : undefined}
+                      norm={norm}
+                      actual={actual}
+                      deviation={deviation}
+                    />
+                  );
+                })}
+              </div>
+              <table className="app-table hidden lg:table">
+                <thead>
+                  <tr>
+                    <th>Заказ-наряд</th>
+                    <th className="w-24 text-right">Норматив</th>
+                    <th className="w-24 text-right">Факт</th>
+                    <th className="w-20 text-right">Разница</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deviations.map(({ order, norm, actual, deviation }) => {
+                    const vehicle = vehicles.find((item) => item.id === order.vehicleId);
+                    return (
+                      <tr key={order.id}>
+                        <td>
+                          <Link to={`/orders/${order.id}`} className="font-medium text-[var(--accent)]">{order.number}</Link>
+                          <div className="muted text-xs">{vehicle ? `${vehicle.make} ${vehicle.model}` : "—"}</div>
+                        </td>
+                        <td className="muted text-right tabular-nums">{formatDuration(norm)}</td>
+                        <td className="text-right tabular-nums">{formatDuration(actual)}</td>
+                        <td
+                          className="text-right font-semibold tabular-nums"
+                          style={{ color: deviation! > 0 ? "var(--danger)" : "var(--accent)" }}
+                        >
+                          {deviation! > 0 ? "+" : ""}{deviation}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              </>
+            )}
           </Card>
         </div>
 
