@@ -8,6 +8,7 @@ import type {
   Invoice,
   Lift,
   Payment,
+  PaymentMethod,
   Order,
   OrderStatus,
   Service,
@@ -230,8 +231,8 @@ interface AppStoreValue extends DB {
   reservePart: (orderId: string, itemId: string, qty: number, price: number) => string | null;
   /** Убрать запчасть из заказа и снять резерв. Выданный заказ менять нельзя. */
   releasePart: (orderId: string, partId: string) => string | null;
-  /** Принять оплату от клиента; больше долга принять нельзя. */
-  acceptPayment: (orderId: string, amount: number) => void;
+  /** Принять одну или несколько частей оплаты; суммарно не больше долга. */
+  acceptPayment: (orderId: string, parts: Array<{ amount: number; method: PaymentMethod }>) => string | null;
   /** Возврат запчасти поставщику: списывает со склада и заводит ожидание денег. */
   returnToSupplier: (input: ReturnToSupplierInput) => void;
   /** Деньги от поставщика пришли — возврат идёт в расчёты. */
@@ -590,25 +591,47 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return error;
       },
-      acceptPayment: (orderId, amount) =>
+      acceptPayment: (orderId, parts) => {
+        let error: string | null = null;
         setDB((prev) => {
           const order = prev.orders.find((item) => item.id === orderId);
-          if (!order || amount <= 0) return prev;
+          if (!order) {
+            error = "Заказ-наряд не найден";
+            return prev;
+          }
+          const normalized = parts
+            .filter((part) => Number.isFinite(part.amount) && part.amount > 0)
+            .map((part) => ({ ...part, amount: Math.round(part.amount) }));
+          const total = normalized.reduce((sum, part) => sum + part.amount, 0);
+          if (total <= 0) {
+            error = "Укажите сумму хотя бы для одного способа оплаты";
+            return prev;
+          }
           const debt = Math.max(0, orderTotals(order).debt);
-          const accepted = Math.min(amount, debt);
-          if (accepted <= 0) return prev;
+          if (total > debt) {
+            error = `Сумма оплаты больше долга на ${total - debt} ₽`;
+            return prev;
+          }
           const at = nowISO();
           return {
             ...prev,
             orders: prev.orders.map((item) =>
-              item.id === orderId ? { ...item, paid: (item.paid ?? 0) + accepted } : item,
+              item.id === orderId ? { ...item, paid: (item.paid ?? 0) + total } : item,
             ),
             payments: [
-              { id: createId("pay"), orderId, at, amount: accepted },
+              ...normalized.map((part) => ({
+                id: createId("pay"),
+                orderId,
+                at,
+                amount: part.amount,
+                method: part.method,
+              })),
               ...prev.payments,
             ],
           };
-        }),
+        });
+        return error;
+      },
       returnToSupplier: (input) =>
         setDB((prev) => {
           const item = prev.stock.find((entry) => entry.id === input.itemId);
