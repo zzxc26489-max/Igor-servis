@@ -150,14 +150,13 @@ set search_path = public
 as $$
 declare
   v_workshop uuid;
-  v_role text;
   v_display text;
   v_current public.crm_state%rowtype;
   v_revision bigint;
   v_changed text[];
 begin
-  select m.workshop_id, m.role, m.display_name
-    into v_workshop, v_role, v_display
+  select m.workshop_id, m.display_name
+    into v_workshop, v_display
   from public.crm_my_membership() m;
 
   if v_workshop is null then
