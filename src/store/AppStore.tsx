@@ -26,7 +26,17 @@ import { nowISO } from "../lib/date";
 import { backfillTimeline } from "../lib/worktime";
 import { normalizeWorkDay, parseWorkHours, setWorkDay } from "../lib/workday";
 import { ensureLegacyPayments } from "../lib/payments";
-import { createCloudBackup, loadCloudState, saveCloudState, type CloudRole } from "../lib/cloud";
+import {
+  createCloudBackup,
+  listCloudAudit,
+  listCloudBackups,
+  loadCloudState,
+  restoreCloudBackup,
+  saveCloudState,
+  type CloudAuditInfo,
+  type CloudBackupInfo,
+  type CloudRole,
+} from "../lib/cloud";
 import { mergeConcurrentState } from "../lib/stateMerge";
 import { useAuth } from "../auth/AuthContext";
 import { LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
@@ -215,6 +225,9 @@ interface AppStoreValue extends DB {
   uploadLocalToCloud: () => Promise<string | null>;
   refreshFromCloud: () => Promise<string | null>;
   backupCloud: () => Promise<string | null>;
+  listBackups: () => Promise<CloudBackupInfo[]>;
+  listAudit: () => Promise<CloudAuditInfo[]>;
+  restoreBackup: (backupId: string) => Promise<string | null>;
   setDB: React.Dispatch<React.SetStateAction<DB>>;
   updateOrder: (id: string, patch: Partial<Order>) => void;
   deleteOrder: (id: string) => string | null;
@@ -500,6 +513,39 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }
   }, [cloudConfigured, session]);
 
+  const listBackups = useCallback(async () => {
+    if (!cloudConfigured || !session) return [];
+    return listCloudBackups(session);
+  }, [cloudConfigured, session]);
+
+  const listAudit = useCallback(async () => {
+    if (!cloudConfigured || !session) return [];
+    return listCloudAudit(session);
+  }, [cloudConfigured, session]);
+
+  const restoreBackup = useCallback(async (backupId: string) => {
+    if (!cloudConfigured || !session) return "Серверная база не подключена";
+    try {
+      await restoreCloudBackup(session, backupId);
+      const snapshot = await loadCloudState(session);
+      cloudRevisionRef.current = snapshot.revision;
+      const remote = migrate(snapshot.data as DB);
+      cloudBaseRef.current = remote;
+      writeCloudBase(session.user.id, snapshot.revision, remote);
+      rawSetDB(remote);
+      setCloud((prev) => ({
+        ...prev,
+        status: "ready",
+        revision: snapshot.revision,
+        lastSyncedAt: new Date().toISOString(),
+        error: undefined,
+      }));
+      return null;
+    } catch (cause) {
+      return cause instanceof Error ? cause.message : "Не удалось восстановить резервную копию";
+    }
+  }, [cloudConfigured, session]);
+
   const value = useMemo<AppStoreValue>(
     () => ({
       ...db,
@@ -507,6 +553,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       uploadLocalToCloud,
       refreshFromCloud: () => loadFromCloud(true),
       backupCloud,
+      listBackups,
+      listAudit,
+      restoreBackup,
       setDB,
       updateOrder: (id, patch) =>
         setDB((prev) => ({
@@ -1008,7 +1057,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [backupCloud, cloud, db, loadFromCloud, setDB, uploadLocalToCloud],
+    [backupCloud, cloud, db, listAudit, listBackups, loadFromCloud, restoreBackup, setDB, uploadLocalToCloud],
   );
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
