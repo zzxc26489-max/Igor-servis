@@ -6,7 +6,7 @@ import { useConfirm } from "../components/Confirm";
 import { isValidMoney, moneyInput } from "../lib/formats";
 import { Button, Modal } from "../components/ui";
 import { formatDate, formatMoney } from "../lib/format";
-import type { StockItem } from "../types";
+import type { PaymentMethod, StockItem } from "../types";
 
 export const RACKS = ["A", "B", "C"];
 export const SHELVES = ["01", "02", "03", "04"];
@@ -45,6 +45,7 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
   const [supplier, setSupplier] = useState(preset?.supplier ?? "");
   const [employee, setEmployee] = useState(employees[0]?.name ?? "");
   const [createExpense, setCreateExpense] = useState(true);
+  const [expenseMethod, setExpenseMethod] = useState<PaymentMethod | "">("");
   const cellParts = parseCell(preset?.cell);
   const [rack, setRack] = useState(cellParts.rack);
   const [shelf, setShelf] = useState(cellParts.shelf);
@@ -108,6 +109,10 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
       showToast(`Ячейка ${cell} занята: ${cellOwner.name}`, "error");
       return;
     }
+    if (createExpense && total > 0 && !expenseMethod) {
+      showToast("Выберите, как оплачена поставка", "error");
+      return;
+    }
 
     const total = Math.round(receivedQty * price);
     const nextQty = (matched?.qty ?? 0) + receivedQty;
@@ -159,6 +164,7 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
       supplier: supplier.trim() || undefined,
       employee: employee || "Не указан",
       createExpense,
+      expenseMethod: createExpense ? (expenseMethod || undefined) : undefined,
     });
 
     showToast(
@@ -267,6 +273,17 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
             Записать расход в финансы
           </label>
         </div>
+
+        {createExpense && total > 0 && (
+          <Field label="Как оплачена поставка">
+            <select value={expenseMethod} onChange={(event) => setExpenseMethod(event.target.value as PaymentMethod | "")}>
+              <option value="">Выберите способ</option>
+              <option value="cash">Наличные</option>
+              <option value="terminal">Терминал / карта</option>
+              <option value="transfer">Перевод / СБП</option>
+            </select>
+          </Field>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg p-3" style={{ background: "var(--bg)" }}>
           <span className="text-sm muted">Сумма приёмки</span>
