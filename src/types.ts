@@ -80,6 +80,13 @@ export type OrderStatus =
   | "готово"
   | "выдан";
 
+export type WorkLineStatus = "planned" | "in_progress" | "paused" | "done";
+
+export interface WorkSession {
+  startedAt: string;
+  endedAt?: string;
+}
+
 export interface OrderLineWork {
   id: string;
   name: string;
@@ -88,6 +95,10 @@ export interface OrderLineWork {
   executor?: string;
   /** Норматив времени на единицу работы, минут. Берётся из прайса при добавлении. */
   normMinutes?: number;
+  /** Личный статус конкретной работы механика, отдельно от статуса всего заказ-наряда. */
+  workStatus?: WorkLineStatus;
+  /** Реальные сессии работы: старт / пауза / продолжение. */
+  workSessions?: WorkSession[];
 }
 
 /** Отметка смены статуса — из них считается фактическое время на подъёмнике. */

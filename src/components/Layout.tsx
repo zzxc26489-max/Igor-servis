@@ -2,7 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import {
   IconCalendarEvent, IconChartBar, IconChevronDown, IconClipboardList, IconCoin,
   IconCube, IconDotsCircleHorizontal, IconHome2, IconSettings, IconShoppingCart,
-  IconTool, IconUsers, IconUsersGroup, IconX,
+  IconTool, IconUsers, IconUsersGroup, IconX, IconGauge,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { lowStockItems } from "../lib/lowStock";
@@ -28,6 +28,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: "/", label: "Сегодня", icon: IconHome2, end: true },
       { to: "/schedule", label: "Расписание", icon: IconCalendarEvent },
       { to: "/orders", label: "Заказ-наряды", icon: IconClipboardList, badge: "orders" },
+      { to: "/my-work", label: "Мои работы", icon: IconGauge },
     ],
   },
   {
@@ -49,10 +50,20 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
 ];
 
-const MOBILE_NAV_ITEMS = [
+const MOBILE_NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Сегодня", icon: IconHome2, end: true },
   { to: "/orders", label: "Заказы", icon: IconClipboardList },
   { to: "/stock", label: "Склад", icon: IconCube },
+];
+
+const MECHANIC_MOBILE_NAV: NavItem[] = [
+  { to: "/my-work", label: "Мои работы", icon: IconGauge, end: true },
+];
+
+const ACCOUNTANT_MOBILE_NAV: NavItem[] = [
+  { to: "/finance", label: "Финансы", icon: IconCoin, end: true },
+  { to: "/reports", label: "Отчёты", icon: IconChartBar },
+  { to: "/employees", label: "Сотрудники", icon: IconUsersGroup },
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -90,11 +101,14 @@ function SidebarContent({
       </div>
 
       <nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-2.5 pb-3">
-        {NAV_GROUPS.map((group) => (
+        {NAV_GROUPS.map((group) => ({
+          ...group,
+          items: group.items.filter((item) => (item.to !== "/my-work" || role === "mechanic") && (!role || canOpenPath(role, item.to))),
+        })).filter((group) => group.items.length > 0).map((group) => (
           <div key={group.label}>
             <div className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[.12em] opacity-38">{group.label}</div>
             <div className="flex flex-col gap-1">
-              {group.items.filter((item) => !role || canOpenPath(role, item.to)).map((item) => {
+              {group.items.map((item) => {
                 const badge = item.badge ? badges[item.badge] : 0;
                 return (
                   <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass} style={navLinkStyle} onClick={onNavigate}>
@@ -209,7 +223,8 @@ export default function Layout() {
         style={{ borderColor: "var(--border)" }}
         aria-label="Основная навигация"
       >
-        {MOBILE_NAV_ITEMS.filter((item) => !cloud.role || canOpenPath(cloud.role, item.to)).map((item) => (
+        {(cloud.role === "mechanic" ? MECHANIC_MOBILE_NAV : cloud.role === "accountant" ? ACCOUNTANT_MOBILE_NAV : MOBILE_NAV_ITEMS)
+          .filter((item) => !cloud.role || canOpenPath(cloud.role, item.to)).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

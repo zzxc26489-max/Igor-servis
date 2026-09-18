@@ -9,11 +9,11 @@ CRM умеет работать в двух режимах:
 
 Создайте обычный Supabase project. В SQL Editor выполните файл:
 
-`supabase/001_crm_cloud.sql`, затем `supabase/002_role_security_admin_tools.sql`, затем `supabase/003_cash_shifts.sql`
+`supabase/001_crm_cloud.sql`, затем `supabase/002_role_security_admin_tools.sql`, затем `supabase/003_cash_shifts.sql`, затем `supabase/004_mechanic_accountant_roles.sql`
 
 ## 2. Создайте пользователей
 
-В Supabase откройте **Authentication → Users** и создайте пользователей Игоря, партнёра, приёмщика и запчастиста.
+В Supabase откройте **Authentication → Users** и создайте нужных пользователей: владельца, партнёра, приёмщика, запчастиста, механиков и бухгалтера.
 
 Затем в SQL Editor:
 
@@ -30,10 +30,12 @@ insert into public.crm_members(workshop_id, user_id, role, display_name) values
 ('<WORKSHOP_UUID>', '<IGOR_USER_UUID>', 'owner', 'Игорь'),
 ('<WORKSHOP_UUID>', '<PARTNER_USER_UUID>', 'partner', 'Партнёр'),
 ('<WORKSHOP_UUID>', '<ADVISOR_USER_UUID>', 'advisor', 'Юра'),
-('<WORKSHOP_UUID>', '<PARTS_USER_UUID>', 'parts', 'Запчастист');
+('<WORKSHOP_UUID>', '<PARTS_USER_UUID>', 'parts', 'Запчастист'),
+('<WORKSHOP_UUID>', '<MECH1_USER_UUID>', 'mechanic', 'Механик 1'),
+('<WORKSHOP_UUID>', '<ACCOUNTANT_USER_UUID>', 'accountant', 'Елена');
 ```
 
-Роли: `owner`, `partner`, `advisor`, `parts`.
+Роли: `owner`, `partner`, `advisor`, `parts`, `mechanic`, `accountant`.
 
 ## 3. Добавьте переменные сборки
 
@@ -100,3 +102,15 @@ Dashboard сотрудникам.
 `supabase/003_cash_shifts.sql`
 
 Эта миграция скрывает кассовые смены от приёмщика и запчастиста на сервере. Управление кассой остаётся только у владельца и партнёра через раздел **Финансы → Касса**.
+
+
+## Механики и бухгалтер
+
+После выполнения `supabase/004_mechanic_accountant_roles.sql`:
+
+- **mechanic** получает только заказ-наряды, где хотя бы одна работа назначена на его `display_name`;
+- цены работ, оплаты, финансы, склад и зарплаты механику сервер не отдаёт;
+- механик может менять только `workStatus` и `workSessions` своих работ;
+- **accountant** открывает Финансы, Отчёты, Сотрудники и печатные документы, но не управляет ремонтом и складом.
+
+Для механика `display_name` в `crm_members` должен **точно совпадать** с именем исполнителя в CRM. Например: `Механик 1`.

@@ -1,4 +1,4 @@
-export type CloudRole = "owner" | "partner" | "advisor" | "parts";
+export type CloudRole = "owner" | "partner" | "advisor" | "parts" | "mechanic" | "accountant";
 
 export interface CloudUser {
   id: string;
