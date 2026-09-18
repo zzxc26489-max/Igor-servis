@@ -671,7 +671,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                   : item.purchasePrice;
                 return {
                   ...item,
-                  qty: normalizedQty,
+                  qty,
                   purchasePrice,
                   cell: input.cell || item.cell,
                   minQty: input.minQty || item.minQty,
@@ -861,7 +861,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 date: nowISO(),
                 itemId: item.id,
                 operation: "Резерв" as const,
-                qty,
+                qty: normalizedQty,
                 from: item.cell,
                 employee: order.advisor || "—",
                 note: `Заказ-наряд ${order.number}`,
