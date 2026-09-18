@@ -25,6 +25,7 @@ import { formatPhone, formatPlate, isValidPhone, looksRussian } from "../lib/for
 import { nowISO } from "../lib/date";
 import { backfillTimeline } from "../lib/worktime";
 import { normalizeWorkDay, parseWorkHours, setWorkDay } from "../lib/workday";
+import { ensureLegacyPayments } from "../lib/payments";
 
 const STORAGE_KEY = "igor-servis-db-v1";
 
@@ -119,22 +120,7 @@ function migrate(db: DB): DB {
     }),
   }));
 
-  const payments: Payment[] = Array.isArray(db.payments) ? [...db.payments] : [];
-  for (const order of orders) {
-    const recorded = payments
-      .filter((payment) => payment.orderId === order.id)
-      .reduce((sum, payment) => sum + Math.max(0, payment.amount), 0);
-    const paid = Math.max(0, order.paid ?? 0);
-    if (paid > recorded) {
-      payments.push({
-        id: `legacy-payment-${order.id}`,
-        orderId: order.id,
-        at: order.issuedAt ?? order.completedAt ?? (order.plannedAt ? `${order.plannedAt}T12:00:00` : order.createdAt),
-        amount: paid - recorded,
-        estimated: true,
-      });
-    }
-  }
+  const payments = ensureLegacyPayments(Array.isArray(db.payments) ? db.payments : [], orders);
 
   return {
     ...db,
@@ -232,7 +218,18 @@ interface AppStoreValue extends DB {
   /** Убрать запчасть из заказа и снять резерв. Выданный заказ менять нельзя. */
   releasePart: (orderId: string, partId: string) => string | null;
   /** Принять одну или несколько частей оплаты; суммарно не больше долга. */
-  acceptPayment: (orderId: string, parts: Array<{ amount: number; method: PaymentMethod }>) => string | null;
+  acceptPayment: (
+    orderId: string,
+    parts: Array<{ amount: number; method: PaymentMethod }>,
+    employee?: string,
+  ) => string | null;
+  /** Вернуть клиенту ранее принятую оплату. */
+  refundPayment: (
+    orderId: string,
+    amount: number,
+    method: PaymentMethod,
+    employee?: string,
+  ) => string | null;
   /** Возврат запчасти поставщику: списывает со склада и заводит ожидание денег. */
   returnToSupplier: (input: ReturnToSupplierInput) => void;
   /** Деньги от поставщика пришли — возврат идёт в расчёты. */
@@ -305,7 +302,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                   id: createId("mv"),
                   date: nowISO(),
                   itemId: item.id,
-                  operation: "Возврат" as const,
+                  operation: "Снят резерв" as const,
                   qty: part.qty,
                   to: item.cell,
                   employee: order.advisor || "—",
@@ -574,7 +571,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 id: createId("mv"),
                 date: new Date().toISOString(),
                 itemId: item.id,
-                operation: "Возврат" as const,
+                operation: "Снят резерв" as const,
                 qty: part.qty,
                 to: item.cell,
                 employee: order.advisor || "—",
@@ -591,7 +588,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return error;
       },
-      acceptPayment: (orderId, parts) => {
+      acceptPayment: (orderId, parts, employee) => {
         let error: string | null = null;
         setDB((prev) => {
           const order = prev.orders.find((item) => item.id === orderId);
@@ -624,8 +621,50 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 orderId,
                 at,
                 amount: part.amount,
+                kind: "payment" as const,
                 method: part.method,
+                employee: employee?.trim() || order.advisor || undefined,
               })),
+              ...prev.payments,
+            ],
+          };
+        });
+        return error;
+      },
+      refundPayment: (orderId, amount, method, employee) => {
+        let error: string | null = null;
+        setDB((prev) => {
+          const order = prev.orders.find((item) => item.id === orderId);
+          if (!order) {
+            error = "Заказ-наряд не найден";
+            return prev;
+          }
+          const accepted = Math.round(amount);
+          if (!Number.isFinite(accepted) || accepted <= 0) {
+            error = "Сумма возврата должна быть больше нуля";
+            return prev;
+          }
+          const paid = Math.max(0, order.paid ?? 0);
+          if (accepted > paid) {
+            error = `Вернуть можно не больше уже оплаченных ${paid} ₽`;
+            return prev;
+          }
+          const at = nowISO();
+          return {
+            ...prev,
+            orders: prev.orders.map((item) =>
+              item.id === orderId ? { ...item, paid: Math.max(0, paid - accepted) } : item,
+            ),
+            payments: [
+              {
+                id: createId("pay"),
+                orderId,
+                at,
+                amount: accepted,
+                kind: "refund" as const,
+                method,
+                employee: employee?.trim() || order.advisor || undefined,
+              },
               ...prev.payments,
             ],
           };

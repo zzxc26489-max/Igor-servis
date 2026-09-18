@@ -1,8 +1,8 @@
 import type { Employee, Order } from "../types";
 
-/** По записям на будущее зарплата не начисляется: работа ещё не сделана. */
+/** Зарплата начисляется только по выданным заказам: это единое правило для всей CRM. */
 export function accruingOrders(orders: Order[]) {
-  return orders.filter((order) => order.status !== "запись");
+  return orders.filter((order) => order.status === "выдан");
 }
 
 /**

@@ -19,7 +19,7 @@ import { paymentMethodLabel } from "../lib/payments";
 import { actualMinutes, deviationPercent, formatDuration, isEstimatedTiming, normMinutes } from "../lib/worktime";
 import { Button, Card, Modal, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
-import type { OrderLinePart, OrderLineWork, OrderStatus } from "../types";
+import type { OrderLinePart, OrderLineWork, OrderStatus, PaymentMethod } from "../types";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
 const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "Документы"] as const;
@@ -37,6 +37,7 @@ export default function OrderDetail() {
     company,
     settings,
     payments,
+    employees,
     updateOrder,
     deleteOrder,
     updateVehicle,
@@ -44,6 +45,7 @@ export default function OrderDetail() {
     reservePart,
     releasePart,
     acceptPayment,
+    refundPayment,
   } = useAppStore();
   const { showToast } = useToast();
   const confirm = useConfirm();
@@ -78,6 +80,10 @@ export default function OrderDetail() {
   const [terminalAmount, setTerminalAmount] = useState("");
   const [transferAmount, setTransferAmount] = useState("");
   const [payOpen, setPayOpen] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundMethod, setRefundMethod] = useState<PaymentMethod>("cash");
+  const [paymentEmployee, setPaymentEmployee] = useState(order?.advisor ?? "");
   const [targetTotal, setTargetTotal] = useState("");
   const [intakeComplaint, setIntakeComplaint] = useState(order?.complaint ?? "");
   const [intakeDiagnosis, setIntakeDiagnosis] = useState(order?.diagnosis ?? "");
@@ -98,7 +104,8 @@ export default function OrderDetail() {
     setIntakeGuarantee(order.guaranteeMonths ? String(order.guaranteeMonths) : "");
     setIntakeMileage(vehicle?.mileage ? String(vehicle.mileage) : "");
     setMechanicComment(order.mechanicComment ?? "");
-  }, [order, vehicle?.mileage]);
+    if (!paymentEmployee) setPaymentEmployee(order.advisor ?? "");
+  }, [order, vehicle?.mileage, paymentEmployee]);
 
   if (!order) {
     return (
@@ -344,7 +351,7 @@ export default function OrderDetail() {
       confirmLabel: "Принять оплату",
     });
     if (!ok) return;
-    const error = acceptPayment(order.id, parts);
+    const error = acceptPayment(order.id, parts, paymentEmployee);
     if (error) {
       showToast(error, "error");
       return;
@@ -354,6 +361,40 @@ export default function OrderDetail() {
     setTransferAmount("");
     setPayOpen(false);
     showToast(`Принята оплата ${formatMoney(total)}`);
+  }
+
+  async function handleRefundPayment() {
+    if (!order) return;
+    const amount = Number(refundAmount) || 0;
+    if (amount <= 0) {
+      showToast("Укажите сумму возврата", "error");
+      return;
+    }
+    if (amount > paid) {
+      showToast(`Вернуть можно не больше ${formatMoney(paid)}`, "error");
+      return;
+    }
+    const ok = await confirm({
+      title: "Вернуть деньги клиенту",
+      question: "Возврат уменьшит оплаченную сумму заказа и появится отдельной строкой в финансах.",
+      summary: [
+        { label: "Клиент", value: client?.name ?? "—" },
+        { label: "Способ", value: paymentMethodLabel(refundMethod) },
+        { label: "Возвращаем", value: formatMoney(amount), total: true, tone: "danger" },
+        { label: "Останется оплачено", value: formatMoney(paid - amount) },
+      ],
+      confirmLabel: "Оформить возврат",
+      danger: true,
+    });
+    if (!ok) return;
+    const error = refundPayment(order.id, amount, refundMethod, paymentEmployee);
+    if (error) {
+      showToast(error, "error");
+      return;
+    }
+    setRefundAmount("");
+    setRefundOpen(false);
+    showToast(`Клиенту возвращено ${formatMoney(amount)}`);
   }
 
   function saveIntake() {
@@ -890,6 +931,11 @@ export default function OrderDetail() {
                     <h2 className="panel-title">История оплат</h2>
                     <p className="muted mt-1 text-xs">Новые оплаты фиксируются по фактической дате приёма денег.</p>
                   </div>
+                  <div className="flex justify-end border-b px-4 py-2" style={{ borderColor: "var(--border)" }}>
+                    <Button variant="secondary" size="sm" disabled={paid <= 0} onClick={() => setRefundOpen(true)}>
+                      Вернуть деньги клиенту
+                    </Button>
+                  </div>
                   {orderPayments.length === 0 ? (
                     <p className="muted p-4 text-sm">Оплат по заказу пока нет.</p>
                   ) : (
@@ -899,9 +945,15 @@ export default function OrderDetail() {
                           <span>
                             <b>{formatDateTime(payment.at)}</b>
                             <span className="muted ml-2 text-xs">· {paymentMethodLabel(payment.method)}</span>
+                            {payment.employee && <span className="muted ml-2 text-xs">· {payment.employee}</span>}
                             {payment.estimated && <span className="muted ml-2 text-xs">· дата восстановлена</span>}
                           </span>
-                          <b className="tabular-nums" style={{ color: "var(--accent)" }}>+{formatMoney(payment.amount)}</b>
+                          <b
+                            className="tabular-nums"
+                            style={{ color: payment.kind === "refund" ? "var(--danger)" : "var(--accent)" }}
+                          >
+                            {payment.kind === "refund" ? "−" : "+"}{formatMoney(payment.amount)}
+                          </b>
                         </div>
                       ))}
                     </div>
@@ -996,6 +1048,43 @@ export default function OrderDetail() {
         <AddPart onClose={() => setAddingPart(false)} onSubmit={handleAddPart} error={partError} />
       )}
 
+      {refundOpen && (
+        <Modal title="Вернуть деньги клиенту" subtitle={`${carTitle} · ${order.number}`} onClose={() => setRefundOpen(false)}>
+          <div className="space-y-3 p-4">
+            <div className="rounded-lg p-3 text-sm" style={{ background: "var(--bg)" }}>
+              <div className="flex justify-between"><span className="muted">Оплачено сейчас</span><b>{formatMoney(paid)}</b></div>
+            </div>
+            <label className="block text-sm">
+              <span className="muted mb-1 block">Сумма возврата, ₽</span>
+              <div className="field-control">
+                <input
+                  autoFocus
+                  inputMode="numeric"
+                  value={refundAmount}
+                  onChange={(e) => setRefundAmount(moneyInput(e.target.value))}
+                  placeholder={String(paid)}
+                  aria-label="Сумма возврата клиенту"
+                />
+              </div>
+            </label>
+            <label className="block text-sm">
+              <span className="muted mb-1 block">Куда возвращаем</span>
+              <div className="field-control">
+                <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as PaymentMethod)}>
+                  <option value="cash">Наличные</option>
+                  <option value="terminal">Терминал / карта</option>
+                  <option value="transfer">Перевод / СБП</option>
+                </select>
+              </div>
+            </label>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setRefundOpen(false)}>Отмена</Button>
+              <Button variant="danger" onClick={handleRefundPayment}>Вернуть деньги</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {payOpen && (
         <Modal title="Принять оплату" subtitle={`${carTitle} · ${order.number}`} onClose={() => setPayOpen(false)}>
           <div className="space-y-3 p-4">
@@ -1006,6 +1095,26 @@ export default function OrderDetail() {
                 <span className="muted">Осталось</span><b className="tabular-nums">{formatMoney(debt)}</b>
               </div>
             </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Button variant="secondary" size="sm" onClick={() => { setCashAmount(String(debt)); setTerminalAmount(""); setTransferAmount(""); }}>
+                Весь долг наличными
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => { setCashAmount(""); setTerminalAmount(String(debt)); setTransferAmount(""); }}>
+                Весь долг по карте
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => { setCashAmount(""); setTerminalAmount(""); setTransferAmount(String(debt)); }}>
+                Весь долг переводом
+              </Button>
+            </div>
+            <label className="block text-sm">
+              <span className="muted mb-1 block">Кто принял оплату</span>
+              <div className="field-control">
+                <select value={paymentEmployee} onChange={(e) => setPaymentEmployee(e.target.value)} aria-label="Кто принял оплату">
+                  <option value="">Не указан</option>
+                  {employees.map((employee) => <option key={employee.id} value={employee.name}>{employee.name}</option>)}
+                </select>
+              </div>
+            </label>
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="block text-sm">
                 <span className="muted mb-1 block">Наличные, ₽</span>

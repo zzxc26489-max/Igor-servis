@@ -378,6 +378,7 @@ const OPERATION_TONES: Record<string, { bg: string; color: string }> = {
   "Приёмка": { bg: "#e8f5ed", color: "var(--accent)" },
   "Возврат": { bg: "#e8f5ed", color: "var(--accent)" },
   "Резерв": { bg: "#fdf3e0", color: "var(--warning)" },
+  "Снят резерв": { bg: "#eef0f4", color: "var(--text-muted)" },
   "Перемещение": { bg: "#edf4ff", color: "#3978c9" },
   "Списание": { bg: "#fbe9e9", color: "var(--danger)" },
 };

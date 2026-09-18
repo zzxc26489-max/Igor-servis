@@ -12,6 +12,7 @@ import { isValidMoney, moneyInput } from "../lib/formats";
 import { Button, Card, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatMoney, plural } from "../lib/format";
 import { computePayroll } from "../lib/payroll";
+import { paymentMethodSummary } from "../lib/payments";
 import { todayISO } from "../lib/date";
 import {
   buildChart, buildOperations, computeMetrics, getRange,
@@ -43,21 +44,24 @@ export default function Finance() {
 
   const range = useMemo(() => getRange(period, offset), [period, offset]);
 
-  // Зарплату считаем по заказам периода, иначе за «день» прилетает начисление за всё время.
+  // Единое правило начисления живёт в payroll.ts: там учитываются только выданные заказы.
   const periodOrders = useMemo(() => ordersInRange(range, orders), [orders, range]);
-  const payrollOrders = useMemo(() => periodOrders.filter((order) => order.status === "выдан"), [periodOrders]);
-  const employees = useMemo(() => computePayroll(rawEmployees, payrollOrders), [payrollOrders, rawEmployees]);
+  const employees = useMemo(() => computePayroll(rawEmployees, periodOrders), [periodOrders, rawEmployees]);
   const totalSalaries = employees.reduce((sum, employee) => sum + employee.accrued, 0);
   const metrics = useMemo(() => computeMetrics(range, orders, expenses, totalSalaries, payments), [expenses, orders, payments, range, totalSalaries]);
   const previous = useMemo(() => {
     const prev = previousRange(range);
     if (!prev) return null;
-    const prevSalaries = computePayroll(rawEmployees, ordersInRange(prev, orders).filter((order) => order.status === "выдан"))
+    const prevSalaries = computePayroll(rawEmployees, ordersInRange(prev, orders))
       .reduce((sum, employee) => sum + employee.accrued, 0);
     return computeMetrics(prev, orders, expenses, prevSalaries, payments);
   }, [expenses, orders, payments, range, rawEmployees]);
 
   const chart = useMemo(() => buildChart(range, payments, expenses), [expenses, payments, range]);
+  const methodSummary = useMemo(
+    () => paymentMethodSummary(payments, range.from, range.to),
+    [payments, range],
+  );
 
   const pending = useMemo(() => pendingPayments(orders, clients), [clients, orders]);
   // Возвраты, по которым деньги ещё не пришли: в расчёт не идут, пока не подтвердят.
@@ -218,14 +222,33 @@ export default function Finance() {
         </div>
 
         <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <Metric icon={<IconCreditCardPay size={18} />} label="Выручка" value={formatMoney(metrics.revenue)} current={metrics.revenue} previous={previous?.revenue} hint={`${metrics.closed.length} ${plural(metrics.closed.length, "выданный заказ", "выданных заказа", "выданных заказов")} · получено ${formatMoney(metrics.received)}`} />
-          <Metric icon={<IconBriefcase size={18} />} tone="warning" label="Расходы" value={formatMoney(metrics.expenses)} current={metrics.expenses} previous={previous?.expenses} lowerIsBetter hint="Закупки и прочее" />
-          <Metric icon={<IconCoin size={18} />} tone="violet" label="Зарплаты" value={formatMoney(metrics.salaries)} hint="Начислено мастерам" />
-          <Metric icon={<IconChartBar size={18} />} label="Прибыль" value={formatMoney(metrics.profit)} current={metrics.profit} previous={previous?.profit} hint="После расходов и зарплат" />
+          <Metric icon={<IconCreditCardPay size={18} />} label="Выручка по выданным" value={formatMoney(metrics.revenue)} current={metrics.revenue} previous={previous?.revenue} hint={`${metrics.closed.length} ${plural(metrics.closed.length, "выданный заказ", "выданных заказа", "выданных заказов")}`} />
+          <Metric icon={<IconBriefcase size={18} />} tone="warning" label="Расходы" value={formatMoney(metrics.expenses)} current={metrics.expenses} previous={previous?.expenses} lowerIsBetter hint="За вычетом возвратов поставщиков" />
+          <Metric icon={<IconCoin size={18} />} tone="violet" label="Зарплаты" value={formatMoney(metrics.salaries)} hint="Начислено по выданным заказам" />
+          <Metric icon={<IconChartBar size={18} />} label="Прибыль" value={formatMoney(metrics.profit)} current={metrics.profit} previous={previous?.profit} hint="По начислению, не по кассе" />
         </div>
+        <p className="muted mb-3 text-xs">
+          Выручка и прибыль считаются по выданным заказам. «Получено» и зелёные столбцы графика — реальные движения денег по датам оплаты.
+        </p>
 
         {tab === "Обзор" && (
         <>
+        <Card className="mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="panel-title">Сверка оплат</h2>
+              <p className="muted mt-1 text-xs">Чистые поступления за период с учётом возвратов клиентам</p>
+            </div>
+            <b className="tabular-nums">{formatMoney(metrics.received)}</b>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Row label="Наличные" value={methodSummary.cash} tone="accent" />
+            <Row label="Терминал / карта" value={methodSummary.terminal} tone="accent" />
+            <Row label="Перевод / СБП" value={methodSummary.transfer} tone="accent" />
+            <Row label="Способ не указан" value={methodSummary.unknown} />
+          </div>
+        </Card>
+
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.4fr_1fr]">
           <Card>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -267,8 +290,8 @@ export default function Finance() {
                           className="flex h-full flex-1 items-end gap-px rounded-t-sm transition"
                           style={{ background: pickedDay === index ? "var(--accent-soft)" : undefined }}
                         >
-                          <div className="flex-1 rounded-t-sm bg-[#1f9d63]" style={{ height: `${(point.revenue / axisMax) * 100}%` }} />
-                          <div className="flex-1 rounded-t-sm bg-[#e39230]" style={{ height: `${(point.expenses / axisMax) * 100}%` }} />
+                          <div className="flex-1 rounded-t-sm bg-[#1f9d63]" style={{ height: `${(Math.max(0, point.revenue) / axisMax) * 100}%` }} />
+                          <div className="flex-1 rounded-t-sm bg-[#e39230]" style={{ height: `${(Math.max(0, point.expenses) / axisMax) * 100}%` }} />
                         </button>
                       ))}
                     </div>
