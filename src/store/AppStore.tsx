@@ -25,7 +25,7 @@ import { formatPhone, formatPlate, isValidPhone, looksRussian } from "../lib/for
 import { nowISO } from "../lib/date";
 import { backfillTimeline } from "../lib/worktime";
 import { normalizeWorkDay, parseWorkHours, setWorkDay } from "../lib/workday";
-import { recordedForOrder } from "../lib/payments";
+import { ensureLegacyPayments } from "../lib/payments";
 
 const STORAGE_KEY = "igor-servis-db-v1";
 
@@ -120,20 +120,7 @@ function migrate(db: DB): DB {
     }),
   }));
 
-  const payments: Payment[] = Array.isArray(db.payments) ? [...db.payments] : [];
-  for (const order of orders) {
-    const recorded = recordedForOrder(payments, order.id);
-    const paid = Math.max(0, order.paid ?? 0);
-    if (paid > recorded) {
-      payments.push({
-        id: `legacy-payment-${order.id}`,
-        orderId: order.id,
-        at: order.issuedAt ?? order.completedAt ?? (order.plannedAt ? `${order.plannedAt}T12:00:00` : order.createdAt),
-        amount: paid - recorded,
-        estimated: true,
-      });
-    }
-  }
+  const payments = ensureLegacyPayments(Array.isArray(db.payments) ? db.payments : [], orders);
 
   return {
     ...db,
