@@ -15,6 +15,7 @@ import AddWork, { type NewWork } from "./AddWork";
 import { reservedByItem } from "../lib/stock";
 import { moneyInput } from "../lib/formats";
 import { margin } from "../lib/price";
+import { paymentMethodLabel } from "../lib/payments";
 import { actualMinutes, deviationPercent, formatDuration, isEstimatedTiming, normMinutes } from "../lib/worktime";
 import { Button, Card, Modal, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
@@ -73,7 +74,9 @@ export default function OrderDetail() {
 
   const [editingDiscount, setEditingDiscount] = useState(false);
   const [discountInput, setDiscountInput] = useState("0");
-  const [paymentAmount, setPaymentAmount] = useState("");
+  const [cashAmount, setCashAmount] = useState("");
+  const [terminalAmount, setTerminalAmount] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
   const [payOpen, setPayOpen] = useState(false);
   const [targetTotal, setTargetTotal] = useState("");
 
@@ -293,30 +296,48 @@ export default function OrderDetail() {
     navigate("/orders");
   }
 
-  async function handleAcceptPayment(amount: number) {
-    if (!order || amount <= 0) return;
-    if (amount > debt) {
-      showToast(`Больше долга принять нельзя: осталось ${formatMoney(debt)}`, "error");
+  async function handleAcceptPayment() {
+    if (!order) return;
+    const parts = [
+      { method: "cash" as const, amount: Number(cashAmount) || 0 },
+      { method: "terminal" as const, amount: Number(terminalAmount) || 0 },
+      { method: "transfer" as const, amount: Number(transferAmount) || 0 },
+    ].filter((part) => part.amount > 0);
+    const total = parts.reduce((sum, part) => sum + part.amount, 0);
+    if (total <= 0) {
+      showToast("Укажите сумму хотя бы для одного способа оплаты", "error");
+      return;
+    }
+    if (total > debt) {
+      showToast(`Больше долга принять нельзя: превышение ${formatMoney(total - debt)}`, "error");
       return;
     }
     const ok = await confirm({
       title: "Принять оплату",
-      question: `Оплата запишется в заказ-наряд ${order.number} и попадёт в финансы за сегодня.`,
+      question: `Оплата запишется в заказ-наряд ${order.number} отдельными частями и попадёт в финансы за сегодня.`,
       summary: [
         { label: "Клиент", value: client?.name ?? "—" },
         { label: "Автомобиль", value: carTitle },
-        { label: "Всего по заказу", value: formatMoney(due) },
-        { label: "Уже оплачено", value: formatMoney(paid) },
-        { label: "Принимаем", value: formatMoney(amount), tone: "accent" },
-        { label: "Останется долг", value: formatMoney(debt - amount), total: true, tone: debt - amount > 0 ? "danger" : "accent" },
+        ...parts.map((part) => ({
+          label: paymentMethodLabel(part.method),
+          value: formatMoney(part.amount),
+        })),
+        { label: "Всего принимаем", value: formatMoney(total), tone: "accent" as const },
+        { label: "Останется долг", value: formatMoney(debt - total), total: true, tone: debt - total > 0 ? "danger" as const : "accent" as const },
       ],
       confirmLabel: "Принять оплату",
     });
     if (!ok) return;
-    acceptPayment(order.id, amount);
-    setPaymentAmount("");
+    const error = acceptPayment(order.id, parts);
+    if (error) {
+      showToast(error, "error");
+      return;
+    }
+    setCashAmount("");
+    setTerminalAmount("");
+    setTransferAmount("");
     setPayOpen(false);
-    showToast(`Принята оплата ${formatMoney(amount)}`);
+    showToast(`Принята оплата ${formatMoney(total)}`);
   }
 
   async function handleChangeStatus(next: OrderStatus) {
@@ -841,7 +862,8 @@ export default function OrderDetail() {
                         <div key={payment.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
                           <span>
                             <b>{formatDateTime(payment.at)}</b>
-                            {payment.estimated && <span className="muted ml-2 text-xs">дата восстановлена</span>}
+                            <span className="muted ml-2 text-xs">· {paymentMethodLabel(payment.method)}</span>
+                            {payment.estimated && <span className="muted ml-2 text-xs">· дата восстановлена</span>}
                           </span>
                           <b className="tabular-nums" style={{ color: "var(--accent)" }}>+{formatMoney(payment.amount)}</b>
                         </div>
@@ -948,23 +970,58 @@ export default function OrderDetail() {
                 <span className="muted">Осталось</span><b className="tabular-nums">{formatMoney(debt)}</b>
               </div>
             </div>
-            <label className="block text-sm">
-              <span className="muted mb-1 block">Сумма оплаты, ₽</span>
-              <div className="field-control">
-                <input
-                  autoFocus
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(moneyInput(e.target.value))}
-                  onKeyDown={(e) => e.key === "Enter" && handleAcceptPayment(paymentAmount ? Number(paymentAmount) : debt)}
-                  placeholder={String(debt)}
-                  inputMode="numeric"
-                  aria-label="Сумма оплаты"
-                />
-              </div>
-            </label>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="block text-sm">
+                <span className="muted mb-1 block">Наличные, ₽</span>
+                <div className="field-control">
+                  <input
+                    autoFocus
+                    value={cashAmount}
+                    onChange={(e) => setCashAmount(moneyInput(e.target.value))}
+                    placeholder="0"
+                    inputMode="numeric"
+                    aria-label="Оплата наличными"
+                  />
+                </div>
+              </label>
+              <label className="block text-sm">
+                <span className="muted mb-1 block">Терминал / карта, ₽</span>
+                <div className="field-control">
+                  <input
+                    value={terminalAmount}
+                    onChange={(e) => setTerminalAmount(moneyInput(e.target.value))}
+                    placeholder="0"
+                    inputMode="numeric"
+                    aria-label="Оплата по терминалу"
+                  />
+                </div>
+              </label>
+              <label className="block text-sm">
+                <span className="muted mb-1 block">Перевод / СБП, ₽</span>
+                <div className="field-control">
+                  <input
+                    value={transferAmount}
+                    onChange={(e) => setTransferAmount(moneyInput(e.target.value))}
+                    placeholder="0"
+                    inputMode="numeric"
+                    aria-label="Оплата переводом"
+                  />
+                </div>
+              </label>
+            </div>
+            {(() => {
+              const total = (Number(cashAmount) || 0) + (Number(terminalAmount) || 0) + (Number(transferAmount) || 0);
+              const left = debt - total;
+              return (
+                <div className="rounded-lg p-3 text-sm" style={{ background: "var(--bg)" }}>
+                  <div className="flex justify-between"><span className="muted">Всего принимаем</span><b>{formatMoney(total)}</b></div>
+                  <div className="mt-1 flex justify-between"><span className="muted">{left < 0 ? "Превышение" : "Останется"}</span><b style={{ color: left < 0 ? "var(--danger)" : left === 0 ? "var(--accent)" : undefined }}>{formatMoney(Math.abs(left))}</b></div>
+                </div>
+              );
+            })()}
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setPayOpen(false)}>Отмена</Button>
-              <Button onClick={() => handleAcceptPayment(paymentAmount ? Number(paymentAmount) : debt)}>Принять</Button>
+              <Button onClick={handleAcceptPayment}>Принять</Button>
             </div>
           </div>
         </Modal>
