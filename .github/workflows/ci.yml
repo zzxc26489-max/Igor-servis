@@ -7,6 +7,7 @@ on:
       - claude/igor-workshop-website-yrdani
       - fix/finance-ledger-20260918
       - fix/split-payments-20260918
+      - fix/mobile-intake-20260918
   pull_request:
 
 permissions:
