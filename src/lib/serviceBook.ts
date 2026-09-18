@@ -1,5 +1,5 @@
 import type { Order } from "../types";
-import { orderTotals } from "./order";
+import { orderTotals } from "./order.ts";
 
 export function vehicleOrders(orders: Order[], vehicleId: string) {
   return orders
