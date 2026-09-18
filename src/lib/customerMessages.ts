@@ -1,4 +1,4 @@
-import { phoneDigits } from "./formats";
+import { phoneDigits } from "./formats.ts";
 
 function normalizedMessengerPhone(phone: string) {
   const digits = phoneDigits(phone);
