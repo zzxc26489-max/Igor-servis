@@ -12,10 +12,11 @@ import { lowStockItems } from "../lib/lowStock";
 import { useConfirm } from "../components/Confirm";
 import { useToast } from "../components/Toast";
 import StockReceive from "./StockReceive";
-import type { Order, StockItem } from "../types";
+import { findPartReferences } from "../data/partReferences";
+import type { Order, PartReference, StockItem } from "../types";
 import { canManageStock } from "../lib/access";
 
-type Chip = "all" | "low" | "reserved" | "movements";
+type Chip = "all" | "low" | "reserved" | "movements" | "catalog";
 
 export default function Stock() {
   const { stock, stockMovements, orders, vehicles, employees, returnToSupplier, cloud } = useAppStore();
@@ -30,6 +31,7 @@ export default function Stock() {
   const searchRef = useRef<HTMLInputElement>(null);
   const [receiveFor, setReceiveFor] = useState<string | null>(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
+  const [referenceForReceive, setReferenceForReceive] = useState<PartReference | null>(null);
 
   const categories = useMemo(() => Array.from(new Set(stock.map((item) => item.category))).sort(), [stock]);
 
@@ -44,6 +46,7 @@ export default function Stock() {
     { value: "low", label: "Заканчиваются", count: lowCount },
     { value: "reserved", label: "В резерве", count: reservedCount },
     { value: "movements", label: "Движения" },
+    { value: "catalog", label: "Справочник артикулов" },
   ];
 
   const shown = useMemo(() => {
@@ -61,11 +64,13 @@ export default function Stock() {
       .sort((a, b) => a.name.localeCompare(b.name, "ru"));
   }, [category, chip, query, reservations, stock]);
 
+  const catalogItems = useMemo(() => findPartReferences(query), [query]);
   const selected = stock.find((item) => item.id === selectedId) ?? null;
   const returnItem = stock.find((item) => item.id === returnFor) ?? null;
 
-  function openReceive(itemId?: string) {
+  function openReceive(itemId?: string, reference?: PartReference) {
     setReceiveFor(itemId ?? null);
+    setReferenceForReceive(reference ?? null);
     setReceiveOpen(true);
   }
 
@@ -194,7 +199,45 @@ export default function Stock() {
           </div>
         </Card>
 
-        {chip === "movements" ? (
+        {chip === "catalog" ? (
+          <Card className="overflow-hidden p-0 max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
+            <div className="border-b p-4 max-sm:px-3 max-sm:py-3" style={{ borderColor: "var(--border)" }}>
+              <h2 className="panel-title">Мини-справочник артикулов</h2>
+              <p className="muted mt-1 text-xs">Поиск по артикулу, OE/кросс-номеру и автомобилю. Применяемость всегда подтверждать по VIN.</p>
+            </div>
+            <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+              {catalogItems.map((item) => (
+                <div key={item.id} className="p-4 max-sm:px-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <b className="block">{item.name}</b>
+                      <span className="muted block text-sm">{item.brand ? item.brand + " · " : ""}{item.sku}</span>
+                      {item.oeNumbers?.length ? <span className="muted mt-1 block text-xs">OE: {item.oeNumbers.join(" · ")}</span> : null}
+                      {item.crossNumbers?.length ? <span className="muted mt-1 block text-xs">Кросс-номера: {item.crossNumbers.slice(0, 8).join(" · ")}</span> : null}
+                    </div>
+                    {stockWritable && (
+                      <Button size="sm" variant="secondary" onClick={() => openReceive(undefined, item)}>
+                        <IconPackageImport size={16} /> Завести на склад
+                      </Button>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {item.fitments.map((fitment) => (
+                      <span key={fitment} className="rounded-full bg-[var(--bg)] px-2.5 py-1 text-xs">{fitment}</span>
+                    ))}
+                  </div>
+                  {item.note && <p className="muted mt-2 text-xs">{item.note}</p>}
+                  {item.sourceUrl && (
+                    <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-semibold text-[var(--accent)]">
+                      Открыть источник каталога ↗
+                    </a>
+                  )}
+                </div>
+              ))}
+              {catalogItems.length === 0 && <p className="muted p-4 text-sm">В справочнике ничего не найдено.</p>}
+            </div>
+          </Card>
+        ) : chip === "movements" ? (
           <Card className="overflow-hidden p-0 max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
             <div className="border-b p-4 max-sm:px-3 max-sm:py-3" style={{ borderColor: "var(--border)" }}>
               <h2 className="panel-title">История движений</h2>
@@ -361,7 +404,16 @@ export default function Stock() {
         />
       )}
 
-      {stockWritable && receiveOpen && <StockReceive onClose={() => setReceiveOpen(false)} presetItemId={receiveFor ?? undefined} />}
+      {stockWritable && receiveOpen && (
+        <StockReceive
+          onClose={() => {
+            setReceiveOpen(false);
+            setReferenceForReceive(null);
+          }}
+          presetItemId={receiveFor ?? undefined}
+          presetReference={referenceForReceive ?? undefined}
+        />
+      )}
     </>
   );
 }
