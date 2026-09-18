@@ -330,13 +330,14 @@ export function buildOperations(range: Range, orders: Order[], expenses: Expense
     .filter((payment) => paymentInRange(payment, range.from, range.to))
     .map((payment) => {
       const order = orders.find((item) => item.id === payment.orderId);
+      const refund = payment.kind === "refund";
       return {
         id: `in-${payment.id}`,
         date: payment.at,
-        title: "Оплата по заказ-наряду",
+        title: refund ? "Возврат клиенту" : "Оплата по заказ-наряду",
         category: payment.estimated
-          ? `Поступление · ${paymentMethodLabel(payment.method)} · дата восстановлена`
-          : `Поступление · ${paymentMethodLabel(payment.method)}`,
+          ? `${refund ? "Возврат" : "Поступление"} · ${paymentMethodLabel(payment.method)} · дата восстановлена`
+          : `${refund ? "Возврат" : "Поступление"} · ${paymentMethodLabel(payment.method)}`,
         orderId: order?.id,
         orderNumber: order?.number,
         amount: signedPaymentAmount(payment),
