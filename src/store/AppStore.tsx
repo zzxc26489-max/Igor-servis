@@ -284,7 +284,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
    * чтобы смена часов в настройках сразу меняла расписание.
    */
   setWorkDay({ start: db.company.openTime, end: db.company.closeTime });
-  dbRef.current = db;
+
+  useEffect(() => {
+    dbRef.current = db;
+  }, [db]);
 
   /**
    * Любое изменение данных снимает метку «Демо-данные»: как только в базе
@@ -371,7 +374,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
       const remote = migrate(result.data as DB);
       const base = cloudBaseRef.current ?? remote;
-      const merged = migrate(mergeConcurrentState(base, candidate, remote));
+      const merged = migrate(
+        mergeConcurrentState(
+          base as unknown as Record<string, unknown>,
+          candidate as unknown as Record<string, unknown>,
+          remote as unknown as Record<string, unknown>,
+        ) as unknown as DB,
+      );
       cloudRevisionRef.current = result.revision;
       cloudBaseRef.current = remote;
       rawSetDB(merged);
