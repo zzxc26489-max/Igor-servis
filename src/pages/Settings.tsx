@@ -7,6 +7,7 @@ import { PhoneField } from "../components/fields";
 import { formatPhone, isValidInn, isValidPhone } from "../lib/formats";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { APP_BUILD_DATE, APP_VERSION, DB_VERSION } from "../data/version";
+import { todayISO } from "../lib/date";
 
 export default function Settings() {
   const { company, settings, updateCompany, updateSettings, resetToSeed, exportDB, importDB, orders, clients, stock, expenses } = useAppStore();
@@ -49,7 +50,7 @@ export default function Settings() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `igor-servis-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `igor-servis-backup-${todayISO()}.json`;
     link.click();
     URL.revokeObjectURL(url);
     showToast("Резервная копия сохранена");

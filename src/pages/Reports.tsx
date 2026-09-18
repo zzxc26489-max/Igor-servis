@@ -9,10 +9,11 @@ import { Card, EmptyState, Metric, Page, TopBar } from "../components/ui";
 import { formatMoney, plural } from "../lib/format";
 import { computePayroll } from "../lib/payroll";
 import { orderTotals } from "../lib/order";
+import { todayISO } from "../lib/date";
 
 export default function Reports() {
   const { orders, employees: rawEmployees, vehicles, lifts, clients, expenses } = useAppStore();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const employees = computePayroll(rawEmployees, orders);
 
   const active = orders.filter((order) => order.status !== "выдан");

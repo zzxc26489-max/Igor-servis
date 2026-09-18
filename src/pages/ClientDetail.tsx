@@ -19,6 +19,7 @@ import { Button, Card, EmptyState, ListCard, Metric, Page, StatusBadge, TopBar }
 import { formatDate, formatDateTime, formatMoney, plural } from "../lib/format";
 import { orderTotals } from "../lib/order";
 import type { Vehicle } from "../types";
+import { todayISO } from "../lib/date";
 
 const SOURCES = ["Сарафанное радио", "Яндекс Карты", "2ГИС", "Авито", "Telegram", "Проезжал мимо", "Другое"];
 
@@ -369,7 +370,7 @@ export default function ClientDetail() {
                     <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} inputMode="email" autoComplete="email" placeholder="client@example.ru" />
                   </Field>
                   <Field label="День рождения" error={clientTouched && !isValidBirthday(form.birthday) ? "Дата не может быть в будущем" : undefined}>
-                    <input type="date" max={new Date().toISOString().slice(0, 10)} value={form.birthday} onChange={(e) => setForm({ ...form, birthday: e.target.value })} />
+                    <input type="date" max={todayISO()} value={form.birthday} onChange={(e) => setForm({ ...form, birthday: e.target.value })} />
                   </Field>
                   <Field label="Скидка, %"><input value={form.discountPercent} onChange={(e) => setForm({ ...form, discountPercent: e.target.value.replace(/\D/g, "").slice(0, 3) })} inputMode="numeric" placeholder="0" /></Field>
                   <Field label="Откуда пришёл">

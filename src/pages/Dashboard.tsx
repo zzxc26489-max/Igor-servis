@@ -6,15 +6,16 @@ import {
 } from "@tabler/icons-react";
 import { Card, ListCard, Page, StatusBadge, TopBar } from "../components/ui";
 import LiftTimeline from "../components/LiftTimeline";
-import { bookingLink, liftLabel, liftState, orderDay } from "../lib/lift";
+import { bookingTarget, liftLabel, liftState, orderDay } from "../lib/lift";
 import { useAppStore } from "../store/AppStore";
 import { formatMoney, plural } from "../lib/format";
 import { orderTotals } from "../lib/order";
+import { toISODate, todayISO } from "../lib/date";
 
 function shiftDay(day: string, delta: number) {
   const date = new Date(day);
   date.setDate(date.getDate() + delta);
-  return date.toISOString().slice(0, 10);
+  return toISODate(date);
 }
 
 function formatDayLabel(day: string) {
@@ -24,7 +25,7 @@ function formatDayLabel(day: string) {
 export default function Dashboard() {
   const { orders, clients, vehicles, lifts } = useAppStore();
   const navigate = useNavigate();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const [day, setDay] = useState(today);
 
   const inWork = orders.filter((order) => order.status === "в работе" || order.status === "диагностика");
@@ -32,7 +33,9 @@ export default function Dashboard() {
   const waitingParts = orders.filter((order) => order.status === "ожидает запчасти");
   // «Свободен» = свободен прямо сейчас; запись на вечер подъёмник не занимает.
   const liftStates = useMemo(() => lifts.map((lift) => ({ lift, state: liftState(orders, lift, day) })), [day, lifts, orders]);
-  const freeLifts = liftStates.filter(({ state }) => !state.busyNow).length;
+  // Сегодня считаем свободные в моменте, на другой день — те, где вообще нет записей.
+  const isToday = day === today;
+  const freeLifts = liftStates.filter(({ state }) => (isToday ? !state.busyNow : state.orders.length === 0)).length;
 
   const attention = useMemo(() => [...ready, ...waitingParts].slice(0, 6), [ready, waitingParts]);
 
@@ -58,7 +61,7 @@ export default function Dashboard() {
           <Stat icon={<IconTool size={17} />} label="В работе" value={inWork.length} unit={plural(inWork.length, "автомобиль", "автомобиля", "автомобилей")} />
           <Stat icon={<IconCheck size={17} />} label="Готовы к выдаче" value={ready.length} unit={plural(ready.length, "заказ", "заказа", "заказов")} tone="accent" />
           <Stat icon={<IconPackage size={17} />} label="Ждут запчасти" value={waitingParts.length} unit={plural(waitingParts.length, "заказ", "заказа", "заказов")} tone="warning" />
-          <Stat icon={<IconClipboardList size={17} />} label="Свободные подъёмники" value={freeLifts} unit={`из ${lifts.length}`} />
+          <Stat icon={<IconClipboardList size={17} />} label={isToday ? "Свободные подъёмники" : "Подъёмники без записей"} value={freeLifts} unit={`из ${lifts.length}`} />
         </div>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
@@ -90,7 +93,7 @@ export default function Dashboard() {
                   return (
                     <button
                       key={lift.id}
-                      onClick={() => navigate(bookingLink(lift.id, day, state.freeFrom))}
+                      onClick={() => navigate(bookingTarget(lift.id, day, state).to)}
                       className="flex w-full items-center justify-between gap-3 rounded-xl border border-dashed px-3 py-3 text-left"
                       style={{ borderColor: "var(--border)" }}
                     >
@@ -143,11 +146,11 @@ export default function Dashboard() {
                       })}
                     </div>
                     <button
-                      onClick={() => navigate(bookingLink(lift.id, day, state.freeFrom))}
+                      onClick={() => navigate(bookingTarget(lift.id, day, state).to)}
                       className="w-full border-t px-3 py-2 text-left text-sm font-semibold text-[var(--accent)]"
                       style={{ borderColor: "var(--border)" }}
                     >
-                      {state.busyNow ? `+ Записать с ${state.freeFrom}` : "+ Записать"}
+                      {bookingTarget(lift.id, day, state).label}
                     </button>
                   </div>
                 );

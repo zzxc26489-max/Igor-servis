@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useAppStore } from "../store/AppStore";
-import { bookingLink, liftLabel, liftState, toMinutes } from "../lib/lift";
+import { bookingLink, bookingTarget, liftLabel, liftState, toMinutes } from "../lib/lift";
+import { todayISO } from "../lib/date";
 export { orderDay } from "../lib/lift";
 
 const DEFAULT_HOURS = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
@@ -21,14 +22,14 @@ export default function LiftTimeline({
   date?: string;
 }) {
   const { lifts, orders, clients, vehicles } = useAppStore();
-  const day = date ?? new Date().toISOString().slice(0, 10);
+  const day = date ?? todayISO();
   const startMinutes = toMinutes(hours[0]);
   const endMinutes = toMinutes(hours[hours.length - 1]) + 60;
   const span = endMinutes - startMinutes;
 
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const isToday = day === new Date().toISOString().slice(0, 10);
+  const isToday = day === todayISO();
   const showNow = isToday && nowMinutes >= startMinutes && nowMinutes <= endMinutes;
 
   function percent(minutes: number) {
@@ -73,7 +74,6 @@ export default function LiftTimeline({
             const state = liftState(orders, lift, day);
             const dayOrders = state.orders;
             const busy = dayOrders.length > 0;
-            const freeFrom = dayOrders.length ? dayOrders[dayOrders.length - 1].scheduledEnd : null;
 
             return (
               <div key={lift.id} className="flex min-h-[86px] items-stretch border-b last:border-b-0" style={{ borderColor: "var(--border)" }}>
@@ -115,24 +115,33 @@ export default function LiftTimeline({
                     );
                   })}
 
-                  {!busy && (
+                  {state.freeSlots.length === 0 && (
                     <Link
-                      to={bookingLink(lift.id, day)}
-                      className="absolute inset-y-2 left-0 right-0 z-10 flex items-center justify-center rounded-lg border border-dashed text-xs muted transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                      to={bookingTarget(lift.id, day, state).to}
+                      className="absolute inset-y-2 right-0 z-0 flex w-[160px] items-center justify-center rounded-lg border border-dashed px-2 text-xs muted transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
                       style={{ borderColor: "var(--border)" }}
                     >
-                      + Записать на подъёмник
+                      {bookingTarget(lift.id, day, state).label}
                     </Link>
                   )}
-                  {busy && freeFrom && toMinutes(freeFrom) < endMinutes - 30 && (
-                    <Link
-                      to={bookingLink(lift.id, day, freeFrom)}
-                      className="absolute inset-y-2 z-0 flex items-center justify-center rounded-lg border border-dashed text-xs muted transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                      style={{ left: `${percent(toMinutes(freeFrom))}%`, right: 0, borderColor: "transparent" }}
-                    >
-                      + Записать с {freeFrom}
-                    </Link>
-                  )}
+                  {/* Показываем все окна, куда влезает час, а не только «после последней записи». */}
+                  {state.freeSlots.map((slot) => {
+                    const start = Math.max(startMinutes, toMinutes(slot.from));
+                    const end = slot.to ? toMinutes(slot.to) : endMinutes;
+                    if (end - start < 30) return null;
+                    const left = Math.max(0, percent(start));
+                    const width = Math.min(100 - left, percent(end) - percent(start));
+                    return (
+                      <Link
+                        key={slot.from}
+                        to={bookingLink(lift.id, day, slot.from)}
+                        className="absolute inset-y-2 z-0 flex items-center justify-center overflow-hidden rounded-lg border border-dashed px-2 text-xs muted transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                        style={{ left: `${left}%`, width: `${width}%`, borderColor: "var(--border)" }}
+                      >
+                        <span className="truncate">{busy ? `+ ${slot.from}` : "+ Записать на подъёмник"}</span>
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
             );

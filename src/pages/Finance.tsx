@@ -12,6 +12,7 @@ import { isValidMoney, moneyInput } from "../lib/formats";
 import { Button, Card, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatMoney, plural } from "../lib/format";
 import { computePayroll } from "../lib/payroll";
+import { todayISO } from "../lib/date";
 import {
   buildChart, buildOperations, computeMetrics, getRange,
   ordersInRange, pendingPayments, previousRange, type PeriodKey,
@@ -135,7 +136,7 @@ export default function Finance() {
     if (!ok) return;
     addExpense({
       id: createId("ex"),
-      date: new Date().toISOString().slice(0, 10),
+      date: todayISO(),
       category,
       description: description.trim(),
       amount: value,

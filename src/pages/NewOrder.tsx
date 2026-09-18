@@ -11,17 +11,11 @@ import {
 } from "../lib/formats";
 import { CODE_PREFIX, useAppStore } from "../store/AppStore";
 import { createId, nextCode } from "../lib/id";
+import { todayISO } from "../lib/date";
+import { SLOT_MINUTES, fromMinutes, isSlotFree, liftState, toMinutes } from "../lib/lift";
 
-const today = new Date().toISOString().slice(0, 10);
+const today = todayISO();
 
-function toMinutes(time: string) {
-  const [h, m] = time.split(":").map(Number);
-  return h * 60 + m;
-}
-
-function intervalsOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
-  return toMinutes(aStart) < toMinutes(bEnd) && toMinutes(bStart) < toMinutes(aEnd);
-}
 
 
 export default function NewOrder() {
@@ -111,18 +105,17 @@ export default function NewOrder() {
     }
 
     const chosenLift = liftId ? Number(liftId) : undefined;
-    const endHour = String(Math.min(Number(time.slice(0, 2)) + 1, 23)).padStart(2, "0");
-    const endTime = `${endHour}:${time.slice(3)}`;
+    const endTime = fromMinutes(toMinutes(time) + SLOT_MINUTES);
 
-    const hasOverlap = chosenLift && orders.some((order) => {
-      if (order.liftId !== chosenLift || order.status === "выдан") return false;
-      if (!order.scheduledStart || !order.scheduledEnd) return false;
-      const orderDate = order.plannedAt ?? order.createdAt.slice(0, 10);
-      if (orderDate !== date) return false;
-      return intervalsOverlap(time, endTime, order.scheduledStart, order.scheduledEnd);
-    });
-    if (hasOverlap) {
-      setError("Этот подъёмник уже занят на выбранное время. Выберите другой или измените время.");
+    // Проверяем весь интервал записи, а не только её начало.
+    if (chosenLift && !isSlotFree(orders, chosenLift, date, time, endTime)) {
+      const lift = lifts.find((item) => item.id === chosenLift);
+      const free = lift ? liftState(orders, lift, date).suggestedStart : null;
+      setError(
+        free
+          ? `Подъёмник занят с ${time} до ${endTime}. Ближайшее свободное окно — с ${free}.`
+          : "Подъёмник занят весь день. Выберите другой подъёмник или другую дату.",
+      );
       return;
     }
 
@@ -164,7 +157,7 @@ export default function NewOrder() {
         code: nextCode(CODE_PREFIX.client, previous.clients.map((item) => item.code)),
         name: clientName.trim(),
         phone: phone.trim(),
-        createdAt: new Date().toISOString().slice(0, 10),
+        createdAt: todayISO(),
       }],
       vehicles: existingVehicleId ? previous.vehicles : [...previous.vehicles, {
         id: vehicleId,

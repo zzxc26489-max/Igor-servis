@@ -4,21 +4,22 @@ import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { Card, ListCard, Page, StatusBadge, TopBar } from "../components/ui";
 import LiftTimeline from "../components/LiftTimeline";
-import { bookingLink, liftLabel, liftState, orderDay } from "../lib/lift";
+import { bookingTarget, liftLabel, liftState, orderDay } from "../lib/lift";
 import { plural } from "../lib/format";
+import { toISODate, todayISO } from "../lib/date";
 
 const WORK_HOURS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
 
 function shiftDay(day: string, delta: number) {
   const date = new Date(day);
   date.setDate(date.getDate() + delta);
-  return date.toISOString().slice(0, 10);
+  return toISODate(date);
 }
 
 export default function Schedule() {
   const { lifts, orders, clients, vehicles } = useAppStore();
   const navigate = useNavigate();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const [day, setDay] = useState(today);
 
   // Записи выбранного дня, а не все активные заказы подряд.
@@ -31,7 +32,10 @@ export default function Schedule() {
   );
 
   const states = useMemo(() => lifts.map((lift) => ({ lift, state: liftState(orders, lift, day) })), [day, lifts, orders]);
+  const isToday = day === todayISO();
   const busy = states.filter(({ state }) => state.busyNow).length;
+  // Для будущих дней «занято сейчас» не имеет смысла — считаем загруженные подъёмники.
+  const booked = states.filter(({ state }) => state.orders.length > 0).length;
   const unassigned = dayOrders.filter((order) => !order.liftId);
 
   const dayLabel = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long" }).format(new Date(day));
@@ -40,7 +44,11 @@ export default function Schedule() {
     <>
       <TopBar
         title="Расписание"
-        subtitle={`${busy} из ${lifts.length} подъёмников занято сейчас · ${dayOrders.length} ${plural(dayOrders.length, "запись", "записи", "записей")} на день`}
+        subtitle={
+          isToday
+            ? `${busy} из ${lifts.length} подъёмников занято сейчас · ${dayOrders.length} ${plural(dayOrders.length, "запись", "записи", "записей")} на день`
+            : `${booked} из ${lifts.length} подъёмников с записями · ${dayOrders.length} ${plural(dayOrders.length, "запись", "записи", "записей")}`
+        }
       />
       <Page>
         <Card className="overflow-hidden p-0">
@@ -87,8 +95,8 @@ export default function Schedule() {
                     </span>
                   </div>
                   {liftOrders.length === 0 ? (
-                    <button onClick={() => navigate(bookingLink(lift.id, day, state.freeFrom))} className="mt-2 w-full rounded-lg border border-dashed py-2 text-sm muted" style={{ borderColor: "var(--border)" }}>
-                      {state.busyNow ? `+ Записать с ${state.freeFrom}` : "+ Записать"}
+                    <button onClick={() => navigate(bookingTarget(lift.id, day, state).to)} className="mt-2 w-full rounded-lg border border-dashed py-2 text-sm muted" style={{ borderColor: "var(--border)" }}>
+                      {bookingTarget(lift.id, day, state).label}
                     </button>
                   ) : (
                     <div className="mt-2 space-y-2">
@@ -107,11 +115,11 @@ export default function Schedule() {
                         );
                       })}
                       <button
-                        onClick={() => navigate(bookingLink(lift.id, day, state.freeFrom))}
+                        onClick={() => navigate(bookingTarget(lift.id, day, state).to)}
                         className="w-full rounded-lg border border-dashed py-2 text-sm font-semibold text-[var(--accent)]"
                         style={{ borderColor: "var(--border)" }}
                       >
-                        {state.busyNow ? `+ Записать с ${state.freeFrom}` : "+ Записать"}
+                        {bookingTarget(lift.id, day, state).label}
                       </button>
                     </div>
                   )}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   IconArrowBackUp, IconArrowLeft, IconCalendarTime, IconCar, IconCheck, IconClipboardText,
@@ -47,6 +47,22 @@ export default function OrderDetail() {
   const order = orders.find((o) => o.id === orderId);
 
   const [tab, setTab] = useState<Tab>("Работы и запчасти");
+  const activeTabRef = useRef<HTMLButtonElement | null>(null);
+
+  // Подтягиваем активную вкладку в видимую часть только при её смене, и не
+  // при первом показе: иначе страница сама прокручивалась к вкладкам.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    // Горизонтально — внутри ряда вкладок, вертикально страницу не трогаем.
+    const node = activeTabRef.current;
+    const row = node?.parentElement;
+    if (!node || !row) return;
+    row.scrollTo({ left: node.offsetLeft - 8, behavior: "smooth" });
+  }, [tab]);
 
   const [addingWork, setAddingWork] = useState(false);
   const [workServiceId, setWorkServiceId] = useState("");
@@ -561,8 +577,7 @@ export default function OrderDetail() {
               {TABS.map((item) => (
                 <button
                   key={item}
-                  // Активная вкладка подтягивается в видимую часть: на телефоне ряд прокручивается.
-                  ref={(node) => { if (node && tab === item) node.scrollIntoView({ block: "nearest", inline: "nearest" }); }}
+                  ref={(node) => { if (tab === item) activeTabRef.current = node; }}
                   onClick={() => setTab(item)}
                   className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition"
                   style={{
@@ -813,9 +828,14 @@ export default function OrderDetail() {
 
             {tab === "Оплаты" && (
               <>
-                <Card className="overflow-hidden p-0 print:hidden">
+                {/* На узком экране правой колонки нет — показываем полный блок здесь. */}
+                <Card className="xl:hidden print:hidden">{moneyPanel}</Card>
+
+                {/* На широком экране блок уже справа: тут только сводка, без повторов. */}
+                <Card className="hidden overflow-hidden p-0 xl:block print:hidden">
                   <div className="p-4">
-                    <h2 className="panel-title">Оплаты по заказу</h2>
+                    <h2 className="panel-title">Расчёт по заказу</h2>
+                    <p className="muted mt-1 text-sm">Приём оплаты, скидка и договорённость — в блоке справа.</p>
                   </div>
                   <table className="app-table">
                     <tbody>
@@ -830,15 +850,14 @@ export default function OrderDetail() {
                       <tr><td className="font-semibold">К оплате</td><td className="text-right font-semibold tabular-nums">{formatMoney(due)}</td></tr>
                       <tr><td>Оплачено</td><td className="text-right tabular-nums">{formatMoney(paid)}</td></tr>
                       <tr>
-                        <td className="font-semibold">Осталось</td>
-                        <td className="text-right font-semibold tabular-nums" style={{ color: debt > 0 ? "var(--danger)" : "var(--accent)" }}>{formatMoney(debt)}</td>
+                        <td className="font-semibold">{debt < 0 ? "Переплата" : "Осталось"}</td>
+                        <td className="text-right font-semibold tabular-nums" style={{ color: debt > 0 ? "var(--danger)" : "var(--accent)" }}>
+                          {formatMoney(Math.abs(debt))}
+                        </td>
                       </tr>
                     </tbody>
                   </table>
                 </Card>
-
-                {/* На узком экране правой колонки нет — показываем её содержимое здесь. */}
-                <Card className="mt-4 xl:hidden print:hidden">{moneyPanel}</Card>
               </>
             )}
 

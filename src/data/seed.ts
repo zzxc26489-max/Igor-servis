@@ -1,3 +1,4 @@
+import { toISODate } from "../lib/date";
 import type {
   Client,
   Employee,
@@ -16,7 +17,7 @@ import type {
 function day(offset = 0) {
   const date = new Date();
   date.setDate(date.getDate() + offset);
-  return date.toISOString().slice(0, 10);
+  return toISODate(date);
 }
 
 function at(offset: number, time: string) {
