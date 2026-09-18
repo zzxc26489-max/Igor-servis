@@ -7,7 +7,7 @@ export function effectiveWorkStatus(work: OrderLineWork): WorkLineStatus {
 export function workSessionMinutes(work: OrderLineWork, now = new Date()) {
   return (work.workSessions ?? []).reduce((sum, session) => {
     const start = new Date(session.startedAt).getTime();
-    const end = new Date(session.endedAt ?? now).getTime();
+    const end = session.endedAt ? new Date(session.endedAt).getTime() : now.getTime();
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return sum;
     return sum + Math.round((end - start) / 60_000);
   }, 0);
