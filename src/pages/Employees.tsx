@@ -7,7 +7,9 @@ import { useToast } from "../components/Toast";
 import { formatDate, formatMoney, plural } from "../lib/format";
 import { computePayroll, payrollBalance } from "../lib/payroll";
 import { moneyInput } from "../lib/formats";
-import type { Employee } from "../types";
+import type { Employee, PaymentMethod } from "../types";
+import { paymentMethodLabel } from "../lib/payments";
+import { activeCashShift } from "../lib/cashShift";
 
 function payLabel(employee: Employee) {
   if (employee.payType === "percent") return `${employee.payValue}% от работ`;
@@ -16,7 +18,7 @@ function payLabel(employee: Employee) {
 }
 
 export default function Employees() {
-  const { employees: rawEmployees, orders, payEmployee } = useAppStore();
+  const { employees: rawEmployees, orders, cashShifts, payEmployee } = useAppStore();
   const confirm = useConfirm();
   const { showToast } = useToast();
   const [payFor, setPayFor] = useState<string | null>(null);
@@ -26,7 +28,11 @@ export default function Employees() {
   const totalDue = employees.reduce((sum, employee) => sum + payrollBalance(employee), 0);
   const target = employees.find((employee) => employee.id === payFor) ?? null;
 
-  async function handlePay(employee: Employee, amount: number) {
+  async function handlePay(employee: Employee, amount: number, method: PaymentMethod) {
+    if (method === "cash" && !activeCashShift(cashShifts)) {
+      showToast("Для выплаты наличными сначала откройте кассовую смену в Финансах → Касса", "error");
+      return;
+    }
     if (amount <= 0) {
       showToast("Сумма выплаты должна быть больше нуля", "error");
       return;
@@ -45,6 +51,7 @@ export default function Employees() {
       summary: [
         { label: "Сотрудник", value: employee.name },
         { label: "Расчёт", value: payLabel(employee) },
+        { label: "Способ выплаты", value: paymentMethodLabel(method) },
         ...(sdelnaya
           ? [
               { label: "Начислено всего", value: formatMoney(employee.accrued) },
@@ -57,7 +64,7 @@ export default function Employees() {
       confirmLabel: "Выплатить",
     });
     if (!ok) return;
-    payEmployee(employee.id, amount);
+    payEmployee(employee.id, amount, undefined, method);
     setPayFor(null);
     showToast(`Выплачено ${formatMoney(amount)} · ${employee.name}`);
   }
@@ -123,7 +130,7 @@ export default function Employees() {
         <PayDialog
           employee={target}
           onClose={() => setPayFor(null)}
-          onSubmit={(amount) => handlePay(target, amount)}
+          onSubmit={(amount, method) => handlePay(target, amount, method)}
         />
       )}
     </>
@@ -135,11 +142,12 @@ function PayDialog({
 }: {
   employee: Employee;
   onClose: () => void;
-  onSubmit: (amount: number) => void;
+  onSubmit: (amount: number, method: PaymentMethod) => void;
 }) {
   const sdelnaya = employee.payType !== "salary";
   const suggested = sdelnaya ? payrollBalance(employee) : employee.payValue;
   const [amount, setAmount] = useState(String(suggested));
+  const [method, setMethod] = useState<PaymentMethod | "">("");
   const value = Number(amount) || 0;
 
   return (
@@ -158,13 +166,26 @@ function PayDialog({
               aria-label="Сумма выплаты"
               value={amount}
               onChange={(event) => setAmount(moneyInput(event.target.value))}
-              onKeyDown={(event) => event.key === "Enter" && onSubmit(value)}
             />
+          </div>
+        </label>
+        <label className="block text-sm">
+          <span className="muted mb-1 block">Как выплачиваем</span>
+          <div className="field-control">
+            <select value={method} onChange={(event) => setMethod(event.target.value as PaymentMethod | "")}>
+              <option value="">Выберите способ</option>
+              <option value="cash">Наличные</option>
+              <option value="terminal">Терминал / карта</option>
+              <option value="transfer">Перевод / СБП</option>
+            </select>
           </div>
         </label>
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Отмена</Button>
-          <Button onClick={() => onSubmit(value)} disabled={value <= 0 || (sdelnaya && value > suggested)}>
+          <Button
+            onClick={() => method && onSubmit(value, method)}
+            disabled={!method || value <= 0 || (sdelnaya && value > suggested)}
+          >
             Выплатить
           </Button>
         </div>

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type {
   Client,
   AppSettings,
+  CashShift,
   CompanyInfo,
   Employee,
   Expense,
@@ -40,6 +41,7 @@ import {
 import { mergeConcurrentState } from "../lib/stateMerge";
 import { useAuth } from "../auth/AuthContext";
 import { LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
+import { activeCashShift, cashShiftSummary } from "../lib/cashShift";
 
 const STORAGE_KEY = LOCAL_DB_KEY;
 
@@ -67,6 +69,7 @@ export interface DB {
   expenses: Expense[];
   invoices: Invoice[];
   payments: Payment[];
+  cashShifts: CashShift[];
 }
 
 const defaultSettings: AppSettings = {
@@ -90,6 +93,7 @@ function seedDB(): DB {
     expenses: seed.expenses,
     invoices: seed.invoices,
     payments: seed.payments,
+    cashShifts: [],
   };
 }
 
@@ -138,6 +142,7 @@ function migrate(db: DB): DB {
 
   return {
     ...db,
+    cashShifts: Array.isArray(db.cashShifts) ? db.cashShifts : [],
     company: {
       ...db.company,
       // Старая маска-заглушка «+7 (___) ___-__-__» не проходила проверку и
@@ -205,6 +210,7 @@ export interface ReceiveStockInput {
   employee: string;
   note?: string;
   createExpense: boolean;
+  expenseMethod?: PaymentMethod;
 }
 
 export type CloudSyncStatus = "local" | "loading" | "needs_upload" | "ready" | "saving" | "error";
@@ -267,9 +273,13 @@ interface AppStoreValue extends DB {
   /** Возврат запчасти поставщику: списывает со склада и заводит ожидание денег. */
   returnToSupplier: (input: ReturnToSupplierInput) => void;
   /** Деньги от поставщика пришли — возврат идёт в расчёты. */
-  confirmRefund: (expenseId: string) => void;
+  confirmRefund: (expenseId: string, method: PaymentMethod) => void;
   /** Выплата зарплаты сотруднику. */
-  payEmployee: (employeeId: string, amount: number, note?: string) => void;
+  payEmployee: (employeeId: string, amount: number, note?: string, method?: PaymentMethod) => void;
+  /** Открыть кассовую смену. */
+  openCashShift: (openingCash: number, openedBy: string) => string | null;
+  /** Закрыть кассовую смену после пересчёта наличных. */
+  closeCashShift: (shiftId: string, countedCash: number, closedBy: string, comment?: string) => string | null;
   resetToSeed: () => void;
   /** Резервная копия: весь справочник одним JSON. */
   exportDB: () => string;
@@ -630,10 +640,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           stock: prev.stock.map((s) => (s.id === id ? { ...s, ...patch } : s)),
         })),
       addExpense: (e) =>
-        setDB((prev) => ({
-          ...prev,
-          expenses: [{ ...e, code: e.code ?? nextCode(CODE_PREFIX.expense, prev.expenses.map((item) => item.code)) }, ...prev.expenses],
-        })),
+        setDB((prev) => {
+          const shift = activeCashShift(prev.cashShifts);
+          const expense = {
+            ...e,
+            code: e.code ?? nextCode(CODE_PREFIX.expense, prev.expenses.map((item) => item.code)),
+            shiftId: e.shiftId ?? (e.paymentMethod && shift ? shift.id : undefined),
+          };
+          return { ...prev, expenses: [expense, ...prev.expenses] };
+        }),
       receiveStock: (input) =>
         setDB((prev) => {
           const stamp = Date.now();
@@ -706,6 +721,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                   counterparty: input.supplier || "Поставщик",
                   status: "Оплачено" as const,
                   source: "stock_purchase" as const,
+                  paymentMethod: input.expenseMethod,
+                  shiftId: input.expenseMethod && activeCashShift(prev.cashShifts)?.id,
                   itemId,
                 },
                 ...prev.expenses,
@@ -883,6 +900,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             .filter((part) => Number.isFinite(part.amount) && part.amount > 0)
             .map((part) => ({ ...part, amount: Math.round(part.amount) }));
           const total = normalized.reduce((sum, part) => sum + part.amount, 0);
+          const shift = activeCashShift(prev.cashShifts);
+          if (normalized.some((part) => part.method === "cash") && !shift) {
+            error = "Для оплаты наличными сначала откройте кассовую смену в Финансах → Касса";
+            return prev;
+          }
           if (total <= 0) {
             error = "Укажите сумму хотя бы для одного способа оплаты";
             return prev;
@@ -893,6 +915,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             return prev;
           }
           const at = nowISO();
+          const shiftId = shift?.id;
           return {
             ...prev,
             orders: prev.orders.map((item) =>
@@ -907,6 +930,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 kind: "payment" as const,
                 method: part.method,
                 employee: employee?.trim() || order.advisor || undefined,
+                shiftId,
               })),
               ...prev.payments,
             ],
@@ -923,6 +947,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             return prev;
           }
           const accepted = Math.round(amount);
+          const shift = activeCashShift(prev.cashShifts);
+          if (method === "cash" && !shift) {
+            error = "Для возврата наличными сначала откройте кассовую смену в Финансах → Касса";
+            return prev;
+          }
           if (!Number.isFinite(accepted) || accepted <= 0) {
             error = "Сумма возврата должна быть больше нуля";
             return prev;
@@ -933,6 +962,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             return prev;
           }
           const at = nowISO();
+          const shiftId = shift?.id;
           return {
             ...prev,
             orders: prev.orders.map((item) =>
@@ -947,6 +977,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 kind: "refund" as const,
                 method,
                 employee: employee?.trim() || order.advisor || undefined,
+                shiftId,
               },
               ...prev.payments,
             ],
@@ -999,21 +1030,31 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             ],
           };
         }),
-      confirmRefund: (expenseId) =>
-        setDB((prev) => ({
-          ...prev,
-          expenses: prev.expenses.map((expense) =>
-            expense.id === expenseId && expense.source === "supplier_refund" && expense.status !== "Возвращено"
-              ? { ...expense, status: "Возвращено" as const, refundConfirmedAt: nowISO() }
-              : expense,
-          ),
-        })),
-      payEmployee: (employeeId, amount, note) =>
+      confirmRefund: (expenseId, method) =>
+        setDB((prev) => {
+          const shift = activeCashShift(prev.cashShifts);
+          return {
+            ...prev,
+            expenses: prev.expenses.map((expense) =>
+              expense.id === expenseId && expense.source === "supplier_refund" && expense.status !== "Возвращено"
+                ? {
+                    ...expense,
+                    status: "Возвращено" as const,
+                    refundConfirmedAt: nowISO(),
+                    paymentMethod: method,
+                    shiftId: shift ? shift.id : undefined,
+                  }
+                : expense,
+            ),
+          };
+        }),
+      payEmployee: (employeeId, amount, note, method) =>
         setDB((prev) => {
           const employee = prev.employees.find((item) => item.id === employeeId);
           if (!employee || amount <= 0) return prev;
           const now = nowISO();
           const sdelnaya = employee.payType !== "salary";
+          const shift = activeCashShift(prev.cashShifts);
           return {
             ...prev,
             employees: prev.employees.map((item) =>
@@ -1031,6 +1072,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 status: "Оплачено" as const,
                 // Сдельная часть уже сидит в начислении, повторно в расходы не идёт.
                 source: sdelnaya ? ("payroll" as const) : undefined,
+                paymentMethod: method,
+                shiftId: method && shift ? shift.id : undefined,
                 employeeId,
                 comment: note,
               },
@@ -1038,6 +1081,64 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             ],
           };
         }),
+      openCashShift: (openingCash, openedBy) => {
+        let error: string | null = null;
+        setDB((prev) => {
+          if (activeCashShift(prev.cashShifts)) {
+            error = "Кассовая смена уже открыта";
+            return prev;
+          }
+          const amount = Math.round(openingCash);
+          if (!Number.isFinite(amount) || amount < 0) {
+            error = "Начальный остаток не может быть отрицательным";
+            return prev;
+          }
+          const shift: CashShift = {
+            id: createId("shift"),
+            openedAt: nowISO(),
+            openedBy: openedBy.trim() || "—",
+            openingCash: amount,
+          };
+          return { ...prev, cashShifts: [shift, ...prev.cashShifts] };
+        });
+        return error;
+      },
+      closeCashShift: (shiftId, countedCash, closedBy, comment) => {
+        let error: string | null = null;
+        setDB((prev) => {
+          const shift = prev.cashShifts.find((item) => item.id === shiftId);
+          if (!shift || shift.closedAt) {
+            error = "Открытая кассовая смена не найдена";
+            return prev;
+          }
+          const counted = Math.round(countedCash);
+          if (!Number.isFinite(counted) || counted < 0) {
+            error = "Фактический остаток не может быть отрицательным";
+            return prev;
+          }
+          const summary = cashShiftSummary(shift, prev.payments, prev.expenses);
+          const difference = counted - summary.expectedCash;
+          if (difference !== 0 && !comment?.trim()) {
+            error = "При расхождении нужен комментарий";
+            return prev;
+          }
+          return {
+            ...prev,
+            cashShifts: prev.cashShifts.map((item) =>
+              item.id === shiftId
+                ? {
+                    ...item,
+                    closedAt: nowISO(),
+                    closedBy: closedBy.trim() || "—",
+                    countedCash: counted,
+                    comment: comment?.trim() || undefined,
+                  }
+                : item,
+            ),
+          };
+        });
+        return error;
+      },
       resetToSeed: () => rawSetDB(migrate(seedDB())),
       exportDB: () => JSON.stringify(db, null, 2),
       importDB: (json) => {
