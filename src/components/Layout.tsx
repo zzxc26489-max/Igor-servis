@@ -196,6 +196,11 @@ export default function Layout() {
       )}
 
       <div className="app-content flex min-w-0 flex-1 flex-col pb-16 lg:pb-0 print:block print:min-h-0 print:pb-0">
+        {cloud.configured && cloud.status === "error" && (
+          <div className="border-b bg-[#fff8e8] px-4 py-2 text-xs font-medium text-[#9a6a12] print:hidden sm:px-5">
+            Связи с сервером нет. Изменения сохранены на этом устройстве и отправятся автоматически после восстановления связи.
+          </div>
+        )}
         <Outlet />
       </div>
 

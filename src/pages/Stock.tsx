@@ -136,7 +136,7 @@ export default function Stock() {
           <Metric icon={<IconLock size={18} />} tone="violet" label="В резерве" value={String(reservedCount)} onClick={() => setChip("reserved")} />
         </div>
 
-        <Card className="mb-3">
+        <Card className="mb-3 max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0 max-sm:px-3 max-sm:shadow-none">
           <div className="flex flex-wrap gap-2">
             <div className="relative min-w-0 flex-1 basis-full sm:basis-0">
               <IconSearch className="pointer-events-none absolute left-3 top-3" size={18} color="var(--text-muted)" />
@@ -191,8 +191,8 @@ export default function Stock() {
         </Card>
 
         {chip === "movements" ? (
-          <Card className="overflow-hidden p-0">
-            <div className="border-b p-4" style={{ borderColor: "var(--border)" }}>
+          <Card className="overflow-hidden p-0 max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
+            <div className="border-b p-4 max-sm:px-3 max-sm:py-3" style={{ borderColor: "var(--border)" }}>
               <h2 className="panel-title">История движений</h2>
             </div>
             <div className="space-y-2 p-3 lg:hidden">
@@ -250,13 +250,13 @@ export default function Stock() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-            <Card className="overflow-hidden p-0">
-              <div className="flex items-center justify-between gap-2 border-b p-4" style={{ borderColor: "var(--border)" }}>
+            <Card className="overflow-hidden p-0 max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
+              <div className="flex items-center justify-between gap-2 border-b p-4 max-sm:px-3 max-sm:py-3" style={{ borderColor: "var(--border)" }}>
                 <h2 className="panel-title">Позиции{shown.length !== stock.length ? `: ${shown.length}` : ""}</h2>
                 <Link to="/purchases" className="shrink-0 text-sm font-semibold text-[var(--accent)]">К закупкам</Link>
               </div>
 
-              <div className="space-y-2 p-3 xl:hidden">
+              <div className="space-y-1.5 p-3 max-sm:p-2 xl:hidden">
                 {shown.map((item) => {
                   const reserved = reservations.get(item.id) ?? 0;
                   return (
