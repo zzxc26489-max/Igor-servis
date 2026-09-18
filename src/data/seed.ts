@@ -150,7 +150,14 @@ export const services: Service[] = [
 
 export const stock: StockItem[] = [
   { id: "st-1", code: "С-0001", name: "Тормозные колодки (передние)", sku: "GDB1956", brand: "TRW", category: "Тормозная система", qty: 6, minQty: 4, purchasePrice: 3250, cell: "A-03-02", unit: "компл." },
-  { id: "st-2", code: "С-0002", name: "Масляный фильтр (VAG)", sku: "26300-35505", brand: "MANN", category: "Фильтры", qty: 14, minQty: 6, purchasePrice: 980, cell: "A-01-02", unit: "шт." },
+  {
+    id: "st-2", code: "С-0002", name: "Масляный фильтр двигателя", sku: "26300-35505", brand: "Hyundai / Kia OE",
+    category: "Фильтры", qty: 14, minQty: 6, purchasePrice: 980, cell: "A-01-02", unit: "шт.",
+    crossNumbers: ["26300-35500", "26300-35501", "26300-35502", "26300-35503", "26300-35504", "26300-35054", "26300-3E010"],
+    oeNumbers: ["26300-35505"],
+    fitments: ["Hyundai Accent / Elantra / Sonata / Tucson / Santa Fe", "Kia Rio / Forte / Optima / Seltos"],
+    catalogRefId: "ref-hyundai-kia-26300-35505",
+  },
   { id: "st-3", code: "С-0003", name: "Моторное масло 5W-30", sku: "Shell 5W-30", brand: "Shell", category: "Масла", qty: 46, minQty: 20, purchasePrice: 850, cell: "B-04-01", unit: "л" },
   { id: "st-4", code: "С-0004", name: "Свечи зажигания (NGK)", sku: "BKR6E", brand: "NGK", category: "Электрика", qty: 32, minQty: 12, purchasePrice: 350, cell: "B-02-01", unit: "шт." },
   { id: "st-5", code: "С-0005", name: "Антифриз G12+", sku: "G12+", brand: "Felix", category: "Жидкости", qty: 24, minQty: 10, purchasePrice: 650, cell: "B-04-02", unit: "л" },

@@ -41,6 +41,7 @@ import {
 import { mergeConcurrentState } from "../lib/stateMerge";
 import { useAuth } from "../auth/AuthContext";
 import { LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
+import { isValidQuantity, normalizeQuantity } from "../lib/quantity";
 import { activeCashShift, cashShiftSummary } from "../lib/cashShift";
 
 const STORAGE_KEY = LOCAL_DB_KEY;
@@ -128,13 +129,14 @@ function migrate(db: DB): DB {
     workDayEnd: order.workDayEnd ?? hours.end,
     workDayEstimated: order.workDayStart && order.workDayEnd ? order.workDayEstimated : true,
     parts: order.parts.map((part) => {
-      if (part.purchasePrice !== undefined) {
-        return { ...part, purchasePriceEstimated: part.purchasePriceEstimated ?? true };
-      }
       const stockItem = db.stock.find((item) => item.sku === part.sku);
+      const withUnit = part.unit ? part : { ...part, unit: stockItem?.unit };
+      if (withUnit.purchasePrice !== undefined) {
+        return { ...withUnit, purchasePriceEstimated: withUnit.purchasePriceEstimated ?? true };
+      }
       return stockItem
-        ? { ...part, purchasePrice: stockItem.purchasePrice, purchasePriceEstimated: true }
-        : part;
+        ? { ...withUnit, purchasePrice: stockItem.purchasePrice, purchasePriceEstimated: true }
+        : withUnit;
     }),
   }));
 
@@ -252,7 +254,7 @@ interface AppStoreValue extends DB {
   updateService: (id: string, patch: Partial<Service>) => void;
   deleteService: (id: string) => void;
   /** Смена статуса заказа: при выдаче списывает запчасти, при откате возвращает. */
-  setOrderStatus: (id: string, status: OrderStatus) => void;
+  setOrderStatus: (id: string, status: OrderStatus) => string | null;
   /** Добавить запчасть со склада в заказ (резерв, без списания остатка). */
   reservePart: (orderId: string, itemId: string, qty: number, price: number) => string | null;
   /** Убрать запчасть из заказа и снять резерв. Выданный заказ менять нельзя. */
@@ -653,7 +655,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         setDB((prev) => {
           const stamp = Date.now();
           const now = nowISO();
-          const total = Math.round(input.qty * input.unitPrice);
+          const receivedQty = normalizeQuantity(input.qty);
+          if (!isValidQuantity(receivedQty)) return prev;
+          const total = Math.round(receivedQty * input.unitPrice);
           const existing = input.itemId ? prev.stock.find((item) => item.id === input.itemId) : undefined;
           const itemId = existing?.id ?? `st-${stamp}`;
 
@@ -661,7 +665,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           const nextStock = existing
             ? prev.stock.map((item) => {
                 if (item.id !== existing.id) return item;
-                const qty = item.qty + input.qty;
+                const qty = normalizeQuantity(item.qty + receivedQty);
                 const purchasePrice = input.unitPrice > 0 && qty > 0
                   ? Math.round((item.qty * item.purchasePrice + total) / qty)
                   : item.purchasePrice;
@@ -685,7 +689,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                   sku: input.sku,
                   brand: input.brand,
                   category: input.category,
-                  qty: input.qty,
+                  qty: receivedQty,
                   minQty: input.minQty,
                   purchasePrice: input.unitPrice,
                   cell: input.cell,
@@ -701,7 +705,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             date: now,
             itemId,
             operation: "Приёмка",
-            qty: input.qty,
+            qty: receivedQty,
             to: input.cell,
             employee: input.employee,
             unitPrice: input.unitPrice,
@@ -716,7 +720,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                   code: nextCode(CODE_PREFIX.expense, prev.expenses.map((item) => item.code)),
                   date: now.slice(0, 10),
                   category: "Закупка запчастей",
-                  description: `Приёмка: ${input.name} — ${input.qty} ${input.unit}`,
+                  description: `Приёмка: ${input.name} — ${receivedQty} ${input.unit}`,
                   amount: total,
                   counterparty: input.supplier || "Поставщик",
                   status: "Оплачено" as const,
@@ -740,7 +744,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           services: prev.services.map((service) => (service.id === id ? { ...service, ...patch } : service)),
         })),
       deleteService: (id) => setDB((prev) => ({ ...prev, services: prev.services.filter((service) => service.id !== id) })),
-      setOrderStatus: (id, status) =>
+      setOrderStatus: (id, status) => {
+        let error: string | null = null;
         setDB((prev) => {
           const order = prev.orders.find((item) => item.id === id);
           if (!order || order.status === status) return prev;
@@ -773,6 +778,17 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           // Запчасти уходят со склада в момент выдачи и возвращаются, если выдачу откатили.
           if (wasIssued === willIssue) return { ...prev, orders };
 
+          if (willIssue) {
+            for (const part of order.parts) {
+              const item = prev.stock.find((entry) => entry.sku === part.sku);
+              if (!item) continue;
+              if (part.qty > item.qty + 0.0001) {
+                error = `Недостаточно «${item.name}»: на складе ${item.qty} ${item.unit}, в заказе ${part.qty} ${part.unit ?? item.unit}`;
+                return prev;
+              }
+            }
+          }
+
           const sign = willIssue ? -1 : 1;
           const stock = [...prev.stock];
           const movements: StockMovement[] = [];
@@ -780,7 +796,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             const index = stock.findIndex((item) => item.sku === part.sku);
             if (index < 0) continue;
             const item = stock[index];
-            stock[index] = { ...item, qty: Math.max(0, item.qty + sign * part.qty) };
+            stock[index] = { ...item, qty: normalizeQuantity(item.qty + sign * part.qty) };
             movements.push({
               id: createId("mv"),
               date: now,
@@ -794,7 +810,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             });
           }
           return { ...prev, orders, stock, stockMovements: [...movements, ...prev.stockMovements] };
-        }),
+        });
+        return error;
+      },
       reservePart: (orderId, itemId, qty, price) => {
         let error: string | null = null;
         setDB((prev) => {
@@ -808,8 +826,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             error = "Выданный заказ нельзя изменять. Сначала верните автомобиль в работу.";
             return prev;
           }
-          if (!Number.isInteger(qty) || qty <= 0) {
-            error = "Количество должно быть целым числом больше нуля";
+          const normalizedQty = normalizeQuantity(qty);
+          if (!isValidQuantity(normalizedQty)) {
+            error = "Количество должно быть больше нуля";
             return prev;
           }
           if (!Number.isFinite(price) || price <= 0 || price > 10_000_000) {
@@ -818,7 +837,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           }
           const reserved = reservedByItem(prev.orders, prev.stock).get(item.id) ?? 0;
           const available = item.qty - reserved;
-          if (qty > available) {
+          if (normalizedQty > available + 0.0001) {
             error = `Свободно только ${available} ${item.unit}: ${reserved} уже в резерве`;
             return prev;
           }
@@ -826,7 +845,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             id: createId("part"),
             name: item.name,
             sku: item.sku,
-            qty,
+            qty: normalizedQty,
+            unit: item.unit,
             price,
             purchasePrice: item.purchasePrice,
             purchasePriceEstimated: false,
@@ -841,7 +861,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 date: nowISO(),
                 itemId: item.id,
                 operation: "Резерв" as const,
-                qty,
+                qty: normalizedQty,
                 from: item.cell,
                 employee: order.advisor || "—",
                 note: `Заказ-наряд ${order.number}`,
