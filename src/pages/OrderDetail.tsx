@@ -25,6 +25,7 @@ import { formatQuantity, isValidQuantity } from "../lib/quantity";
 import { nowISO } from "../lib/date";
 import type { OrderConsumable, OrderLinePart, OrderLineWork, OrderStatus, PaymentMethod } from "../types";
 import defaultLogo from "../assets/logo.jpg";
+import { effectiveWorkStatus, WORK_STATUS_LABEL, workSessionMinutes } from "../lib/workSessions";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
 const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "Документы"] as const;
@@ -829,6 +830,8 @@ export default function OrderDetail() {
                               {w.executor ? `Исполнитель: ${w.executor}` : ""}
                               {w.executor && w.normMinutes ? " · " : ""}
                               {w.normMinutes ? `норматив ${formatDuration(w.normMinutes * w.qty)}` : ""}
+                              {w.executor ? ` · ${WORK_STATUS_LABEL[effectiveWorkStatus(w)]}` : ""}
+                              {workSessionMinutes(w) > 0 ? ` · факт ${formatDuration(workSessionMinutes(w))}` : ""}
                             </div>
                           </td>
                           <td className="text-right tabular-nums">{w.qty}</td>

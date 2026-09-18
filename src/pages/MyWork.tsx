@@ -6,22 +6,34 @@ import { useToast } from "../components/Toast";
 import { effectiveWorkStatus, WORK_STATUS_LABEL, workSessionMinutes } from "../lib/workSessions";
 import { formatDuration } from "../lib/worktime";
 import { formatDate } from "../lib/format";
+import { todayISO } from "../lib/date";
+import { orderDay } from "../lib/lift";
 import type { OrderLineWork, WorkLineStatus } from "../types";
 
 export default function MyWork() {
   const { orders, vehicles, lifts, cloud, setWorkLineStatus } = useAppStore();
   const { showToast } = useToast();
   const mechanicName = cloud.displayName ?? "";
+  const today = todayISO();
 
   const assigned = useMemo(() => {
     return orders
-      .filter((order) => order.status !== "выдан" && order.works.some((work) => work.executor === mechanicName))
+      .filter((order) => {
+        const ownWorks = order.works.filter((work) => work.executor === mechanicName);
+        if (ownWorks.length === 0 || order.status === "выдан" || order.status === "готово") return false;
+        const hasRunningWork = ownWorks.some((work) => {
+          const status = effectiveWorkStatus(work);
+          return status === "in_progress" || status === "paused";
+        });
+        const serviceActive = order.status === "в работе" || order.status === "диагностика";
+        return orderDay(order) === today || hasRunningWork || serviceActive;
+      })
       .sort((a, b) => {
         const aKey = `${a.plannedAt ?? a.createdAt.slice(0, 10)} ${a.scheduledStart ?? ""}`;
         const bKey = `${b.plannedAt ?? b.createdAt.slice(0, 10)} ${b.scheduledStart ?? ""}`;
         return aKey.localeCompare(bKey);
       });
-  }, [mechanicName, orders]);
+  }, [mechanicName, orders, today]);
 
   function changeWork(orderId: string, work: OrderLineWork, status: WorkLineStatus) {
     const error = setWorkLineStatus(orderId, work.id, status);
@@ -125,9 +137,14 @@ export default function MyWork() {
                             </span>
                           </div>
 
+                          {order.status === "ожидает запчасти" && (
+                            <div className="mt-3 rounded-lg bg-[#fff8e8] px-3 py-2 text-xs font-medium text-[#9a6a12]">
+                              Ожидаем запчасти — запуск работы временно заблокирован
+                            </div>
+                          )}
                           <div className="mt-3 grid grid-cols-2 gap-2 sm:flex">
                             {status === "planned" && (
-                              <Button className="justify-center sm:min-w-32" onClick={() => changeWork(order.id, work, "in_progress")}>
+                              <Button className="justify-center sm:min-w-32" disabled={order.status === "ожидает запчасти"} onClick={() => changeWork(order.id, work, "in_progress")}>
                                 <IconPlayerPlay size={18} /> Начать
                               </Button>
                             )}
@@ -142,7 +159,7 @@ export default function MyWork() {
                               </>
                             )}
                             {status === "paused" && (
-                              <Button className="justify-center sm:min-w-32" onClick={() => changeWork(order.id, work, "in_progress")}>
+                              <Button className="justify-center sm:min-w-32" disabled={order.status === "ожидает запчасти"} onClick={() => changeWork(order.id, work, "in_progress")}>
                                 <IconRefresh size={18} /> Продолжить
                               </Button>
                             )}

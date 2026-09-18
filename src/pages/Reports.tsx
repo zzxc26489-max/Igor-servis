@@ -24,6 +24,7 @@ import { formatMoney, plural } from "../lib/format";
 import { computePayroll } from "../lib/payroll";
 import { orderTotals } from "../lib/order";
 import { todayISO } from "../lib/date";
+import { workSessionMinutes } from "../lib/workSessions";
 
 /** Компактная строка времени для телефона: таблица на 390px нечитаема. */
 function TimeRow({
@@ -119,13 +120,14 @@ export default function Reports() {
     : 0;
 
   // Выработка мастера: работы, где он указан исполнителем.
-  const byExecutor = new Map<string, { name: string; count: number; revenue: number }>();
+  const byExecutor = new Map<string, { name: string; count: number; revenue: number; actualMinutes: number }>();
   orders.forEach((order) =>
     order.works.forEach((work) => {
       const name = work.executor || "Не указан";
-      const entry = byExecutor.get(name) ?? { name, count: 0, revenue: 0 };
+      const entry = byExecutor.get(name) ?? { name, count: 0, revenue: 0, actualMinutes: 0 };
       entry.count += work.qty;
       entry.revenue += work.price * work.qty;
+      entry.actualMinutes += workSessionMinutes(work);
       byExecutor.set(name, entry);
     }),
   );
@@ -215,7 +217,10 @@ export default function Reports() {
                         </span>
                         <span className="min-w-0">
                           <b className="block truncate">{executor.name}</b>
-                          <span className="muted text-xs">{executor.count} {plural(executor.count, "работа", "работы", "работ")}</span>
+                          <span className="muted text-xs">
+                            {executor.count} {plural(executor.count, "работа", "работы", "работ")}
+                            {executor.actualMinutes > 0 ? ` · факт ${formatDuration(executor.actualMinutes)}` : ""}
+                          </span>
                         </span>
                       </span>
                       <span className="shrink-0 text-right">
