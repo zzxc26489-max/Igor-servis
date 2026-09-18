@@ -7,6 +7,8 @@ import {
 import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../components/Confirm";
+import { reservedByItem } from "../lib/stock";
 import { Button, Card, Modal, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
 import type { OrderLinePart, OrderLineWork, OrderStatus } from "../types";
@@ -31,11 +33,15 @@ export default function OrderDetail() {
     settings,
     updateOrder,
     deleteOrder,
-    updateStockItem,
-    addStockMovement,
     updateVehicle,
+    setOrderStatus,
+    reservePart,
+    releasePart,
+    acceptPayment,
   } = useAppStore();
   const { showToast } = useToast();
+  const confirm = useConfirm();
+  const reserved = reservedByItem(orders, stock);
   const order = orders.find((o) => o.id === orderId);
 
   const [tab, setTab] = useState<Tab>("Работы и запчасти");
@@ -163,67 +169,68 @@ export default function OrderDetail() {
     setPartError("");
   }
 
-  function handleAddPart() {
+  async function handleAddPart() {
     if (!order) return;
     setPartError("");
     const stockItem = stock.find((s) => s.id === partItemId);
     if (!stockItem) return;
     const qty = Math.max(1, Number(partQty) || 1);
-    if (qty > stockItem.qty) {
-      setPartError(`На складе доступно только ${stockItem.qty} ${stockItem.unit}.`);
+    const available = stockItem.qty - (reserved.get(stockItem.id) ?? 0);
+    if (qty > available) {
+      setPartError(`Свободно только ${available} ${stockItem.unit} — остальное в резерве по другим заказам.`);
       return;
     }
     const price = Number(partPrice) || stockItem.purchasePrice;
-    const newPart: OrderLinePart = { id: createId("part"), name: stockItem.name, sku: stockItem.sku, qty, price, availability: "reserved" };
-    const nextParts = [...order.parts, newPart];
-    const target = Number(targetTotal);
-    const nextPartsTotal = nextParts.reduce((sum, part) => sum + part.price * part.qty, 0);
-    updateOrder(order.id, {
-      parts: nextParts,
-      works: settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(order.works, target, nextPartsTotal) : order.works,
+
+    const ok = await confirm({
+      title: "Добавить запчасть в заказ",
+      question: `Запчасть уйдёт в резерв по заказ-наряду ${order.number}. Со склада она спишется при выдаче автомобиля.`,
+      summary: [
+        { label: "Запчасть", value: `${stockItem.name} · ${stockItem.sku}` },
+        { label: "Ячейка", value: stockItem.cell || "—" },
+        { label: "Количество", value: `${qty} ${stockItem.unit}` },
+        { label: "Цена для клиента", value: formatMoney(price) },
+        { label: "Свободно после резерва", value: `${available - qty} ${stockItem.unit}` },
+        { label: "Добавится к сумме заказа", value: formatMoney(price * qty), total: true, tone: "accent" },
+      ],
+      confirmLabel: "Добавить",
     });
-    updateStockItem(stockItem.id, { qty: stockItem.qty - qty });
-    addStockMovement({
-      id: createId("mv"),
-      date: new Date().toISOString(),
-      itemId: stockItem.id,
-      operation: "Резерв",
-      qty,
-      from: stockItem.cell,
-      employee: order.advisor || "—",
-    });
+    if (!ok) return;
+
+    const error = reservePart(order.id, stockItem.id, qty, price);
+    if (error) {
+      setPartError(error);
+      return;
+    }
     resetPartForm();
     showToast(`Добавлена запчасть «${stockItem.name}»`);
   }
 
-  function handleRemovePart(part: OrderLinePart) {
+  async function handleRemovePart(part: OrderLinePart) {
     if (!order) return;
-    const nextParts = order.parts.filter((p) => p.id !== part.id);
-    const target = Number(targetTotal);
-    const nextPartsTotal = nextParts.reduce((sum, item) => sum + item.price * item.qty, 0);
-    updateOrder(order.id, {
-      parts: nextParts,
-      works: settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(order.works, target, nextPartsTotal) : order.works,
+    const issued = order.status === "выдан";
+    const ok = await confirm({
+      title: "Убрать запчасть из заказа",
+      question: issued
+        ? "Заказ уже выдан — запчасть вернётся на склад, сумма заказа уменьшится."
+        : "Резерв снимется, запчасть снова станет свободной на складе.",
+      summary: [
+        { label: "Запчасть", value: `${part.name}${part.sku ? ` · ${part.sku}` : ""}` },
+        { label: "Количество", value: part.qty },
+        { label: "Сумма уйдёт из заказа", value: `−${formatMoney(part.price * part.qty)}`, total: true, tone: "danger" },
+      ],
+      confirmLabel: "Убрать",
+      danger: true,
     });
-    const stockItem = stock.find((s) => s.sku === part.sku);
-    if (stockItem) {
-      updateStockItem(stockItem.id, { qty: stockItem.qty + part.qty });
-      addStockMovement({
-        id: createId("mv"),
-        date: new Date().toISOString(),
-        itemId: stockItem.id,
-        operation: "Возврат",
-        qty: part.qty,
-        to: stockItem.cell,
-        employee: order.advisor || "—",
-      });
-    }
+    if (!ok) return;
+    releasePart(order.id, part.id);
     showToast("Запчасть возвращена на склад", "error");
   }
 
   function handleSaveDiscount() {
     if (!order) return;
-    const value = Math.max(0, Number(discountInput) || 0);
+    // Скидка не может быть больше суммы заказа, иначе «к оплате» уходит в минус.
+    const value = Math.min(worksTotal + partsTotal, Math.max(0, Number(discountInput) || 0));
     const target = Number(targetTotal);
     updateOrder(order.id, {
       discount: value,
@@ -233,28 +240,88 @@ export default function OrderDetail() {
     showToast("Скидка обновлена");
   }
 
-  function handleDeleteOrder() {
+  async function handleDeleteOrder() {
     if (!order) return;
-    if (!window.confirm(`Удалить заказ-наряд ${order.number}? Действие нельзя отменить.`)) return;
+    const ok = await confirm({
+      title: "Удалить заказ-наряд",
+      question: "Заказ-наряд исчезнет из списков, статистики и финансов. Отменить это нельзя.",
+      summary: [
+        { label: "Заказ-наряд", value: order.number },
+        { label: "Клиент", value: client?.name ?? "—" },
+        { label: "Автомобиль", value: carTitle },
+        { label: "Сумма", value: formatMoney(due) },
+        { label: "Принято от клиента", value: formatMoney(paid), tone: paid > 0 ? "danger" : undefined },
+      ],
+      note: paid > 0 ? "По заказу уже принимали деньги — оплата тоже пропадёт из отчётов." : undefined,
+      confirmLabel: "Удалить",
+      danger: true,
+    });
+    if (!ok) return;
     deleteOrder(order.id);
     showToast(`Заказ-наряд ${order.number} удалён`, "error");
     navigate("/orders");
   }
 
-  function handleAcceptPayment(amount: number) {
+  async function handleAcceptPayment(amount: number) {
     if (!order || amount <= 0) return;
-    updateOrder(order.id, { paid: (order.paid ?? 0) + amount });
+    if (amount > debt) {
+      showToast(`Больше долга принять нельзя: осталось ${formatMoney(debt)}`, "error");
+      return;
+    }
+    const ok = await confirm({
+      title: "Принять оплату",
+      question: `Оплата запишется в заказ-наряд ${order.number} и попадёт в финансы за сегодня.`,
+      summary: [
+        { label: "Клиент", value: client?.name ?? "—" },
+        { label: "Автомобиль", value: carTitle },
+        { label: "Всего по заказу", value: formatMoney(due) },
+        { label: "Уже оплачено", value: formatMoney(paid) },
+        { label: "Принимаем", value: formatMoney(amount), tone: "accent" },
+        { label: "Останется долг", value: formatMoney(debt - amount), total: true, tone: debt - amount > 0 ? "danger" : "accent" },
+      ],
+      confirmLabel: "Принять оплату",
+    });
+    if (!ok) return;
+    acceptPayment(order.id, amount);
     setPaymentAmount("");
     setPayOpen(false);
     showToast(`Принята оплата ${formatMoney(amount)}`);
   }
 
-  function handleAdvance() {
-    if (!order || !nextStatus) return;
-    const patch: Parameters<typeof updateOrder>[1] =
-      nextStatus === "готово" ? { status: nextStatus, completedAt: new Date().toISOString() } : { status: nextStatus };
-    updateOrder(order.id, patch);
-    showToast(`Статус изменён: «${nextStatus}»`);
+  async function handleChangeStatus(next: OrderStatus) {
+    if (!order || next === order.status) return;
+    const issuing = next === "выдан";
+    const reverting = order.status === "выдан" && next !== "выдан";
+    const summary: Parameters<typeof confirm>[0]["summary"] = [
+      { label: "Заказ-наряд", value: order.number },
+      { label: "Автомобиль", value: carTitle },
+      { label: "Статус", value: `${order.status} → ${next}` },
+    ];
+    if (issuing || reverting) {
+      summary.push({
+        label: issuing ? "Спишется со склада" : "Вернётся на склад",
+        value: order.parts.length
+          ? order.parts.map((part) => `${part.name} × ${part.qty}`).join(", ")
+          : "запчастей нет",
+      });
+    }
+    if (issuing && debt > 0) {
+      summary.push({ label: "Останется долг клиента", value: formatMoney(debt), total: true, tone: "danger" });
+    }
+    const ok = await confirm({
+      title: issuing ? "Выдать автомобиль" : `Перевести в статус «${next}»`,
+      question: issuing
+        ? "Запчасти спишутся со склада, заказ попадёт в закрытые и в статистику по выработке."
+        : reverting
+          ? "Выдача откатится, списанные запчасти вернутся на склад."
+          : "Статус заказ-наряда изменится.",
+      summary,
+      note: issuing && debt > 0 ? "Клиент остаётся должен — заказ попадёт в «Ожидаем оплату»." : undefined,
+      confirmLabel: issuing ? "Выдать" : "Изменить статус",
+    });
+    if (!ok) return;
+    setOrderStatus(order.id, next);
+    showToast(`Статус изменён: «${next}»`);
   }
 
   const carTitle = vehicle ? `${vehicle.make} ${vehicle.model}` : order.number;
@@ -279,7 +346,7 @@ export default function OrderDetail() {
           <>
             <StatusBadge status={order.status} />
             {nextStatusLabel && (
-              <Button onClick={handleAdvance}>
+              <Button onClick={() => nextStatus && handleChangeStatus(nextStatus)}>
                 <IconCheck size={18} /> {nextStatusLabel}
               </Button>
             )}
@@ -353,10 +420,7 @@ export default function OrderDetail() {
                   />
                 )}
                 <button
-                  onClick={() => {
-                    updateOrder(order.id, { status: step });
-                    showToast(`Статус изменён: «${step}»`);
-                  }}
+                  onClick={() => handleChangeStatus(step)}
                   className="relative z-10 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-xs font-semibold text-white transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 sm:h-7 sm:w-7"
                   style={{ background: idx <= currentStepIndex ? "var(--accent)" : "#cfd3da" }}
                   aria-label={`Установить статус «${step}»`}
@@ -685,9 +749,11 @@ export default function OrderDetail() {
 
           <div className="hidden min-w-0 space-y-4 xl:block">
             <Card className="xl:sticky xl:top-20">
-              <div className="muted text-xs font-semibold uppercase tracking-[.07em]">Осталось оплатить</div>
+              <div className="muted text-xs font-semibold uppercase tracking-[.07em]">
+                {debt < 0 ? "Переплата клиента" : "Осталось оплатить"}
+              </div>
               <div className="mt-1 text-[32px] font-bold leading-none tabular-nums" style={{ color: debt > 0 ? "var(--text)" : "var(--accent)" }}>
-                {formatMoney(debt)}
+                {formatMoney(Math.abs(debt))}
               </div>
               <div className="muted mt-1 text-sm">Всего по заказу {formatMoney(due)} · оплачено {formatMoney(paid)}</div>
 
@@ -794,8 +860,8 @@ export default function OrderDetail() {
         style={{ borderColor: "var(--border)" }}
       >
         <div className="min-w-0">
-          <div className="muted text-[11px] uppercase tracking-[.06em]">К оплате</div>
-          <div className="text-lg font-bold leading-tight tabular-nums">{formatMoney(debt)}</div>
+          <div className="muted text-[11px] uppercase tracking-[.06em]">{debt < 0 ? "Переплата" : "К оплате"}</div>
+          <div className="text-lg font-bold leading-tight tabular-nums">{formatMoney(Math.abs(debt))}</div>
         </div>
         {debt > 0 ? (
           <Button className="shrink-0" onClick={() => setPayOpen(true)}>Принять оплату</Button>

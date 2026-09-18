@@ -2,11 +2,18 @@ import { IconAlertTriangle, IconCheck, IconShoppingCart, IconStack2 } from "@tab
 import { useAppStore } from "../store/AppStore";
 import { Card, EmptyState, ListCard, Metric, Page, TopBar } from "../components/ui";
 import { formatMoney } from "../lib/format";
+import { lowStockItems, toBuyQty } from "../lib/lowStock";
+import { reservedByItem } from "../lib/stock";
 
 export default function Purchases() {
-  const { stock } = useAppStore();
-  const toOrder = stock.filter((i) => i.qty <= i.minQty);
-  const totalSum = toOrder.reduce((s, item) => s + (item.minQty * 2 - item.qty) * item.purchasePrice, 0);
+  const { stock, orders } = useAppStore();
+  // Резерв уже обещан клиентам, поэтому в закупку он не считается свободным остатком.
+  const reserved = reservedByItem(orders, stock);
+  const toOrder = lowStockItems(stock, orders);
+  const totalSum = toOrder.reduce(
+    (sum, item) => sum + toBuyQty(item, reserved.get(item.id) ?? 0) * item.purchasePrice,
+    0,
+  );
 
   return (
     <>
@@ -24,7 +31,9 @@ export default function Purchases() {
           </div>
           <div className="space-y-2 p-3 lg:hidden">
             {toOrder.map((item) => {
-              const toBuy = item.minQty * 2 - item.qty;
+              const inReserve = reserved.get(item.id) ?? 0;
+              const free = item.qty - inReserve;
+              const toBuy = toBuyQty(item, inReserve);
               return (
                 <ListCard
                   key={item.id}
@@ -33,7 +42,8 @@ export default function Purchases() {
                   lines={[
                     item.sku,
                     <>
-                      Остаток <span style={{ color: "var(--danger)" }}>{item.qty} {item.unit}</span> · минимум {item.minQty} · купить <b>{toBuy} {item.unit}</b>
+                      Свободно <span style={{ color: "var(--danger)" }}>{free} {item.unit}</span>
+                      {inReserve > 0 ? ` (в резерве ${inReserve})` : ""} · минимум {item.minQty} · купить <b>{toBuy} {item.unit}</b>
                     </>,
                   ]}
                 />
@@ -50,22 +60,25 @@ export default function Purchases() {
                 <tr>
                   <th>Наименование</th>
                   <th>Артикул</th>
-                  <th className="text-right">Остаток</th>
-                  <th className="text-right">Мин. остаток</th>
+                  <th className="text-right">Свободно</th>
+                  <th className="text-right">Резерв</th>
+                  <th className="text-right">Минимум</th>
                   <th className="text-right">К закупке</th>
                   <th className="text-right">Сумма</th>
                 </tr>
               </thead>
               <tbody>
                 {toOrder.map((item) => {
-                  const toBuy = item.minQty * 2 - item.qty;
+                  const inReserve = reserved.get(item.id) ?? 0;
+                  const toBuy = toBuyQty(item, inReserve);
                   return (
                     <tr key={item.id}>
                       <td className="font-medium">{item.name}</td>
                       <td className="muted">{item.sku}</td>
                       <td className="text-right" style={{ color: "var(--danger)" }}>
-                        {item.qty} {item.unit}
+                        {item.qty - inReserve} {item.unit}
                       </td>
+                      <td className="muted text-right">{inReserve || "—"}</td>
                       <td className="text-right">{item.minQty}</td>
                       <td className="text-right font-medium">
                         {toBuy} {item.unit}
@@ -76,7 +89,7 @@ export default function Purchases() {
                 })}
                 {toOrder.length === 0 && (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <EmptyState icon={<IconCheck size={22} />} title="Все запчасти в наличии" hint="Закупка не требуется" />
                     </td>
                   </tr>

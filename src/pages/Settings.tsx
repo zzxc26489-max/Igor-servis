@@ -2,12 +2,14 @@ import { useRef, useState, type FormEvent } from "react";
 import { IconAdjustments, IconBuildingStore, IconDatabase, IconDownload, IconInfoCircle, IconUpload } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../components/Confirm";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { APP_BUILD_DATE, APP_VERSION, DB_VERSION } from "../data/version";
 
 export default function Settings() {
-  const { company, settings, updateCompany, updateSettings, resetToSeed, exportDB, importDB } = useAppStore();
+  const { company, settings, updateCompany, updateSettings, resetToSeed, exportDB, importDB, orders, clients, stock, expenses } = useAppStore();
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [shortName, setShortName] = useState(company.shortName);
   const [address, setAddress] = useState(company.address);
   const [phone, setPhone] = useState(company.phone);
@@ -43,7 +45,27 @@ export default function Settings() {
 
   async function handleRestore(file: File) {
     const text = await file.text();
-    if (!window.confirm("Заменить текущие данные содержимым резервной копии?")) return;
+    let incoming: { orders?: unknown[]; clients?: unknown[]; stock?: unknown[]; expenses?: unknown[] } = {};
+    try {
+      incoming = JSON.parse(text);
+    } catch {
+      showToast("Файл не похож на резервную копию CRM", "error");
+      return;
+    }
+    const ok = await confirm({
+      title: "Восстановить из резервной копии",
+      question: "Текущие данные в этом браузере будут полностью заменены содержимым файла.",
+      summary: [
+        { label: "Заказ-наряды", value: `${orders.length} → ${incoming.orders?.length ?? 0}` },
+        { label: "Клиенты", value: `${clients.length} → ${incoming.clients?.length ?? 0}` },
+        { label: "Позиции склада", value: `${stock.length} → ${incoming.stock?.length ?? 0}` },
+        { label: "Расходы", value: `${expenses.length} → ${incoming.expenses?.length ?? 0}` },
+      ],
+      note: "Сначала скачайте копию текущих данных, если они ещё нужны.",
+      confirmLabel: "Восстановить",
+      danger: true,
+    });
+    if (!ok) return;
     if (importDB(text)) {
       showToast("Данные восстановлены из копии");
     } else {
@@ -51,10 +73,21 @@ export default function Settings() {
     }
   }
 
-  function handleReset() {
-    if (!window.confirm("Сбросить все данные к демонстрационным? Все внесённые заказы, клиенты и изменения будут потеряны.")) {
-      return;
-    }
+  async function handleReset() {
+    const ok = await confirm({
+      title: "Сбросить к демонстрационным данным",
+      question: "Все внесённые заказ-наряды, клиенты, движения склада и финансы в этом браузере будут заменены демо-данными.",
+      summary: [
+        { label: "Заказ-наряды", value: orders.length },
+        { label: "Клиенты", value: clients.length },
+        { label: "Позиции склада", value: stock.length },
+        { label: "Расходы", value: expenses.length },
+      ],
+      note: "Отменить сброс нельзя. Скачайте резервную копию, если данные ещё нужны.",
+      confirmLabel: "Сбросить",
+      danger: true,
+    });
+    if (!ok) return;
     resetToSeed();
     showToast("Данные сброшены к демонстрационным");
   }

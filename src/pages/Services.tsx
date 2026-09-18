@@ -3,12 +3,14 @@ import { IconEdit, IconPlus, IconSearch, IconTool, IconTrash } from "@tabler/ico
 import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../components/Confirm";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { formatMoney, plural } from "../lib/format";
 
 export default function Services() {
   const { services, addService, updateService, deleteService } = useAppStore();
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [query, setQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -61,8 +63,20 @@ export default function Services() {
     resetForm();
   }
 
-  function handleDelete(id: string, serviceName: string) {
-    if (!window.confirm(`Удалить услугу «${serviceName}» из прайс-листа?`)) return;
+  async function handleDelete(id: string, serviceName: string) {
+    const service = services.find((item) => item.id === id);
+    const ok = await confirm({
+      title: "Удалить услугу",
+      question: "Услуга пропадёт из прайс-листа. Уже добавленные в заказы работы останутся на месте.",
+      summary: [
+        { label: "Услуга", value: serviceName },
+        { label: "Категория", value: service?.category ?? "—" },
+        { label: "Цена", value: formatMoney(service?.price ?? 0) },
+      ],
+      confirmLabel: "Удалить",
+      danger: true,
+    });
+    if (!ok) return;
     deleteService(id);
     if (editingId === id) resetForm();
     showToast("Услуга удалена", "error");

@@ -1,19 +1,26 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  IconAlertTriangle, IconBox, IconCoin, IconMapPin, IconPackageImport,
-  IconLock, IconScan, IconSearch,
+  IconAlertTriangle, IconArrowBackUp, IconBox, IconCoin, IconLock, IconMapPin,
+  IconPackageImport, IconScan, IconSearch,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { Button, Card, EmptyState, ListCard, Metric, Modal, Page, TopBar } from "../components/ui";
 import { formatDateTime, formatMoney, plural } from "../lib/format";
+import { reservedByItem, reservingOrders } from "../lib/stock";
+import { lowStockItems } from "../lib/lowStock";
+import { useConfirm } from "../components/Confirm";
+import { useToast } from "../components/Toast";
 import StockReceive from "./StockReceive";
 import type { Order, StockItem } from "../types";
 
 type Chip = "all" | "low" | "reserved" | "movements";
 
 export default function Stock() {
-  const { stock, stockMovements, orders, vehicles } = useAppStore();
+  const { stock, stockMovements, orders, vehicles, employees, returnToSupplier } = useAppStore();
+  const confirm = useConfirm();
+  const { showToast } = useToast();
+  const [returnFor, setReturnFor] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [chip, setChip] = useState<Chip>("all");
   const [category, setCategory] = useState("all");
@@ -23,26 +30,10 @@ export default function Stock() {
 
   const categories = useMemo(() => Array.from(new Set(stock.map((item) => item.category))).sort(), [stock]);
 
-  /** Сколько единиц позиции стоит в резерве по незакрытым заказ-нарядам. */
-  const reservations = useMemo(() => {
-    const map = new Map<string, { qty: number; orders: Order[] }>();
-    for (const order of orders) {
-      if (order.status === "выдан") continue;
-      for (const part of order.parts) {
-        if (!part.sku) continue;
-        const item = stock.find((entry) => entry.sku === part.sku);
-        if (!item) continue;
-        const current = map.get(item.id) ?? { qty: 0, orders: [] };
-        current.qty += part.qty;
-        if (!current.orders.some((entry) => entry.id === order.id)) current.orders.push(order);
-        map.set(item.id, current);
-      }
-    }
-    return map;
-  }, [orders, stock]);
+  const reservations = useMemo(() => reservedByItem(orders, stock), [orders, stock]);
 
-  const lowCount = stock.filter((item) => item.qty <= item.minQty).length;
-  const reservedCount = stock.filter((item) => (reservations.get(item.id)?.qty ?? 0) > 0).length;
+  const lowCount = lowStockItems(stock, orders).length;
+  const reservedCount = stock.filter((item) => (reservations.get(item.id) ?? 0) > 0).length;
   const totalValue = stock.reduce((sum, item) => sum + item.qty * item.purchasePrice, 0);
 
   const CHIPS: { value: Chip; label: string; count?: number }[] = [
@@ -56,8 +47,8 @@ export default function Stock() {
     const term = query.trim().toLocaleLowerCase("ru-RU");
     return stock
       .filter((item) => {
-        if (chip === "low" && item.qty > item.minQty) return false;
-        if (chip === "reserved" && (reservations.get(item.id)?.qty ?? 0) === 0) return false;
+        if (chip === "low" && item.qty - (reservations.get(item.id) ?? 0) > item.minQty) return false;
+        if (chip === "reserved" && (reservations.get(item.id) ?? 0) === 0) return false;
         if (category !== "all" && item.category !== category) return false;
         if (!term) return true;
         return `${item.code ?? ""} ${item.name} ${item.sku} ${item.brand ?? ""} ${item.cell ?? ""}`
@@ -68,6 +59,7 @@ export default function Stock() {
   }, [category, chip, query, reservations, stock]);
 
   const selected = stock.find((item) => item.id === selectedId) ?? null;
+  const returnItem = stock.find((item) => item.id === returnFor) ?? null;
 
   function openReceive(itemId?: string) {
     setReceiveFor(itemId ?? null);
@@ -78,13 +70,49 @@ export default function Stock() {
     return stockMovements.filter((movement) => movement.itemId === itemId).slice(0, 10);
   }
 
+  async function handleReturn(item: StockItem, qty: number, reason: string) {
+    const free = item.qty - (reservations.get(item.id) ?? 0);
+    if (qty <= 0 || qty > free) {
+      showToast(`Свободно только ${free} ${item.unit}`, "error");
+      return;
+    }
+    const amount = qty * item.purchasePrice;
+    const ok = await confirm({
+      title: "Оформить возврат поставщику",
+      question: "Запчасть спишется со склада, а в финансах появится ожидание возврата денег. В расчёт возврат пойдёт только после подтверждения, что деньги пришли.",
+      summary: [
+        { label: "Запчасть", value: `${item.name} · ${item.sku}` },
+        { label: "Поставщик", value: item.supplier || "не указан" },
+        { label: "Количество", value: `${qty} ${item.unit}` },
+        { label: "Цена закупки", value: formatMoney(item.purchasePrice) },
+        { label: "Остаток после возврата", value: `${item.qty - qty} ${item.unit}` },
+        { label: "Ждём от поставщика", value: formatMoney(amount), total: true, tone: "accent" },
+      ],
+      note: reason ? `Причина: ${reason}` : "Укажите причину возврата — она попадёт в историю движений.",
+      confirmLabel: "Оформить возврат",
+    });
+    if (!ok) return;
+    returnToSupplier({
+      itemId: item.id,
+      qty,
+      unitPrice: item.purchasePrice,
+      supplier: item.supplier ?? "",
+      employee: employees[0]?.name ?? "—",
+      reason,
+    });
+    setReturnFor(null);
+    showToast(`Возврат оформлен, ждём ${formatMoney(amount)} от поставщика`);
+  }
+
   const detail = selected && (
     <ItemCard
       item={selected}
-      reserved={reservations.get(selected.id)}
+      reserved={reservations.get(selected.id) ?? 0}
+      reservedOrders={reservingOrders(orders, selected)}
       vehicles={vehicles}
       movements={movementsOf(selected.id)}
       onReceive={() => openReceive(selected.id)}
+      onReturn={() => setReturnFor(selected.id)}
     />
   );
 
@@ -222,7 +250,7 @@ export default function Stock() {
 
               <div className="space-y-2 p-3 xl:hidden">
                 {shown.map((item) => {
-                  const reserved = reservations.get(item.id)?.qty ?? 0;
+                  const reserved = reservations.get(item.id) ?? 0;
                   return (
                     <ListCard
                       key={item.id}
@@ -261,7 +289,7 @@ export default function Stock() {
                   </thead>
                   <tbody>
                     {shown.map((item) => {
-                      const reserved = reservations.get(item.id)?.qty ?? 0;
+                      const reserved = reservations.get(item.id) ?? 0;
                       const available = item.qty - reserved;
                       return (
                         <tr
@@ -312,6 +340,15 @@ export default function Stock() {
         </div>
       )}
 
+      {returnItem && (
+        <ReturnDialog
+          item={returnItem}
+          free={returnItem.qty - (reservations.get(returnItem.id) ?? 0)}
+          onClose={() => setReturnFor(null)}
+          onSubmit={(qty, reason) => handleReturn(returnItem, qty, reason)}
+        />
+      )}
+
       {receiveOpen && <StockReceive onClose={() => setReceiveOpen(false)} presetItemId={receiveFor ?? undefined} />}
     </>
   );
@@ -347,15 +384,17 @@ function OperationChip({ operation }: { operation: string }) {
 }
 
 function ItemCard({
-  item, reserved, vehicles, movements, onReceive,
+  item, reserved, reservedOrders, vehicles, movements, onReceive, onReturn,
 }: {
   item: StockItem;
-  reserved?: { qty: number; orders: Order[] };
+  reserved: number;
+  reservedOrders: Order[];
   vehicles: { id: string; make: string; model: string; plate: string }[];
   movements: { id: string; date: string; operation: string; qty: number; from?: string; to?: string; employee: string }[];
   onReceive: () => void;
+  onReturn: () => void;
 }) {
-  const reservedQty = reserved?.qty ?? 0;
+  const reservedQty = reserved;
   const available = item.qty - reservedQty;
   return (
     <div>
@@ -368,9 +407,10 @@ function ItemCard({
         <div className="text-[28px] font-bold leading-none tracking-[-0.02em] tabular-nums">{item.cell || "—"}</div>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-        <Fact label="Доступно" value={`${available}`} tone={available <= item.minQty ? "var(--danger)" : undefined} />
+      <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+        <Fact label="На полке" value={`${item.qty}`} />
         <Fact label="Резерв" value={`${reservedQty}`} />
+        <Fact label="Свободно" value={`${available}`} tone={available <= item.minQty ? "var(--danger)" : undefined} />
         <Fact label="Минимум" value={`${item.minQty}`} />
       </div>
 
@@ -382,11 +422,11 @@ function ItemCard({
         <Row label="Стоимость остатка" value={formatMoney(item.qty * item.purchasePrice)} />
       </div>
 
-      {reserved && reserved.orders.length > 0 && (
+      {reservedOrders.length > 0 && (
         <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--border)" }}>
           <div className="muted mb-1.5 text-xs font-semibold uppercase tracking-[.07em]">Зарезервировано под</div>
           <div className="space-y-1.5">
-            {reserved.orders.map((order) => {
+            {reservedOrders.map((order) => {
               const vehicle = vehicles.find((entry) => entry.id === order.vehicleId);
               return (
                 <Link
@@ -426,6 +466,9 @@ function ItemCard({
       <Button className="mt-3 w-full justify-center" onClick={onReceive}>
         <IconPackageImport size={18} /> Принять на склад
       </Button>
+      <Button variant="secondary" className="mt-2 w-full justify-center" onClick={onReturn} disabled={available <= 0}>
+        <IconArrowBackUp size={18} /> Вернуть поставщику
+      </Button>
     </div>
   );
 }
@@ -445,5 +488,65 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="muted">{label}</span>
       <span className="text-right font-medium">{value}</span>
     </div>
+  );
+}
+
+/** Возврат поставщику: количество и причина, деньги подтверждаются позже в финансах. */
+function ReturnDialog({
+  item, free, onClose, onSubmit,
+}: {
+  item: StockItem;
+  free: number;
+  onClose: () => void;
+  onSubmit: (qty: number, reason: string) => void;
+}) {
+  const [qty, setQty] = useState("1");
+  const [reason, setReason] = useState("");
+  const amount = (Number(qty) || 0) * item.purchasePrice;
+
+  return (
+    <Modal title="Вернуть поставщику" subtitle={`${item.name} · ${item.sku}`} onClose={onClose}>
+      <div className="space-y-3 p-4">
+        <div className="rounded-lg p-3 text-sm" style={{ background: "var(--bg)" }}>
+          <div className="flex justify-between"><span className="muted">Свободно на складе</span><b>{free} {item.unit}</b></div>
+          <div className="flex justify-between"><span className="muted">Цена закупки</span><b>{formatMoney(item.purchasePrice)}</b></div>
+          <div className="flex justify-between"><span className="muted">Поставщик</span><b>{item.supplier || "не указан"}</b></div>
+        </div>
+        <label className="block text-sm">
+          <span className="muted mb-1 block">Количество к возврату</span>
+          <div className="field-control">
+            <input
+              autoFocus
+              inputMode="numeric"
+              aria-label="Количество к возврату"
+              value={qty}
+              onChange={(event) => setQty(event.target.value.replace(/\D/g, ""))}
+            />
+          </div>
+        </label>
+        <label className="block text-sm">
+          <span className="muted mb-1 block">Причина возврата</span>
+          <div className="field-control">
+            <textarea
+              rows={2}
+              aria-label="Причина возврата"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Например: не подошла по артикулу"
+            />
+          </div>
+        </label>
+        <div className="flex items-center justify-between text-sm">
+          <span className="muted">Ждём от поставщика</span>
+          <b className="tabular-nums">{formatMoney(amount)}</b>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>Отмена</Button>
+          <Button onClick={() => onSubmit(Number(qty) || 0, reason.trim())} disabled={!Number(qty) || Number(qty) > free}>
+            Оформить возврат
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }

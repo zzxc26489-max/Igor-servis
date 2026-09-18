@@ -25,9 +25,11 @@ export interface Employee {
   name: string;
   role: string;
   payType: "percent" | "salary+percent" | "salary";
+  /** Для percent — доля от работ в процентах, для оклада — сумма в месяц. */
   payValue: number;
   accrued: number;
   paid: number;
+  lastPaidAt?: string;
 }
 
 export interface Client {
@@ -139,7 +141,7 @@ export interface StockMovement {
   id: string;
   date: string;
   itemId: string;
-  operation: "Приёмка" | "Списание" | "Перемещение" | "Резерв" | "Возврат";
+  operation: "Приёмка" | "Списание" | "Перемещение" | "Резерв" | "Возврат" | "Возврат поставщику";
   qty: number;
   from?: string;
   to?: string;
@@ -157,11 +159,21 @@ export interface Expense {
   description: string;
   amount: number;
   counterparty: string;
-  status: "Оплачено" | "Ожидает";
+  status: ExpenseStatus;
   comment?: string;
-  source?: "stock_purchase";
+  /**
+   * stock_purchase — закупка запчастей со склада;
+   * payroll — выплата уже начисленной сдельной зарплаты (движение денег, не новый расход);
+   * supplier_refund — возврат денег от поставщика, уменьшает расходы периода.
+   */
+  source?: "stock_purchase" | "payroll" | "supplier_refund";
   itemId?: string;
+  employeeId?: string;
+  /** Для возврата поставщику: пока деньги не пришли, в расчёт не идёт. */
+  refundConfirmedAt?: string;
 }
+
+export type ExpenseStatus = "Оплачено" | "Ожидает" | "Ждём возврат" | "Возвращено";
 
 export interface Invoice {
   id: string;

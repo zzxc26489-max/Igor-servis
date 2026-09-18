@@ -8,6 +8,7 @@ import {
 import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../components/Confirm";
 import { Button, Card, EmptyState, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney, plural } from "../lib/format";
 import { orderTotals } from "../lib/order";
@@ -70,6 +71,7 @@ export default function ClientDetail() {
   const { clientId } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const { clients, vehicles, orders, updateClient, addVehicle, updateVehicle, deleteVehicle } = useAppStore();
   const client = clients.find((item) => item.id === clientId);
 
@@ -222,13 +224,24 @@ export default function ClientDetail() {
     resetVehicleForm();
   }
 
-  function handleDeleteVehicle(vehicle: Vehicle) {
+  async function handleDeleteVehicle(vehicle: Vehicle) {
     const used = orders.some((order) => order.vehicleId === vehicle.id);
     if (used) {
       showToast("По этому авто есть заказ-наряды, удалить нельзя", "error");
       return;
     }
-    if (!window.confirm(`Удалить ${vehicle.make} ${vehicle.model} (${vehicle.plate})?`)) return;
+    const ok = await confirm({
+      title: "Удалить автомобиль",
+      question: "Автомобиль исчезнет из карточки клиента. Отменить это нельзя.",
+      summary: [
+        { label: "Клиент", value: client?.name ?? "—" },
+        { label: "Автомобиль", value: `${vehicle.make} ${vehicle.model}` },
+        { label: "Госномер", value: vehicle.plate },
+      ],
+      confirmLabel: "Удалить",
+      danger: true,
+    });
+    if (!ok) return;
     deleteVehicle(vehicle.id);
     if (editingVehicleId === vehicle.id) resetVehicleForm();
     showToast("Автомобиль удалён", "error");

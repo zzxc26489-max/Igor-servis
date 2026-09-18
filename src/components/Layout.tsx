@@ -5,6 +5,7 @@ import {
   IconTool, IconUsers, IconUsersGroup, IconX,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
+import { lowStockItems } from "../lib/lowStock";
 import { useMobileMenu } from "./MobileMenu";
 import logo from "../assets/logo.jpg";
 import { APP_VERSION } from "../data/version";
@@ -127,7 +128,7 @@ export default function Layout() {
 
   const badges = {
     orders: orders.filter((order) => order.status !== "выдан").length,
-    purchases: stock.filter((item) => item.qty <= item.minQty).length,
+    purchases: lowStockItems(stock, orders).length,
   };
 
   return (

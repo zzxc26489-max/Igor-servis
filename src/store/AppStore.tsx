@@ -8,6 +8,7 @@ import type {
   Invoice,
   Lift,
   Order,
+  OrderStatus,
   Service,
   StockItem,
   StockMovement,
@@ -15,7 +16,9 @@ import type {
 } from "../types";
 import * as seed from "../data/seed";
 import { company as companySeed } from "../data/company";
-import { nextCode } from "../lib/id";
+import { createId, nextCode } from "../lib/id";
+import { orderTotals } from "../lib/order";
+import { reservedByItem } from "../lib/stock";
 
 const STORAGE_KEY = "igor-servis-db-v1";
 
@@ -102,6 +105,15 @@ function loadInitial(): DB {
   return migrate(seedDB());
 }
 
+export interface ReturnToSupplierInput {
+  itemId: string;
+  qty: number;
+  unitPrice: number;
+  supplier: string;
+  employee: string;
+  reason: string;
+}
+
 export interface ReceiveStockInput {
   itemId?: string;
   name: string;
@@ -137,6 +149,20 @@ interface AppStoreValue extends DB {
   addService: (service: Service) => void;
   updateService: (id: string, patch: Partial<Service>) => void;
   deleteService: (id: string) => void;
+  /** Смена статуса заказа: при выдаче списывает запчасти, при откате возвращает. */
+  setOrderStatus: (id: string, status: OrderStatus) => void;
+  /** Добавить запчасть со склада в заказ (резерв, без списания остатка). */
+  reservePart: (orderId: string, itemId: string, qty: number, price: number) => string | null;
+  /** Убрать запчасть из заказа и снять резерв. */
+  releasePart: (orderId: string, partId: string) => void;
+  /** Принять оплату от клиента; больше долга принять нельзя. */
+  acceptPayment: (orderId: string, amount: number) => void;
+  /** Возврат запчасти поставщику: списывает со склада и заводит ожидание денег. */
+  returnToSupplier: (input: ReturnToSupplierInput) => void;
+  /** Деньги от поставщика пришли — возврат идёт в расчёты. */
+  confirmRefund: (expenseId: string) => void;
+  /** Выплата зарплаты сотруднику. */
+  payEmployee: (employeeId: string, amount: number, note?: string) => void;
   resetToSeed: () => void;
   /** Резервная копия: весь справочник одним JSON. */
   exportDB: () => string;
@@ -261,7 +287,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 {
                   id: `exp-${stamp}`,
                   code: nextCode(CODE_PREFIX.expense, prev.expenses.map((item) => item.code)),
-                  date: now,
+                  date: now.slice(0, 10),
                   category: "Закупка запчастей",
                   description: `Приёмка: ${input.name} — ${input.qty} ${input.unit}`,
                   amount: total,
@@ -285,6 +311,216 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           services: prev.services.map((service) => (service.id === id ? { ...service, ...patch } : service)),
         })),
       deleteService: (id) => setDB((prev) => ({ ...prev, services: prev.services.filter((service) => service.id !== id) })),
+      setOrderStatus: (id, status) =>
+        setDB((prev) => {
+          const order = prev.orders.find((item) => item.id === id);
+          if (!order || order.status === status) return prev;
+
+          const wasIssued = order.status === "выдан";
+          const willIssue = status === "выдан";
+          const now = new Date().toISOString();
+
+          const patch: Partial<Order> = { status };
+          if (status === "готово" && !order.completedAt) patch.completedAt = now;
+          if (status !== "готово" && status !== "выдан") patch.completedAt = undefined;
+
+          const orders = prev.orders.map((item) => (item.id === id ? { ...item, ...patch } : item));
+
+          // Запчасти уходят со склада в момент выдачи и возвращаются, если выдачу откатили.
+          if (wasIssued === willIssue) return { ...prev, orders };
+
+          const sign = willIssue ? -1 : 1;
+          const stock = [...prev.stock];
+          const movements: StockMovement[] = [];
+          for (const part of order.parts) {
+            const index = stock.findIndex((item) => item.sku === part.sku);
+            if (index < 0) continue;
+            const item = stock[index];
+            stock[index] = { ...item, qty: Math.max(0, item.qty + sign * part.qty) };
+            movements.push({
+              id: createId("mv"),
+              date: now,
+              itemId: item.id,
+              operation: willIssue ? "Списание" : "Возврат",
+              qty: part.qty,
+              from: willIssue ? item.cell : undefined,
+              to: willIssue ? undefined : item.cell,
+              employee: order.advisor || "—",
+              note: `Заказ-наряд ${order.number}`,
+            });
+          }
+          return { ...prev, orders, stock, stockMovements: [...movements, ...prev.stockMovements] };
+        }),
+      reservePart: (orderId, itemId, qty, price) => {
+        let error: string | null = null;
+        setDB((prev) => {
+          const order = prev.orders.find((item) => item.id === orderId);
+          const item = prev.stock.find((entry) => entry.id === itemId);
+          if (!order || !item) {
+            error = "Позиция не найдена";
+            return prev;
+          }
+          const reserved = reservedByItem(prev.orders, prev.stock).get(item.id) ?? 0;
+          const available = item.qty - reserved;
+          if (qty <= 0) {
+            error = "Количество должно быть больше нуля";
+            return prev;
+          }
+          if (qty > available) {
+            error = `Свободно только ${available} ${item.unit}: ${reserved} уже в резерве`;
+            return prev;
+          }
+          const part = { id: createId("part"), name: item.name, sku: item.sku, qty, price, availability: "reserved" as const };
+          return {
+            ...prev,
+            orders: prev.orders.map((entry) => (entry.id === orderId ? { ...entry, parts: [...entry.parts, part] } : entry)),
+            stockMovements: [
+              {
+                id: createId("mv"),
+                date: new Date().toISOString(),
+                itemId: item.id,
+                operation: "Резерв" as const,
+                qty,
+                from: item.cell,
+                employee: order.advisor || "—",
+                note: `Заказ-наряд ${order.number}`,
+              },
+              ...prev.stockMovements,
+            ],
+          };
+        });
+        return error;
+      },
+      releasePart: (orderId, partId) =>
+        setDB((prev) => {
+          const order = prev.orders.find((item) => item.id === orderId);
+          const part = order?.parts.find((item) => item.id === partId);
+          if (!order || !part) return prev;
+          const item = prev.stock.find((entry) => entry.sku === part.sku);
+          // Если заказ уже выдан, запчасть была списана — возвращаем её на полку.
+          const stock = order.status === "выдан" && item
+            ? prev.stock.map((entry) => (entry.id === item.id ? { ...entry, qty: entry.qty + part.qty } : entry))
+            : prev.stock;
+          const movements = item
+            ? [{
+                id: createId("mv"),
+                date: new Date().toISOString(),
+                itemId: item.id,
+                operation: "Возврат" as const,
+                qty: part.qty,
+                to: item.cell,
+                employee: order.advisor || "—",
+                note: `Снят резерв по заказу ${order.number}`,
+              }, ...prev.stockMovements]
+            : prev.stockMovements;
+          return {
+            ...prev,
+            stock,
+            stockMovements: movements,
+            orders: prev.orders.map((entry) =>
+              entry.id === orderId ? { ...entry, parts: entry.parts.filter((item) => item.id !== partId) } : entry,
+            ),
+          };
+        }),
+      acceptPayment: (orderId, amount) =>
+        setDB((prev) => {
+          const order = prev.orders.find((item) => item.id === orderId);
+          if (!order || amount <= 0) return prev;
+          // Переплату не принимаем: иначе «долг» уходит в минус и портит статистику.
+          const debt = Math.max(0, orderTotals(order).debt);
+          const accepted = Math.min(amount, debt);
+          if (accepted <= 0) return prev;
+          return {
+            ...prev,
+            orders: prev.orders.map((item) =>
+              item.id === orderId ? { ...item, paid: (item.paid ?? 0) + accepted } : item,
+            ),
+          };
+        }),
+      returnToSupplier: (input) =>
+        setDB((prev) => {
+          const item = prev.stock.find((entry) => entry.id === input.itemId);
+          if (!item || input.qty <= 0) return prev;
+          const reserved = reservedByItem(prev.orders, prev.stock).get(item.id) ?? 0;
+          const qty = Math.min(input.qty, item.qty - reserved);
+          if (qty <= 0) return prev;
+          const now = new Date().toISOString();
+          const amount = Math.round(qty * input.unitPrice);
+          return {
+            ...prev,
+            stock: prev.stock.map((entry) => (entry.id === item.id ? { ...entry, qty: entry.qty - qty } : entry)),
+            stockMovements: [
+              {
+                id: createId("mv"),
+                date: now,
+                itemId: item.id,
+                operation: "Возврат поставщику" as const,
+                qty,
+                from: item.cell,
+                employee: input.employee,
+                unitPrice: input.unitPrice,
+                amount,
+                note: input.reason,
+              },
+              ...prev.stockMovements,
+            ],
+            expenses: [
+              {
+                id: createId("exp"),
+                code: nextCode(CODE_PREFIX.expense, prev.expenses.map((entry) => entry.code)),
+                date: now.slice(0, 10),
+                category: "Возврат поставщику",
+                description: `Возврат: ${item.name} — ${qty} ${item.unit}`,
+                amount,
+                counterparty: input.supplier || item.supplier || "Поставщик",
+                status: "Ждём возврат" as const,
+                source: "supplier_refund" as const,
+                itemId: item.id,
+                comment: input.reason,
+              },
+              ...prev.expenses,
+            ],
+          };
+        }),
+      confirmRefund: (expenseId) =>
+        setDB((prev) => ({
+          ...prev,
+          expenses: prev.expenses.map((expense) =>
+            expense.id === expenseId && expense.source === "supplier_refund" && expense.status !== "Возвращено"
+              ? { ...expense, status: "Возвращено" as const, refundConfirmedAt: new Date().toISOString() }
+              : expense,
+          ),
+        })),
+      payEmployee: (employeeId, amount, note) =>
+        setDB((prev) => {
+          const employee = prev.employees.find((item) => item.id === employeeId);
+          if (!employee || amount <= 0) return prev;
+          const now = new Date().toISOString();
+          const sdelnaya = employee.payType !== "salary";
+          return {
+            ...prev,
+            employees: prev.employees.map((item) =>
+              item.id === employeeId ? { ...item, paid: item.paid + amount, lastPaidAt: now } : item,
+            ),
+            expenses: [
+              {
+                id: createId("exp"),
+                code: nextCode(CODE_PREFIX.expense, prev.expenses.map((entry) => entry.code)),
+                date: now.slice(0, 10),
+                category: "Зарплата",
+                description: `Выплата: ${employee.name}`,
+                amount,
+                counterparty: employee.name,
+                status: "Оплачено" as const,
+                // Сдельная часть уже сидит в начислении, повторно в расходы не идёт.
+                source: sdelnaya ? ("payroll" as const) : undefined,
+                employeeId,
+                comment: note,
+              },
+              ...prev.expenses,
+            ],
+          };
+        }),
       resetToSeed: () => setDB(seedDB()),
       exportDB: () => JSON.stringify(db, null, 2),
       importDB: (json) => {

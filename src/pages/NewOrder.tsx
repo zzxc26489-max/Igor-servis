@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconAlertCircle, IconCalendarEvent, IconCar, IconUser } from "@tabler/icons-react";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../components/Confirm";
 import { CODE_PREFIX, useAppStore } from "../store/AppStore";
 import { createId, nextCode } from "../lib/id";
 
@@ -30,6 +31,7 @@ function isValidPlate(value: string) {
 export default function NewOrder() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const { clients, vehicles, lifts, orders, setDB } = useAppStore();
   const [searchParams] = useSearchParams();
   const presetClient = clients.find((item) => item.id === searchParams.get("clientId"));
@@ -73,7 +75,7 @@ export default function NewOrder() {
     setMileage(vehicle?.mileage ? String(vehicle.mileage) : "");
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     if (!clientName.trim() || !phone.trim() || !make.trim() || !model.trim() || !plate.trim()) {
@@ -113,6 +115,22 @@ export default function NewOrder() {
       return Number.isNaN(digits) ? max : Math.max(max, digits);
     }, 0);
     const orderNumber = `№АИ-${String(lastNumber + 1).padStart(4, "0")}`;
+
+    const ok = await confirm({
+      title: "Создать заказ-наряд",
+      question: "Запись появится в расписании и в списке заказ-нарядов.",
+      summary: [
+        { label: "Номер", value: orderNumber },
+        { label: "Клиент", value: `${clientName.trim()}${existingClientId ? "" : " (новый)"}` },
+        { label: "Телефон", value: phone.trim() },
+        { label: "Автомобиль", value: `${make.trim()} ${model.trim()} · ${plate.trim().toUpperCase()}${existingVehicleId ? "" : " (новый)"}` },
+        { label: "Дата и время", value: `${date}, ${time}–${endTime}` },
+        { label: "Подъёмник", value: chosenLift ? `Подъёмник ${chosenLift}` : "не назначен" },
+      ],
+      note: existingClientId ? undefined : "Клиент и автомобиль будут заведены в справочник.",
+      confirmLabel: "Создать",
+    });
+    if (!ok) return;
 
     setDB((previous) => ({
       ...previous,

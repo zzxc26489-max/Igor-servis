@@ -31,7 +31,7 @@ export const lifts: Lift[] = [
   { id: 5, name: "Подъёмник 5", status: "free" },
 ];
 
-export const employees: Employee[] = [
+const employeeList: Employee[] = [
   {
     id: "emp-igor",
     name: "Игорь",
@@ -55,7 +55,7 @@ export const employees: Employee[] = [
     name: "Елена",
     role: "Учёт, документы, таблицы",
     payType: "salary",
-    payValue: 0,
+    payValue: 45000,
     accrued: 0,
     paid: 0,
   },
@@ -540,6 +540,74 @@ function bookings(): Order[] {
 const history = buildHistory();
 const planned = bookings();
 
+/**
+ * Демо-выплаты: сдельную часть считаем закрытой по заказам старше двух недель,
+ * оклад — помесячно. Так на странице «Сотрудники» видно и выплаченное, и остаток.
+ */
+const PAYOUT_CUTOFF = day(-14);
+
+function payoutsAndSalaries(): { employees: Employee[]; expenses: Expense[] } {
+  const settled = history.closed.filter((order) => (order.plannedAt ?? order.createdAt) < PAYOUT_CUTOFF);
+  const expenses: Expense[] = [];
+
+  const employees = employeeList.map((employee) => {
+    if (employee.payType === "salary") return employee;
+    const revenue = settled
+      .flatMap((order) => order.works)
+      .filter((work) => work.executor === employee.name)
+      .reduce((sum, work) => sum + work.price * work.qty, 0);
+    const paid = Math.round((revenue * employee.payValue) / 100);
+    if (paid > 0) {
+      expenses.push({
+        id: `ex-pay-${employee.id}`,
+        date: PAYOUT_CUTOFF,
+        category: "Зарплата",
+        description: `Выплата: ${employee.name}`,
+        amount: paid,
+        counterparty: employee.name,
+        status: "Оплачено",
+        source: "payroll",
+        employeeId: employee.id,
+      });
+    }
+    return { ...employee, paid, lastPaidAt: paid > 0 ? `${PAYOUT_CUTOFF}T18:00:00` : undefined };
+  });
+
+  // Оклад администратора — обычный расход, он не проходит через начисление.
+  const salaried = employees.filter((employee) => employee.payType === "salary");
+  let months = 0;
+  for (let back = HISTORY_DAYS; back >= 1; back -= 1) {
+    const date = new Date(day(-back));
+    if (date.getDate() !== 10) continue;
+    months += 1;
+    for (const employee of salaried) {
+      expenses.push({
+        id: `ex-salary-${employee.id}-${back}`,
+        date: day(-back),
+        category: "Зарплата",
+        description: `Оклад: ${employee.name}`,
+        amount: employee.payValue,
+        counterparty: employee.name,
+        status: "Оплачено",
+        employeeId: employee.id,
+      });
+    }
+  }
+
+  return {
+    employees: employees.map((employee) =>
+      employee.payType === "salary"
+        ? { ...employee, paid: employee.payValue * months, lastPaidAt: months ? `${day(-10)}T18:00:00` : undefined }
+        : employee,
+    ),
+    expenses,
+  };
+}
+
+const payroll = payoutsAndSalaries();
+
+export const employees: Employee[] = payroll.employees;
+
 /** Сквозная нумерация по дате создания: старые заказы получают меньшие номера. */
 function numbered(list: Order[], offset: number): Order[] {
   return [...list]
@@ -563,7 +631,7 @@ const recentMovements: StockMovement[] = [
 export const stockMovements: StockMovement[] = [...recentMovements, ...history.movements]
   .sort((a, b) => b.date.localeCompare(a.date));
 
-export const expenses: Expense[] = history.expenses
+export const expenses: Expense[] = [...history.expenses, ...payroll.expenses]
   .sort((a, b) => b.date.localeCompare(a.date))
   .map((expense, index) => ({ ...expense, code: `Р-${String(index + 1).padStart(4, "0")}` }));
 

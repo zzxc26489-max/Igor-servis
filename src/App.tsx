@@ -1,6 +1,7 @@
 import { HashRouter, Route, Routes } from "react-router-dom";
 import { AppStoreProvider } from "./store/AppStore";
 import { ToastProvider } from "./components/Toast";
+import { ConfirmProvider } from "./components/Confirm";
 import { MobileMenuProvider } from "./components/MobileMenu";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
@@ -23,6 +24,7 @@ function App() {
   return (
     <AppStoreProvider>
       <ToastProvider>
+        <ConfirmProvider>
         <MobileMenuProvider>
           <HashRouter>
             <Routes>
@@ -46,6 +48,7 @@ function App() {
             </Routes>
           </HashRouter>
         </MobileMenuProvider>
+        </ConfirmProvider>
       </ToastProvider>
     </AppStoreProvider>
   );

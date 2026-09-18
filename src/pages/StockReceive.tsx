@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { IconCheck, IconInfoCircle, IconMapPin, IconX } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../components/Confirm";
 import { Button, Modal } from "../components/ui";
 import { formatDate, formatMoney } from "../lib/format";
 import type { StockItem } from "../types";
@@ -25,6 +26,7 @@ function parseCell(cell?: string) {
 
 export default function StockReceive({ onClose, presetItemId }: { onClose: () => void; presetItemId?: string }) {
   const { stock, employees, receiveStock } = useAppStore();
+  const confirm = useConfirm();
   const { showToast } = useToast();
 
   const preset = presetItemId ? stock.find((item) => item.id === presetItemId) : undefined;
@@ -81,7 +83,7 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
     setPlace(parts.place);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const receivedQty = Number(qty);
     const price = Number(unitPrice);
@@ -101,6 +103,42 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
       showToast(`Ячейка ${cell} занята: ${cellOwner.name}`, "error");
       return;
     }
+
+    const total = Math.round(receivedQty * price);
+    const nextQty = (matched?.qty ?? 0) + receivedQty;
+    const nextPrice = matched && price > 0 && nextQty > 0
+      ? Math.round((matched.qty * matched.purchasePrice + total) / nextQty)
+      : price;
+
+    const ok = await confirm({
+      title: matched ? "Принять на склад" : "Завести новую позицию",
+      question: matched
+        ? "Остаток и средняя цена закупки пересчитаются, движение попадёт в историю склада."
+        : "На складе появится новая позиция с указанной ячейкой и ценой закупки.",
+      summary: [
+        { label: "Запчасть", value: `${name.trim()} · ${sku.trim()}` },
+        { label: "Ячейка", value: cell },
+        { label: "Принимаем", value: `${receivedQty} ${unit || "шт."}` },
+        { label: "Цена закупки", value: formatMoney(price) },
+        ...(matched
+          ? [
+              { label: "Остаток станет", value: `${matched.qty} → ${nextQty} ${matched.unit}` },
+              { label: "Средняя цена станет", value: `${formatMoney(matched.purchasePrice)} → ${formatMoney(nextPrice)}` },
+            ]
+          : []),
+        {
+          label: createExpense ? "Запишем в расходы" : "Сумма приёмки (без расхода)",
+          value: formatMoney(total),
+          total: true,
+          tone: createExpense ? "danger" : undefined,
+        },
+      ],
+      note: createExpense
+        ? undefined
+        : "Расход в финансы не попадёт — поставьте галочку, если поставку уже оплатили.",
+      confirmLabel: "Принять",
+    });
+    if (!ok) return;
 
     receiveStock({
       itemId: matched?.id,

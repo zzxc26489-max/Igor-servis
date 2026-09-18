@@ -111,10 +111,29 @@ export interface Metrics {
   debt: number;
   stockPurchases: number;
   otherExpenses: number;
+  /** Возвраты поставщикам, деньги по которым уже пришли. */
+  refunds: number;
   expenses: number;
   salaries: number;
+  /** Выплачено сдельной зарплаты за период — движение денег, не расход. */
+  payouts: number;
   profit: number;
   averageCheck: number;
+}
+
+/**
+ * Расход, который участвует в себестоимости периода.
+ * Выплата сдельной зарплаты не в счёт: она уже учтена в начислении (salaries),
+ * иначе одна и та же сумма вычиталась бы дважды.
+ * Возврат поставщику — тоже нет: он уменьшает расходы отдельной строкой.
+ */
+export function isCostExpense(expense: Expense) {
+  return expense.source !== "payroll" && expense.source !== "supplier_refund";
+}
+
+/** Возврат поставщику считается только после подтверждения прихода денег. */
+export function isConfirmedRefund(expense: Expense) {
+  return expense.source === "supplier_refund" && expense.status === "Возвращено";
 }
 
 export function computeMetrics(
@@ -143,10 +162,16 @@ export function computeMetrics(
   });
 
   const periodExpenses = expenses.filter((expense) => inRange(expense.date, range));
-  const stockPurchases = periodExpenses
+  const costs = periodExpenses.filter(isCostExpense);
+  const stockPurchases = costs
     .filter((expense) => expense.source === "stock_purchase" || expense.category === "Закупка запчастей")
     .reduce((sum, expense) => sum + expense.amount, 0);
-  const total = periodExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const gross = costs.reduce((sum, expense) => sum + expense.amount, 0);
+  const refunds = periodExpenses.filter(isConfirmedRefund).reduce((sum, expense) => sum + expense.amount, 0);
+  const payouts = periodExpenses
+    .filter((expense) => expense.source === "payroll")
+    .reduce((sum, expense) => sum + expense.amount, 0);
+  const total = gross - refunds;
 
   return {
     orders: periodOrders,
@@ -157,9 +182,11 @@ export function computeMetrics(
     received,
     debt,
     stockPurchases,
-    otherExpenses: total - stockPurchases,
+    otherExpenses: gross - stockPurchases,
+    refunds,
     expenses: total,
     salaries,
+    payouts,
     profit: revenue - total - salaries,
     averageCheck: periodOrders.length ? Math.round(revenue / periodOrders.length) : 0,
   };
@@ -202,7 +229,7 @@ export function buildChart(range: Range, orders: Order[], expenses: Expense[]): 
     const bucket = buckets.get(keyFor(date));
     if (bucket) bucket.revenue += orderTotals(order).due;
   });
-  expenses.forEach((expense) => {
+  expenses.filter(isCostExpense).forEach((expense) => {
     const date = new Date(expense.date);
     const bucket = buckets.get(keyFor(date));
     if (bucket) bucket.expenses += expense.amount;
@@ -283,6 +310,8 @@ export interface Operation {
   orderId?: string;
   orderNumber?: string;
   amount: number;
+  /** Деньги ещё не пришли — операция показывается, но в суммы не идёт. */
+  pending?: boolean;
 }
 
 /** Единая лента операций: поступления по заказам и расходы. */
@@ -306,7 +335,11 @@ export function buildOperations(range: Range, orders: Order[], expenses: Expense
       date: expense.date,
       title: expense.description,
       category: expense.category,
-      amount: -expense.amount,
+      // Возврат поставщику — приход денег, но только когда он подтверждён.
+      amount: expense.source === "supplier_refund"
+        ? (expense.status === "Возвращено" ? expense.amount : 0)
+        : -expense.amount,
+      pending: expense.source === "supplier_refund" && expense.status !== "Возвращено",
     }));
 
   return [...income, ...outcome].sort((a, b) => b.date.localeCompare(a.date));
