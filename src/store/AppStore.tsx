@@ -29,7 +29,7 @@ import { ensureLegacyPayments } from "../lib/payments";
 import { createCloudBackup, loadCloudState, saveCloudState, type CloudRole } from "../lib/cloud";
 import { mergeConcurrentState } from "../lib/stateMerge";
 import { useAuth } from "../auth/AuthContext";
-import { CLOUD_BASE_KEY, LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
+import { LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
 
 const STORAGE_KEY = LOCAL_DB_KEY;
 
