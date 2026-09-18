@@ -6,6 +6,7 @@ import {
   signOutCloud,
   type CloudSession,
 } from "../lib/cloud";
+import { clearCloudDeviceData } from "../lib/cloudCache";
 
 const SESSION_KEY = "igor-servis-cloud-session-v1";
 
@@ -96,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut: async () => {
       const current = session;
       localStorage.removeItem(SESSION_KEY);
+      clearCloudDeviceData();
       setSession(null);
       if (current) await signOutCloud(current).catch(() => undefined);
     },
