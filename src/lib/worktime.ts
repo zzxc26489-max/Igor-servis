@@ -1,7 +1,7 @@
 import type { Order, OrderStatus, StatusEvent } from "../types";
 import { shiftISOTime, toISODate } from "./date";
 import { SLOT_MINUTES, toMinutes } from "./lift";
-import { workDay, workDayMinutes } from "./workday";
+import { normalizeWorkDay, workDay, workDayMinutes, type WorkDay } from "./workday";
 
 /** Статусы, в которых машина реально занимает подъёмник. */
 const ON_LIFT: OrderStatus[] = ["диагностика", "в работе"];
@@ -25,9 +25,8 @@ function makeInterval(from: Date, to: Date): Interval | null {
  * Обрезаем отрезок рабочим днём и по календарным дням: машину могли оставить
  * на ночь, но мастер в это время не работал, и в темп это писать нельзя.
  */
-function clampToWorkday(interval: Interval): Interval[] {
+function clampToWorkday(interval: Interval, hours: WorkDay): Interval[] {
   const result: Interval[] = [];
-  const hours = workDay();
   const dayStart = toMinutes(hours.start);
   const dayEnd = toMinutes(hours.end);
 
@@ -81,7 +80,10 @@ export function liftIntervals(order: Order, now = new Date()): Interval[] {
     if (slice) raw.push(slice);
   }
 
-  return raw.flatMap(clampToWorkday);
+  const hours = order.workDayStart && order.workDayEnd
+    ? normalizeWorkDay({ start: order.workDayStart, end: order.workDayEnd })
+    : workDay();
+  return raw.flatMap((interval) => clampToWorkday(interval, hours));
 }
 
 /** Минуты отрезков, попавшие внутрь периода. Заказ может идти через границу дня. */
