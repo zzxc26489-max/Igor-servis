@@ -112,7 +112,8 @@ button { cursor: pointer; }
     width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
-    font-size: 11pt;
+    font-size: 9pt;
+    line-height: 1.32;
     break-after: avoid-page;
     page-break-after: avoid;
   }
@@ -124,7 +125,57 @@ button { cursor: pointer; }
     break-inside: avoid;
     page-break-inside: avoid;
   }
-  .act-table { font-size: 9pt; }
+  .act-table { font-size: 8.5pt; }
+
+  /* Акт печатается в альбомной ориентации: короткий заказ помещается на один лист. */
+  .work-act .act-tables {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6mm;
+    align-items: start;
+  }
+  .work-act .act-tables > section { margin-top: 0 !important; }
+  .work-act table { min-width: 0 !important; }
+  .act-table th,
+  .act-table td { padding: 0.28rem 0.35rem; }
+
+  /* Итоги и текст соглашения встают рядом — экономит вертикаль. */
+  .work-act .act-bottom {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 6mm;
+    align-items: start;
+  }
+  .work-act .act-agreement { order: 1; }
+  .work-act .act-totals { order: 2; }
+  .work-act .act-agreement h2 { margin-top: 0 !important; text-align: left; }
+  .work-act .act-agreement p { text-align: left; }
+  .work-act .act-totals section { margin-top: 0 !important; max-width: none !important; }
+
+  /* Сжимаем вертикальные отступы, рассчитанные на экран. */
+  .work-act > header { padding-bottom: 2mm !important; gap: 4mm !important; }
+  .work-act > header h1 { font-size: 13pt !important; }
+  .work-act > header h2 { font-size: 11pt !important; }
+  .work-act > *:not(:first-child) { margin-top: 2.5mm !important; }
+  /* Карточки заказчика и авто на бумаге лишние — печатаем плотным текстом. */
+  .work-act .act-parties {
+    grid-template-columns: 1fr 1fr;
+    gap: 4mm !important;
+  }
+  .work-act .act-parties > div {
+    border: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+  .work-act .act-parties p { display: inline; }
+  .work-act .act-parties p + p::before { content: " · "; }
+  .work-act .act-parties p:first-child { display: block; }
+  .work-act .act-parties p:first-child + p::before { content: none; }
+  .work-act .act-agreement section { line-height: 1.25; font-size: 8pt; }
+  .work-act h2 { font-size: 9.5pt !important; margin-bottom: 1mm !important; }
+  .work-act footer { margin-top: 6mm !important; gap: 10mm !important; }
+  .work-act footer > div > div { margin-top: 5mm !important; }
+  .work-act .text-lg { font-size: 10.5pt !important; }
 }
 
 @media (max-width: 639px) {
