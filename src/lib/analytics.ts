@@ -1,5 +1,6 @@
-import type { Client, Expense, Order, StockItem, Vehicle } from "../types";
+import type { Client, Expense, Order, Payment, StockItem, Vehicle } from "../types";
 import { orderTotals } from "./order";
+import { paymentInRange, receivedInRange } from "./payments";
 
 export type PeriodKey = "today" | "week" | "month" | "year" | "all";
 
@@ -98,6 +99,7 @@ export function ordersInRange(range: Range, orders: Order[]) {
 
 /** День, к которому относится заказ: когда закрыт, иначе плановый день визита. */
 export function orderDate(order: Order) {
+  if (order.status === "выдан") return order.issuedAt ?? order.completedAt ?? order.plannedAt ?? order.createdAt;
   return order.completedAt ?? order.plannedAt ?? order.createdAt;
 }
 
@@ -141,25 +143,26 @@ export function computeMetrics(
   orders: Order[],
   expenses: Expense[],
   salaries: number,
+  payments: Payment[] = [],
 ): Metrics {
-  // Записи на будущее — ещё не деньги, в выручку периода они не идут.
+  // Выручка — только по реально выданным заказам. Активный заказ не должен
+  // увеличивать прибыль до завершения сделки.
   const periodOrders = orders.filter((order) => order.status !== "запись" && inRange(orderDate(order), range));
   const closed = periodOrders.filter((order) => order.status === "выдан");
 
   let worksRevenue = 0;
   let partsRevenue = 0;
   let revenue = 0;
-  let received = 0;
   let debt = 0;
 
-  periodOrders.forEach((order) => {
+  closed.forEach((order) => {
     const totals = orderTotals(order);
     worksRevenue += totals.works;
     partsRevenue += totals.parts;
     revenue += totals.due;
-    received += order.paid ?? 0;
     debt += Math.max(0, totals.debt);
   });
+  const received = receivedInRange(payments, range.from, range.to);
 
   const periodExpenses = expenses.filter((expense) => inRange(expense.date, range));
   const costs = periodExpenses.filter(isCostExpense);
@@ -188,7 +191,7 @@ export function computeMetrics(
     salaries,
     payouts,
     profit: revenue - total - salaries,
-    averageCheck: periodOrders.length ? Math.round(revenue / periodOrders.length) : 0,
+    averageCheck: closed.length ? Math.round(revenue / closed.length) : 0,
   };
 }
 
@@ -198,7 +201,7 @@ export interface ChartPoint {
   expenses: number;
 }
 
-export function buildChart(range: Range, orders: Order[], expenses: Expense[]): ChartPoint[] {
+export function buildChart(range: Range, payments: Payment[], expenses: Expense[]): ChartPoint[] {
   const days = Math.ceil((range.to.getTime() - range.from.getTime()) / 86_400_000);
   const byMonth = days > 62;
   const buckets = new Map<string, ChartPoint>();
@@ -224,15 +227,19 @@ export function buildChart(range: Range, orders: Order[], expenses: Expense[]): 
     }
   }
 
-  orders.forEach((order) => {
-    const date = new Date(orderDate(order));
-    const bucket = buckets.get(keyFor(date));
-    if (bucket) bucket.revenue += orderTotals(order).due;
+  payments.filter((payment) => paymentInRange(payment, range.from, range.to)).forEach((payment) => {
+    const bucket = buckets.get(keyFor(new Date(payment.at)));
+    if (bucket) bucket.revenue += payment.amount;
   });
-  expenses.filter(isCostExpense).forEach((expense) => {
-    const date = new Date(expense.date);
-    const bucket = buckets.get(keyFor(date));
-    if (bucket) bucket.expenses += expense.amount;
+
+  expenses.forEach((expense) => {
+    const bucket = buckets.get(keyFor(new Date(expense.date)));
+    if (!bucket) return;
+    if (expense.source === "supplier_refund") {
+      if (expense.status === "Возвращено") bucket.revenue += expense.amount;
+      return;
+    }
+    bucket.expenses += expense.amount;
   });
 
   return [...buckets.values()];
@@ -315,18 +322,21 @@ export interface Operation {
 }
 
 /** Единая лента операций: поступления по заказам и расходы. */
-export function buildOperations(range: Range, orders: Order[], expenses: Expense[]): Operation[] {
-  const income: Operation[] = orders
-    .filter((order) => (order.paid ?? 0) > 0 && inRange(orderDate(order), range))
-    .map((order) => ({
-      id: `in-${order.id}`,
-      date: orderDate(order) ?? order.createdAt,
-      title: "Оплата по заказ-наряду",
-      category: "Поступление",
-      orderId: order.id,
-      orderNumber: order.number,
-      amount: order.paid ?? 0,
-    }));
+export function buildOperations(range: Range, orders: Order[], expenses: Expense[], payments: Payment[]): Operation[] {
+  const income: Operation[] = payments
+    .filter((payment) => paymentInRange(payment, range.from, range.to))
+    .map((payment) => {
+      const order = orders.find((item) => item.id === payment.orderId);
+      return {
+        id: `in-${payment.id}`,
+        date: payment.at,
+        title: "Оплата по заказ-наряду",
+        category: payment.estimated ? "Поступление · дата восстановлена" : "Поступление",
+        orderId: order?.id,
+        orderNumber: order?.number,
+        amount: payment.amount,
+      };
+    });
 
   const outcome: Operation[] = expenses
     .filter((expense) => inRange(expense.date, range))
