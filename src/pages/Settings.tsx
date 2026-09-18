@@ -10,6 +10,7 @@ import { Button, Card, Page, TopBar } from "../components/ui";
 import { formatMoney } from "../lib/format";
 import { APP_BUILD_DATE, APP_VERSION, DB_VERSION } from "../data/version";
 import { todayISO } from "../lib/date";
+import { isValidTime, timeToMinutes } from "../lib/workday";
 
 export default function Settings() {
   const { company, settings, updateCompany, updateSettings, resetToSeed, exportDB, importDB, orders, clients, stock, expenses } = useAppStore();
@@ -19,7 +20,8 @@ export default function Settings() {
   const [address, setAddress] = useState(company.address);
   const [phone, setPhone] = useState(formatPhone(company.phone));
   const [touched, setTouched] = useState(false);
-  const [workHours, setWorkHours] = useState(company.workHours);
+  const [openTime, setOpenTime] = useState(company.openTime);
+  const [closeTime, setCloseTime] = useState(company.closeTime);
   const [inn, setInn] = useState(company.inn);
   const [responsible, setResponsible] = useState(company.responsible);
 
@@ -30,6 +32,10 @@ export default function Settings() {
       showToast("Номер телефона неполный: нужен +7 и 10 цифр", "error");
       return;
     }
+    if (!isValidTime(openTime) || !isValidTime(closeTime) || timeToMinutes(closeTime) - timeToMinutes(openTime) < 60) {
+      showToast("Часы работы: закрытие должно быть хотя бы на час позже открытия", "error");
+      return;
+    }
     if (!isValidInn(inn)) {
       showToast("ИНН должен быть из 10 или 12 цифр", "error");
       return;
@@ -38,7 +44,8 @@ export default function Settings() {
       shortName: shortName.trim(),
       address: address.trim(),
       phone: phone.trim(),
-      workHours: workHours.trim(),
+      openTime,
+      closeTime,
       inn: inn.trim(),
       responsible: responsible.trim(),
     });
@@ -137,12 +144,19 @@ export default function Settings() {
               </label>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <PhoneField label="Телефон" value={phone} onChange={setPhone} touched={touched} />
-                <label className="block text-sm">
+                <div className="block text-sm">
                   <span className="mb-1 block muted">Часы работы</span>
-                  <div className="field-control">
-                    <input value={workHours} onChange={(e) => setWorkHours(e.target.value)} placeholder="Ежедневно, 10:00–20:00" />
+                  <div className="flex items-center gap-2">
+                    <div className="field-control flex-1">
+                      <input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} aria-label="Открытие" step={900} />
+                    </div>
+                    <span className="muted">—</span>
+                    <div className="field-control flex-1">
+                      <input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} aria-label="Закрытие" step={900} />
+                    </div>
                   </div>
-                </label>
+                  <span className="mt-1 block text-xs muted">По этим часам строится расписание, свободные окна и загрузка подъёмников</span>
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="block text-sm">

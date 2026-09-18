@@ -51,7 +51,7 @@ export default function WorkAct() {
             <div>
               <h2 className="text-xl font-bold">{company.name}</h2>
               <p className="mt-1 text-sm">{company.address}</p>
-              <p className="text-sm">Тел.: {company.phone}</p>
+              {company.phone && <p className="text-sm">Тел.: {company.phone}</p>}
               {company.inn && <p className="text-sm">ИНН: {company.inn}</p>}
             </div>
             <div className="sm:text-right">

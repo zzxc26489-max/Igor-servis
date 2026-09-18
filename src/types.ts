@@ -3,7 +3,9 @@ export interface CompanyInfo {
   shortName: string;
   address: string;
   phone: string;
-  workHours: string;
+  /** Часы работы, «ЧЧ:ММ». По ним строится расписание и считается загрузка. */
+  openTime: string;
+  closeTime: string;
   inn: string;
   responsible: string;
 }
@@ -88,6 +90,8 @@ export interface OrderLineWork {
 export interface StatusEvent {
   status: OrderStatus;
   at: string;
+  /** Отметка восстановлена по плану старого заказа, а не замерена. */
+  estimated?: boolean;
 }
 
 export interface OrderLinePart {

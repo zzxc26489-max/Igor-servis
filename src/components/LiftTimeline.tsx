@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useAppStore } from "../store/AppStore";
-import { WORK_DAY_END, WORK_HOURS, bookingLink, bookingTarget, liftLabel, liftState, toMinutes } from "../lib/lift";
+import { bookingLink, bookingTarget, liftLabel, liftState, toMinutes } from "../lib/lift";
+import { workDay, workHourScale } from "../lib/workday";
 import { todayISO } from "../lib/date";
 export { orderDay } from "../lib/lift";
 
@@ -13,18 +14,20 @@ const PALETTE = [
 ];
 
 export default function LiftTimeline({
-  hours = WORK_HOURS,
+  hours,
   date,
 }: {
+  /** Часы шкалы; по умолчанию — рабочие часы из настроек мастерской. */
   hours?: string[];
   /** День в формате YYYY-MM-DD; по умолчанию сегодня. */
   date?: string;
 }) {
   const { lifts, orders, clients, vehicles } = useAppStore();
   const day = date ?? todayISO();
+  const scale = hours ?? workHourScale();
   // Шкала заканчивается концом рабочего дня, а не «последний час плюс час».
-  const startMinutes = toMinutes(hours[0]);
-  const endMinutes = Math.max(toMinutes(hours[hours.length - 1]) + 60, toMinutes(WORK_DAY_END));
+  const startMinutes = toMinutes(scale[0]);
+  const endMinutes = Math.max(toMinutes(scale[scale.length - 1]) + 60, toMinutes(workDay().end));
   const span = endMinutes - startMinutes;
 
   const now = new Date();
@@ -42,7 +45,7 @@ export default function LiftTimeline({
         <div className="relative flex border-b pb-2 text-xs muted" style={{ borderColor: "var(--border)" }}>
           <div className="w-[132px] shrink-0" />
           <div className="relative flex-1">
-            {hours.map((hour) => (
+            {scale.map((hour) => (
               <span
                 key={hour}
                 className="absolute -translate-x-1/2"
@@ -87,14 +90,14 @@ export default function LiftTimeline({
 
                 <div className="relative flex-1 py-2">
                   <div className="absolute inset-0 flex">
-                    {hours.map((hour) => (
+                    {scale.map((hour) => (
                       <div key={hour} className="flex-1 border-l" style={{ borderColor: "#eef0ee" }} />
                     ))}
                   </div>
 
                   {dayOrders.map((order, index) => {
-                    const start = toMinutes(order.scheduledStart ?? hours[0]);
-                    const end = toMinutes(order.scheduledEnd ?? hours[0]) || start + 60;
+                    const start = toMinutes(order.scheduledStart ?? scale[0]);
+                    const end = toMinutes(order.scheduledEnd ?? scale[0]) || start + 60;
                     const client = clients.find((item) => item.id === order.clientId);
                     const vehicle = vehicles.find((item) => item.id === order.vehicleId);
                     const palette = PALETTE[index % PALETTE.length];

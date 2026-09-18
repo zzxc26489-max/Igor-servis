@@ -24,8 +24,19 @@ export function shiftISODate(day: string, delta: number) {
 }
 
 /** Момент времени в формате YYYY-MM-DDTHH:MM:SS по местному времени. */
-export function nowISO() {
-  const date = new Date();
+export function toLocalISO(date: Date) {
   const time = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}`;
   return `${toISODate(date)}T${time}`;
+}
+
+export function nowISO() {
+  return toLocalISO(new Date());
+}
+
+/** Момент времени, сдвинутый на N минут, в том же формате. */
+export function shiftISOTime(at: string, minutes: number) {
+  const date = new Date(at);
+  if (Number.isNaN(date.getTime())) return at;
+  date.setMinutes(date.getMinutes() + minutes);
+  return toLocalISO(date);
 }

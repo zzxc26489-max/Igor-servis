@@ -1,6 +1,7 @@
 import type { Order, OrderStatus, StatusEvent } from "../types";
-import { toISODate } from "./date";
-import { WORK_DAY_END, WORK_DAY_START, toMinutes } from "./lift";
+import { shiftISOTime, toISODate } from "./date";
+import { SLOT_MINUTES, toMinutes } from "./lift";
+import { workDay, workDayMinutes } from "./workday";
 
 /** Статусы, в которых машина реально занимает подъёмник. */
 const ON_LIFT: OrderStatus[] = ["диагностика", "в работе"];
@@ -26,8 +27,9 @@ function makeInterval(from: Date, to: Date): Interval | null {
  */
 function clampToWorkday(interval: Interval): Interval[] {
   const result: Interval[] = [];
-  const dayStart = toMinutes(WORK_DAY_START);
-  const dayEnd = toMinutes(WORK_DAY_END);
+  const hours = workDay();
+  const dayStart = toMinutes(hours.start);
+  const dayEnd = toMinutes(hours.end);
 
   const cursor = new Date(interval.from);
   cursor.setHours(0, 0, 0, 0);
@@ -98,6 +100,15 @@ export interface Period {
 }
 
 /**
+ * Время восстановлено по плановому окну, а не замерено. Такие заказы заведены
+ * до появления истории статусов: сравнивать их с нормативом нечестно, поэтому
+ * в отчётах они помечены и по умолчанию в анализ не попадают.
+ */
+export function isEstimatedTiming(order: Order) {
+  return (order.timeline ?? []).some((event) => event.estimated);
+}
+
+/**
  * Время замерено по-настоящему, а не взято из плана. В аналитику пускаем
  * только такие заказы: плановое окно сравнивать с нормативом бессмысленно.
  */
@@ -148,11 +159,19 @@ export function deviationPercent(norm: number, actual: number) {
 }
 
 /** Заказы, чьё время хотя бы частично попало в период. */
-export function ordersWithTimeIn(orders: Order[], period?: Period, now = new Date()) {
+export function ordersWithTimeIn(orders: Order[], period?: Period, now = new Date(), includeEstimated = false) {
   return orders.filter((order) => {
     if (!isTimingComplete(order, now)) return false;
+    if (!includeEstimated && isEstimatedTiming(order)) return false;
     return actualMinutes(order, period, now) > 0;
   });
+}
+
+/** Сколько заказов периода посчитаны по восстановленному, а не замеренному времени. */
+export function estimatedOrdersIn(orders: Order[], period?: Period, now = new Date()) {
+  return orders.filter(
+    (order) => isEstimatedTiming(order) && isTimingComplete(order, now) && actualMinutes(order, period, now) > 0,
+  ).length;
 }
 
 export interface ServiceTiming {
@@ -168,10 +187,10 @@ export interface ServiceTiming {
  * пропорционально нормативу — иначе одной длинной работе достался бы весь
  * простой всего заказа.
  */
-export function timingByService(orders: Order[], period?: Period, now = new Date()): ServiceTiming[] {
+export function timingByService(orders: Order[], period?: Period, now = new Date(), includeEstimated = false): ServiceTiming[] {
   const map = new Map<string, ServiceTiming>();
 
-  for (const order of ordersWithTimeIn(orders, period, now)) {
+  for (const order of ordersWithTimeIn(orders, period, now, includeEstimated)) {
     const norm = normMinutes(order);
     if (norm <= 0) continue;
     const actual = actualMinutes(order, period, now);
@@ -211,10 +230,10 @@ export interface ExecutorTiming {
 }
 
 /** Время и выработка по исполнителям. */
-export function timingByExecutor(orders: Order[], period?: Period, now = new Date()): ExecutorTiming[] {
+export function timingByExecutor(orders: Order[], period?: Period, now = new Date(), includeEstimated = false): ExecutorTiming[] {
   const map = new Map<string, ExecutorTiming & { orderIds: Set<string> }>();
 
-  for (const order of ordersWithTimeIn(orders, period, now)) {
+  for (const order of ordersWithTimeIn(orders, period, now, includeEstimated)) {
     const norm = normMinutes(order);
     if (norm <= 0) continue;
     const actual = actualMinutes(order, period, now);
@@ -264,7 +283,7 @@ export interface LiftLoad {
 
 /** Загрузка подъёмников за период: часы занятости от доступного времени. */
 export function loadByLift(orders: Order[], liftIds: number[], period: Period, now = new Date()): LiftLoad[] {
-  const workDayMinutes = toMinutes(WORK_DAY_END) - toMinutes(WORK_DAY_START);
+  const dayCapacity = workDayMinutes();
   const days = new Set<string>();
   const minutes = new Map<number, number>();
   const counts = new Map<number, Set<string>>();
@@ -283,7 +302,7 @@ export function loadByLift(orders: Order[], liftIds: number[], period: Period, n
   }
 
   // Считаем только дни, в которые сервис вообще работал.
-  const capacity = Math.max(1, days.size) * workDayMinutes;
+  const capacity = Math.max(1, days.size) * dayCapacity;
 
   return liftIds.map((liftId) => {
     const busy = Math.round(minutes.get(liftId) ?? 0);
@@ -297,8 +316,8 @@ export function loadByLift(orders: Order[], liftIds: number[], period: Period, n
 }
 
 /** Заказы, где факт сильнее всего разошёлся с нормативом. */
-export function biggestDeviations(orders: Order[], period?: Period, limit = 6, now = new Date()) {
-  return ordersWithTimeIn(orders, period, now)
+export function biggestDeviations(orders: Order[], period?: Period, limit = 6, now = new Date(), includeEstimated = false) {
+  return ordersWithTimeIn(orders, period, now, includeEstimated)
     .map((order) => {
       const share = normShareInPeriod(order, period, now);
       const norm = Math.round(normMinutes(order) * share);
@@ -330,11 +349,11 @@ export function runningOrders(orders: Order[], now = new Date()): RunningOrder[]
 }
 
 /** Сводка по периоду: нормо-часы, фактические часы и темп работы. */
-export function timingSummary(orders: Order[], period?: Period, now = new Date()) {
+export function timingSummary(orders: Order[], period?: Period, now = new Date(), includeEstimated = false) {
   let norm = 0;
   let actual = 0;
   let counted = 0;
-  for (const order of ordersWithTimeIn(orders, period, now)) {
+  for (const order of ordersWithTimeIn(orders, period, now, includeEstimated)) {
     const orderNorm = normMinutes(order) * normShareInPeriod(order, period, now);
     const orderActual = actualMinutes(order, period, now);
     if (orderNorm <= 0 || orderActual <= 0) continue;
@@ -345,6 +364,7 @@ export function timingSummary(orders: Order[], period?: Period, now = new Date()
   norm = Math.round(norm);
   return {
     orders: counted,
+    estimatedOrders: estimatedOrdersIn(orders, period, now),
     normMinutes: norm,
     actualMinutes: actual,
     deviation: deviationPercent(norm, actual),
@@ -356,29 +376,37 @@ export function timingSummary(orders: Order[], period?: Period, now = new Date()
 /**
  * История статусов для заказов, заведённых до её появления. Без этого
  * у старого заказа после нажатия «Готово» фактическое время было бы нулевым.
+ *
+ * Все восстановленные отметки помечаются `estimated`: это оценка по плановому
+ * окну и нормативу, а не замер. В отчётах такие заказы отделены от точных.
  */
 export function backfillTimeline(order: Order): StatusEvent[] {
   if (order.timeline && order.timeline.length > 0) return order.timeline;
 
-  const events: StatusEvent[] = [{ status: "запись", at: order.createdAt }];
-  const day = order.plannedAt ?? order.createdAt.slice(0, 10);
-  const startedAt = order.scheduledStart ? `${day}T${order.scheduledStart}:00` : order.createdAt;
+  const guess = (status: OrderStatus, at: string): StatusEvent => ({ status, at, estimated: true });
+  const events: StatusEvent[] = [guess("запись", order.createdAt)];
+  if (order.status === "запись") return events;
 
-  const reachedLift = order.status !== "запись";
-  if (reachedLift && startedAt > order.createdAt) {
-    events.push({ status: "в работе", at: startedAt });
-  } else if (reachedLift) {
-    events.push({ status: "в работе", at: order.createdAt });
-  }
+  const day = order.plannedAt ?? order.createdAt.slice(0, 10);
+  const planStart = order.scheduledStart ? `${day}T${order.scheduledStart}:00` : null;
+  const startedAt = planStart && planStart > order.createdAt ? planStart : order.createdAt;
+  events.push(guess("в работе", startedAt));
+
+  // Конец работ: фактическая отметка, иначе плановое окно, иначе норматив
+  // работ. Без этого у старого «ожидает запчасти» начало и конец совпадали
+  // и отрезок получался нулевым — время на подъёмнике выходило нулём.
+  const planEnd = order.scheduledEnd ? `${day}T${order.scheduledEnd}:00` : null;
+  const norm = normMinutes(order);
+  const fallback = shiftISOTime(startedAt, norm > 0 ? norm : SLOT_MINUTES);
+  const candidate = order.completedAt ?? (planEnd && planEnd > startedAt ? planEnd : fallback);
+  const endedAt = candidate > startedAt ? candidate : fallback;
 
   if (order.status === "готово" || order.status === "выдан") {
-    const endedAt = order.completedAt
-      ?? (order.scheduledEnd ? `${day}T${order.scheduledEnd}:00` : null);
-    if (endedAt) events.push({ status: "готово", at: endedAt });
-    if (order.status === "выдан") events.push({ status: "выдан", at: endedAt ?? order.createdAt });
-  } else if (!isOnLift(order.status) && order.status !== "запись") {
+    events.push(guess("готово", endedAt));
+    if (order.status === "выдан") events.push(guess("выдан", endedAt));
+  } else if (!isOnLift(order.status)) {
     // «Ожидает запчасти»: машина сошла с подъёмника, время остановилось.
-    events.push({ status: order.status, at: order.completedAt ?? startedAt });
+    events.push(guess(order.status, endedAt));
   }
 
   return events;

@@ -19,9 +19,10 @@ import { company as companySeed } from "../data/company";
 import { createId, nextCode } from "../lib/id";
 import { orderTotals } from "../lib/order";
 import { reservedByItem } from "../lib/stock";
-import { formatPhone, formatPlate, looksRussian } from "../lib/formats";
+import { formatPhone, formatPlate, isValidPhone, looksRussian } from "../lib/formats";
 import { nowISO } from "../lib/date";
 import { backfillTimeline } from "../lib/worktime";
+import { normalizeWorkDay, parseWorkHours, setWorkDay } from "../lib/workday";
 
 const STORAGE_KEY = "igor-servis-db-v1";
 
@@ -85,9 +86,24 @@ function withCodes<T extends { code?: string }>(items: T[], prefix: string): T[]
 }
 
 function migrate(db: DB): DB {
+  // Часы работы раньше хранились строкой «Ежедневно, 10:00–20:00» — достаём из неё время.
+  const legacyHours = parseWorkHours((db.company as unknown as { workHours?: string }).workHours);
+  const hours = normalizeWorkDay(
+    db.company.openTime && db.company.closeTime
+      ? { start: db.company.openTime, end: db.company.closeTime }
+      : legacyHours ?? undefined,
+  );
+
   return {
     ...db,
-    company: { ...db.company, phone: formatPhone(db.company.phone) || db.company.phone },
+    company: {
+      ...db.company,
+      // Старая маска-заглушка «+7 (___) ___-__-__» не проходила проверку и
+      // не давала сохранить настройки — такой номер считаем незаполненным.
+      phone: isValidPhone(db.company.phone) ? formatPhone(db.company.phone) : "",
+      openTime: hours.start,
+      closeTime: hours.end,
+    },
     // Телефоны и номера приводим к единому виду: старые записи хранились как придётся.
     clients: withCodes(db.clients, CODE_PREFIX.client).map((client) => ({
       ...client,
@@ -193,6 +209,13 @@ const AppStoreContext = createContext<AppStoreValue | null>(null);
 
 export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [db, rawSetDB] = useState<DB>(loadInitial);
+
+  /**
+   * Рабочие часы из настроек — единственный источник для расписания, поиска
+   * свободных окон и учёта времени. Применяем до отрисовки дочерних страниц,
+   * чтобы смена часов в настройках сразу меняла расписание.
+   */
+  setWorkDay({ start: db.company.openTime, end: db.company.closeTime });
 
   /**
    * Любое изменение данных снимает метку «Демо-данные»: как только в базе

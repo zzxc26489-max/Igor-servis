@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { Card, ListCard, Page, StatusBadge, TopBar } from "../components/ui";
@@ -18,7 +18,14 @@ export default function Schedule() {
   const { lifts, orders, clients, vehicles } = useAppStore();
   const navigate = useNavigate();
   const today = todayISO();
-  const [day, setDay] = useState(today);
+  // День и подъёмник можно передать ссылкой: с главной ведут сюда, когда
+  // свободного окна нет и время подставлять нельзя.
+  const [params] = useSearchParams();
+  const focusLift = Number(params.get("lift")) || null;
+  const [day, setDay] = useState(() => {
+    const asked = params.get("date");
+    return asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : today;
+  });
 
   // Записи выбранного дня, а не все активные заказы подряд.
   const dayOrders = useMemo(
@@ -84,7 +91,11 @@ export default function Schedule() {
             {states.map(({ lift, state }) => {
               const liftOrders = state.orders;
               return (
-                <div key={lift.id} className="rounded-xl border p-3" style={{ borderColor: "var(--border)" }}>
+                <div
+                  key={lift.id}
+                  className="rounded-xl border p-3"
+                  style={{ borderColor: focusLift === lift.id ? "var(--accent)" : "var(--border)" }}
+                >
                   <div className="flex items-center justify-between gap-2">
                     <b className="text-sm">{lift.name}</b>
                     <span className="flex items-center gap-1.5 text-xs muted">

@@ -174,7 +174,7 @@ const activeOrders: Order[] = [
     vehicleId: "veh-2",
     liftId: 2,
     status: "в работе",
-    createdAt: at(0, "09:30"), plannedAt: day(0),
+    createdAt: at(0, "10:00"), plannedAt: day(0),
     advisor: "Игорь",
     scheduledStart: "10:00",
     scheduledEnd: "14:00",
@@ -199,10 +199,10 @@ const activeOrders: Order[] = [
     vehicleId: "veh-3",
     liftId: 4,
     status: "в работе",
-    createdAt: at(0, "09:00"), plannedAt: day(0),
+    createdAt: at(0, "10:00"), plannedAt: day(0),
     advisor: "Юра",
-    scheduledStart: "09:30",
-    scheduledEnd: "12:30",
+    scheduledStart: "10:30",
+    scheduledEnd: "13:30",
     works: [{ id: "w1", name: "Замена термостата", normMinutes: 90, qty: 1, price: 1800, executor: "Механик 2" }],
     parts: [],
     paid: 0,
@@ -215,10 +215,10 @@ const activeOrders: Order[] = [
     vehicleId: "veh-1",
     liftId: 1,
     status: "в работе",
-    createdAt: at(0, "09:00"), plannedAt: day(0),
+    createdAt: at(0, "10:00"), plannedAt: day(0),
     advisor: "Игорь",
-    scheduledStart: "09:00",
-    scheduledEnd: "12:00",
+    scheduledStart: "10:00",
+    scheduledEnd: "13:00",
     works: [
       { id: "w1", name: "Замена масла в ДВС", normMinutes: 30, qty: 1, price: 1200 },
       { id: "w2", name: "Компьютерная диагностика", normMinutes: 45, qty: 1, price: 1500 },
@@ -228,23 +228,23 @@ const activeOrders: Order[] = [
   },
   {
     id: "ord-264",
-    timeline: [{ status: "запись" as const, at: at(0, "08:30") }, { status: "в работе" as const, at: at(0, "08:40") }, { status: "готово" as const, at: at(0, "10:10") }],
+    timeline: [{ status: "запись" as const, at: at(0, "10:00") }, { status: "в работе" as const, at: at(0, "10:10") }, { status: "готово" as const, at: at(0, "11:40") }],
     number: "№АИ-0264",
     clientId: "cl-4",
     vehicleId: "veh-4",
     liftId: 3,
     status: "готово",
-    createdAt: at(0, "08:40"), plannedAt: day(0),
+    createdAt: at(0, "10:10"), plannedAt: day(0),
     advisor: "Юра",
-    scheduledStart: "08:40",
-    scheduledEnd: "10:10",
+    scheduledStart: "10:10",
+    scheduledEnd: "11:40",
     works: [
       { id: "w1", name: "Замена масла в ДВС", normMinutes: 30, qty: 1, price: 1200, executor: "Механик 2" },
       { id: "w2", name: "Замена масляного фильтра", normMinutes: 15, qty: 1, price: 600, executor: "Механик 2" },
     ],
     parts: [{ id: "p1", name: "Моторное масло 5W-30", sku: "Shell 5W-30", qty: 4, price: 1100, availability: "in_stock" }],
     paid: 0,
-    completedAt: at(0, "10:10"),
+    completedAt: at(0, "11:40"),
     notes: "Готово к выдаче, клиент обещал забрать после 17:00.",
   },
   {
@@ -263,12 +263,12 @@ const activeOrders: Order[] = [
   },
   {
     id: "ord-262",
-    timeline: [{ status: "запись" as const, at: at(-1, "09:20") }, { status: "в работе" as const, at: at(-1, "09:30") }, { status: "готово" as const, at: at(-1, "12:40") }],
+    timeline: [{ status: "запись" as const, at: at(-1, "10:20") }, { status: "в работе" as const, at: at(-1, "10:30") }, { status: "готово" as const, at: at(-1, "12:40") }],
     number: "№АИ-0262",
     clientId: "cl-1",
     vehicleId: "veh-1",
     status: "готово",
-    createdAt: at(-1, "09:20"), plannedAt: day(-1),
+    createdAt: at(-1, "10:20"), plannedAt: day(-1),
     advisor: "Игорь",
     works: [{ id: "w1", name: "Развал-схождение", normMinutes: 60, qty: 1, price: 2500, executor: "Механик 1" }],
     parts: [],
@@ -444,13 +444,13 @@ function buildHistory(): History {
       // Пара заказов в неделю остаётся с частичным долгом: так видно «Ожидаем оплату».
       const paid = step % 11 === 0 ? Math.round(due / 2 / 100) * 100 : due;
 
-      const startHour = 9 + index * 3;
+      // Смены укладываем в рабочий день мастерской: 10:00, 12:30, 15:00, 17:30.
+      const startMinutes = 10 * 60 + index * 150;
       // Фактическое время: у каждого мастера свой темп, плюс разброс по заказам.
       const norm = works.reduce((sum, work) => sum + (work.normMinutes ?? 0), 0);
       const pace = PACE[works.find((work) => work.executor !== "Игорь")?.executor ?? "Механик 1"] ?? 1;
       const spread = 1 + ((step % 7) - 3) * 0.06;
       const actual = Math.max(20, Math.round((norm * pace * spread) / 5) * 5);
-      const startMinutes = startHour * 60;
       const clock = (minutes: number) =>
         `${String(Math.floor(Math.min(minutes, 20 * 60) / 60)).padStart(2, "0")}:${String(Math.min(minutes, 20 * 60) % 60).padStart(2, "0")}`;
 
@@ -461,7 +461,7 @@ function buildHistory(): History {
         vehicleId,
         liftId: back === 0 ? undefined : (index % 5) + 1,
         status: "выдан",
-        createdAt: at(-back, `${String(startHour).padStart(2, "0")}:00`),
+        createdAt: at(-back, clock(startMinutes)),
         plannedAt: day(-back),
         completedAt: at(-back, clock(startMinutes + actual)),
         timeline: [
@@ -471,8 +471,8 @@ function buildHistory(): History {
           { status: "выдан" as const, at: at(-back, clock(startMinutes + actual + 20)) },
         ],
         advisor: step % 2 === 0 ? "Игорь" : "Юра",
-        scheduledStart: back === 0 ? undefined : `${String(startHour).padStart(2, "0")}:00`,
-        scheduledEnd: back === 0 ? undefined : `${String(Math.min(20, startHour + 3)).padStart(2, "0")}:00`,
+        scheduledStart: back === 0 ? undefined : clock(startMinutes),
+        scheduledEnd: back === 0 ? undefined : clock(startMinutes + 150),
         works,
         parts,
         discount: discount || undefined,
@@ -542,7 +542,7 @@ const BOOKING_TEMPLATES: { works: [string, number][]; note: string }[] = [
   { works: [["Замена ступичного подшипника", 3800]], note: "Гул на скорости" },
 ];
 
-const BOOKING_SLOTS: [string, string][] = [["09:00", "11:00"], ["11:30", "14:00"], ["14:30", "17:00"]];
+const BOOKING_SLOTS: [string, string][] = [["10:00", "12:00"], ["12:30", "15:00"], ["15:30", "18:00"]];
 
 function bookings(): Order[] {
   const result: Order[] = [];

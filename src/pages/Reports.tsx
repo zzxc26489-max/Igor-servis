@@ -63,6 +63,9 @@ export default function Reports() {
   const { orders, employees: rawEmployees, vehicles, lifts, clients, expenses } = useAppStore();
   const today = todayISO();
   const [period, setPeriod] = useState<PeriodKey>("month");
+  // Восстановленное время старых заказов — оценка по плану, а не замер.
+  // По умолчанию держим его отдельно, чтобы не смешивать с точными цифрами.
+  const [includeEstimated, setIncludeEstimated] = useState(false);
 
   // Время считаем за выбранный период: за всё время цифры теряют смысл.
   const range = useMemo(() => getRange(period, 0), [period]);
@@ -72,14 +75,27 @@ export default function Reports() {
     () => orders.filter((order) => actualMinutes(order, window) > 0),
     [orders, window],
   );
-  const summary = useMemo(() => timingSummary(timeOrders, window), [timeOrders, window]);
-  const serviceTiming = useMemo(() => timingByService(timeOrders, window), [timeOrders, window]);
-  const executorTiming = useMemo(() => timingByExecutor(timeOrders, window), [timeOrders, window]);
+  const now = useMemo(() => new Date(), []);
+  const summary = useMemo(
+    () => timingSummary(timeOrders, window, now, includeEstimated),
+    [includeEstimated, now, timeOrders, window],
+  );
+  const serviceTiming = useMemo(
+    () => timingByService(timeOrders, window, now, includeEstimated),
+    [includeEstimated, now, timeOrders, window],
+  );
+  const executorTiming = useMemo(
+    () => timingByExecutor(timeOrders, window, now, includeEstimated),
+    [includeEstimated, now, timeOrders, window],
+  );
   const liftLoad = useMemo(
     () => loadByLift(timeOrders, lifts.map((lift) => lift.id), window),
     [lifts, timeOrders, window],
   );
-  const deviations = useMemo(() => biggestDeviations(timeOrders, window), [timeOrders, window]);
+  const deviations = useMemo(
+    () => biggestDeviations(timeOrders, window, 6, now, includeEstimated),
+    [includeEstimated, now, timeOrders, window],
+  );
   // Машины, которые стоят на подъёмнике прямо сейчас: видно, где уже перебор.
   const running = useMemo(() => runningOrders(orders), [orders]);
   const employees = computePayroll(rawEmployees, orders);
@@ -297,6 +313,22 @@ export default function Reports() {
           </div>
           <span className="muted ml-auto text-xs">{range.title}</span>
         </div>
+
+        {summary.estimatedOrders > 0 && (
+          <div
+            className="mb-3 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-sm"
+            style={{ background: "var(--surface-muted, #f6f7f9)" }}
+          >
+            <span className="muted">
+              {summary.estimatedOrders} {plural(summary.estimatedOrders, "заказ", "заказа", "заказов")} за период
+              заведены до учёта времени: их время восстановлено по плану, а не замерено.
+            </span>
+            <label className="ml-auto flex cursor-pointer items-center gap-2 font-medium">
+              <input type="checkbox" checked={includeEstimated} onChange={(e) => setIncludeEstimated(e.target.checked)} />
+              Учитывать восстановленные
+            </label>
+          </div>
+        )}
 
         <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
           <Metric

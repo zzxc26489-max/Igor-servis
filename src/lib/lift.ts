@@ -1,28 +1,9 @@
 import type { Lift, Order } from "../types";
 import { shiftISODate, toISODate, todayISO } from "./date";
+import { minutesToTime, timeToMinutes, workDay } from "./workday";
 
-export function toMinutes(time: string) {
-  const [hours, minutes] = time.split(":").map(Number);
-  return hours * 60 + (minutes || 0);
-}
-
-export function fromMinutes(minutes: number) {
-  const clamped = Math.max(0, Math.min(24 * 60 - 1, Math.round(minutes)));
-  return `${String(Math.floor(clamped / 60)).padStart(2, "0")}:${String(clamped % 60).padStart(2, "0")}`;
-}
-
-export const WORK_DAY_START = "08:00";
-export const WORK_DAY_END = "20:00";
-
-/**
- * Часы для шкалы расписания. Одна константа на главную, расписание и расчёт
- * свободных окон: раньше шкала на главной шла с 09:00 до 19:00, в расписании
- * до 21:00, а окна считались с 08:00 до 20:00.
- */
-export const WORK_HOURS = Array.from(
-  { length: (toMinutes(WORK_DAY_END) - toMinutes(WORK_DAY_START)) / 60 },
-  (_, index) => fromMinutes(toMinutes(WORK_DAY_START) + index * 60),
-);
+export const toMinutes = timeToMinutes;
+export const fromMinutes = minutesToTime;
 /** Стандартная длительность записи — столько же ставит форма новой записи. */
 export const SLOT_MINUTES = 60;
 /** Время предлагаем кратным четверти часа: «записать с 15:31» неудобно. */
@@ -70,8 +51,9 @@ export interface LiftState {
 export function liftState(orders: Order[], lift: Lift, day: string, now = new Date()): LiftState {
   const dayOrders = liftOrders(orders, lift.id, day);
   const isToday = day === toISODate(now);
-  const dayStart = toMinutes(WORK_DAY_START);
-  const dayEnd = toMinutes(WORK_DAY_END);
+  const hours = workDay();
+  const dayStart = toMinutes(hours.start);
+  const dayEnd = toMinutes(hours.end);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
   const booked = dayOrders
@@ -171,12 +153,21 @@ export function bookingTarget(
   }
 
   const next = orders && lift ? nextFreeSlot(orders, lift, shiftISODate(day, 1), 14, now) : null;
-  if (!next) return { to: bookingLink(liftId, shiftISODate(day, 1)), label: "Записать на другой день" };
+  // Свободного часа на две недели вперёд нет. Подставлять «завтра в 10:00»
+  // нельзя — это время тоже занято; открываем расписание, пусть выберут день.
+  if (!next) return { to: scheduleLink(liftId, shiftISODate(day, 1)), label: "Открыть расписание" };
 
   const label = next.day === shiftISODate(day, 1)
     ? `Записать завтра с ${next.start}`
     : `Записать ${new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" }).format(new Date(`${next.day}T12:00:00`))} с ${next.start}`;
   return { to: bookingLink(liftId, next.day, next.start), label };
+}
+
+/** Ссылка на расписание с открытым днём и подсвеченным подъёмником. */
+export function scheduleLink(liftId: number | undefined, day: string) {
+  const params = new URLSearchParams({ date: day });
+  if (liftId) params.set("lift", String(liftId));
+  return `/schedule?${params.toString()}`;
 }
 
 /** Ссылка на новую запись с уже выбранным подъёмником, датой и временем. */

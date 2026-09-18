@@ -4,6 +4,7 @@ import {
   IconArrowBackUp, IconArrowLeft, IconCalendarTime, IconCar, IconCheck, IconClipboardText,
   IconFileDescription, IconNotes, IconPrinter, IconStopwatch, IconTool, IconTrash, IconUser,
 } from "@tabler/icons-react";
+import { formatWorkHours } from "../lib/workday";
 import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
@@ -14,7 +15,7 @@ import AddWork, { type NewWork } from "./AddWork";
 import { reservedByItem } from "../lib/stock";
 import { moneyInput } from "../lib/formats";
 import { margin } from "../lib/price";
-import { actualMinutes, deviationPercent, formatDuration, normMinutes } from "../lib/worktime";
+import { actualMinutes, deviationPercent, formatDuration, isEstimatedTiming, normMinutes } from "../lib/worktime";
 import { Button, Card, Modal, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
 import type { OrderLinePart, OrderLineWork, OrderStatus } from "../types";
@@ -461,7 +462,7 @@ export default function OrderDetail() {
             <div>
               <div className="text-lg font-bold">{company.shortName}</div>
               <div className="text-sm">{company.address}</div>
-              <div className="text-sm">{company.phone} · {company.workHours}</div>
+              <div className="text-sm">{[company.phone, formatWorkHours({ start: company.openTime, end: company.closeTime })].filter(Boolean).join(" · ")}</div>
             </div>
             <div className="text-right">
               <div className="text-lg font-bold">Заказ-наряд {order.number}</div>
@@ -510,7 +511,9 @@ export default function OrderDetail() {
               )}
             </div>
             <div className="muted truncate text-xs">
-              {orderNorm > 0 ? `Норматив ${formatDuration(orderNorm)}` : "Норматив не задан"}
+              {isEstimatedTiming(order)
+                ? "Восстановлено по плану, не замер"
+                : orderNorm > 0 ? `Норматив ${formatDuration(orderNorm)}` : "Норматив не задан"}
             </div>
           </InfoCell>
           <InfoCell icon={<IconCalendarTime size={18} />} tone="#fdf3e0" color="var(--warning)" label="Обещано клиенту">
