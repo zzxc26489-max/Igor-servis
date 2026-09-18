@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { IconAdjustments, IconBuildingStore, IconCloud, IconDatabase, IconDownload, IconHistory, IconInfoCircle, IconRefresh, IconRestore, IconUpload } from "@tabler/icons-react";
+import { IconAdjustments, IconAlertTriangle, IconBuildingStore, IconCheck, IconCloud, IconDatabase, IconDownload, IconHistory, IconInfoCircle, IconRefresh, IconRestore, IconUpload } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
@@ -15,7 +15,7 @@ import { isValidTime, timeToMinutes } from "../lib/workday";
 export default function Settings() {
   const {
     company, settings, updateCompany, updateSettings, resetToSeed, exportDB, importDB,
-    orders, clients, stock, expenses, cloud, uploadLocalToCloud, refreshFromCloud, backupCloud,
+    orders, clients, vehicles, stock, expenses, services, employees, demo, cloud, uploadLocalToCloud, refreshFromCloud, backupCloud,
     listBackups, listAudit, restoreBackup,
   } = useAppStore();
   const { showToast } = useToast();
@@ -31,6 +31,39 @@ export default function Settings() {
   const [cloudBackups, setCloudBackups] = useState<Awaited<ReturnType<typeof listBackups>>>([]);
   const [cloudAudit, setCloudAudit] = useState<Awaited<ReturnType<typeof listAudit>>>([]);
   const [cloudAdminLoading, setCloudAdminLoading] = useState(false);
+
+  const readiness = [
+    {
+      label: "Телефон сервиса",
+      ok: Boolean(company.phone && isValidPhone(company.phone)),
+      detail: company.phone ? formatPhone(company.phone) : "Не заполнен",
+    },
+    {
+      label: "Прайс-лист услуг",
+      ok: services.length >= 10,
+      detail: `${services.length} услуг · ${services.length < 10 ? "проверьте полноту прайса" : "база заполнена"}`,
+    },
+    {
+      label: "Имена механиков",
+      ok: !employees.some((employee) => /^Механик\s+\d+$/i.test(employee.name)),
+      detail: employees.filter((employee) => /механик/i.test(employee.role)).map((employee) => employee.name).join(", ") || "Механики не заведены",
+    },
+    {
+      label: "Реальные рабочие данные",
+      ok: !demo,
+      detail: demo ? "Сейчас используется демонстрационная база" : `${clients.length} клиентов · ${vehicles.length} авто · ${orders.length} заказов`,
+    },
+    {
+      label: "Общая серверная база",
+      ok: cloud.configured && cloud.status !== "needs_upload" && cloud.status !== "error",
+      detail: cloud.configured ? (cloud.status === "ready" ? "Синхронизация включена" : `Статус: ${cloud.status}`) : "Supabase не подключён",
+    },
+    {
+      label: "Резервная копия",
+      ok: !cloud.configured || cloudBackups.length > 0,
+      detail: cloud.configured ? (cloudBackups.length ? `${cloudBackups.length} серверных копий доступно` : "Создайте первую серверную копию") : "Доступен ручной JSON-экспорт",
+    },
+  ];
 
   useEffect(() => {
     if (!cloud.configured || cloud.status === "needs_upload") return;
@@ -418,6 +451,37 @@ export default function Settings() {
               )}
             </Card>
           )}
+
+          <Card>
+            <div className="mb-4 flex items-center gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#fdf3e0] text-[var(--warning)]">
+                <IconCheck size={22} />
+              </div>
+              <div>
+                <h2 className="panel-title">Готовность к реальной работе</h2>
+                <p className="muted text-sm">Что ещё нужно заполнить или проверить перед отказом от демо-данных</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {readiness.map((item) => (
+                <div key={item.label} className="flex items-start gap-3 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
+                  <span
+                    className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full"
+                    style={{
+                      background: item.ok ? "var(--accent-soft)" : "#fdf3e0",
+                      color: item.ok ? "var(--accent)" : "var(--warning)",
+                    }}
+                  >
+                    {item.ok ? <IconCheck size={14} /> : <IconAlertTriangle size={14} />}
+                  </span>
+                  <span className="min-w-0">
+                    <b className="block text-sm">{item.label}</b>
+                    <span className="muted block text-xs">{item.detail}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
 
           <Card>
             <div className="mb-4 flex items-center gap-3">
