@@ -1,6 +1,6 @@
 import type { Client, Expense, Order, Payment, StockItem, Vehicle } from "../types";
 import { orderTotals } from "./order";
-import { paymentInRange, receivedInRange } from "./payments";
+import { paymentInRange, paymentMethodLabel, receivedInRange } from "./payments";
 
 export type PeriodKey = "today" | "week" | "month" | "year" | "all";
 
@@ -331,7 +331,9 @@ export function buildOperations(range: Range, orders: Order[], expenses: Expense
         id: `in-${payment.id}`,
         date: payment.at,
         title: "Оплата по заказ-наряду",
-        category: payment.estimated ? "Поступление · дата восстановлена" : "Поступление",
+        category: payment.estimated
+          ? `Поступление · ${paymentMethodLabel(payment.method)} · дата восстановлена`
+          : `Поступление · ${paymentMethodLabel(payment.method)}`,
         orderId: order?.id,
         orderNumber: order?.number,
         amount: payment.amount,
