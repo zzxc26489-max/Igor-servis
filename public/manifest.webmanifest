@@ -1,0 +1,19 @@
+{
+  "name": "The Service and UMC CRM",
+  "short_name": "The Service CRM",
+  "description": "CRM автосервиса: заказы, склад, финансы и сервисная история.",
+  "start_url": "/Igor-servis/",
+  "scope": "/Igor-servis/",
+  "display": "standalone",
+  "background_color": "#f6f7f8",
+  "theme_color": "#1f6e4a",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "/Igor-servis/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
