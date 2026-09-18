@@ -29,8 +29,9 @@ import { ensureLegacyPayments } from "../lib/payments";
 import { createCloudBackup, loadCloudState, saveCloudState, type CloudRole } from "../lib/cloud";
 import { mergeConcurrentState } from "../lib/stateMerge";
 import { useAuth } from "../auth/AuthContext";
+import { CLOUD_BASE_KEY, LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
 
-const STORAGE_KEY = "igor-servis-db-v1";
+const STORAGE_KEY = LOCAL_DB_KEY;
 
 export const CODE_PREFIX = {
   client: "К",
@@ -272,6 +273,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const cloudBaseRef = useRef<DB | null>(null);
   const cloudRevisionRef = useRef(0);
   const cloudSaveTimerRef = useRef<number | null>(null);
+  const cloudRetryTimerRef = useRef<number | null>(null);
   const cloudLoadingKeyRef = useRef<string | null>(null);
   const [cloud, setCloud] = useState<CloudSyncInfo>({
     configured: cloudConfigured,
@@ -305,6 +307,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   }, [db]);
 
   const applyCloudSnapshot = useCallback((snapshot: Awaited<ReturnType<typeof loadCloudState>>) => {
+    if (!session) return;
     cloudRevisionRef.current = snapshot.revision;
     const meta = {
       configured: true,
@@ -321,15 +324,32 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }
 
     const remote = migrate(snapshot.data as DB);
-    cloudBaseRef.current = remote;
-    rawSetDB(remote);
-    setCloud({ ...meta, status: "ready", lastSyncedAt: new Date().toISOString() } as CloudSyncInfo);
-  }, []);
+    const cached = readCloudBase<DB>(session.user.id);
+    const base = cloudBaseRef.current ?? (cached ? migrate(cached.base) : null);
+    const local = migrate(dbRef.current);
+    const hasUnsavedLocal = Boolean(base && JSON.stringify(local) !== JSON.stringify(base));
+    const next = hasUnsavedLocal && base
+      ? migrate(
+          mergeConcurrentState(
+            base as unknown as Record<string, unknown>,
+            local as unknown as Record<string, unknown>,
+            remote as unknown as Record<string, unknown>,
+          ) as unknown as DB,
+        )
+      : remote;
 
-  const loadFromCloud = useCallback(async () => {
+    cloudBaseRef.current = remote;
+    writeCloudBase(session.user.id, snapshot.revision, remote);
+    rawSetDB(next);
+    setCloud({ ...meta, status: "ready", lastSyncedAt: new Date().toISOString() } as CloudSyncInfo);
+  }, [session]);
+
+  const loadFromCloud = useCallback(async (showLoading = true) => {
     if (!cloudConfigured || !session) return "Серверная база не подключена";
     try {
-      setCloud((prev) => ({ ...prev, configured: true, status: "loading", error: undefined }));
+      if (showLoading) {
+        setCloud((prev) => ({ ...prev, configured: true, status: "loading", error: undefined }));
+      }
       const snapshot = await loadCloudState(session);
       applyCloudSnapshot(snapshot);
       return null;
@@ -351,17 +371,22 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     const key = session.user.id;
     if (cloudLoadingKeyRef.current === key) return;
     cloudLoadingKeyRef.current = key;
-    void loadFromCloud();
+    void loadFromCloud(true);
   }, [cloudConfigured, loadFromCloud, session]);
 
   const pushCloudState = useCallback(async (candidate: DB, attempt = 0): Promise<string | null> => {
     if (!cloudConfigured || !session) return "Серверная база не подключена";
     try {
+      if (cloudRetryTimerRef.current) {
+        window.clearTimeout(cloudRetryTimerRef.current);
+        cloudRetryTimerRef.current = null;
+      }
       setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
       const result = await saveCloudState(session, cloudRevisionRef.current, candidate);
       if (result.ok) {
         cloudRevisionRef.current = result.revision;
         cloudBaseRef.current = candidate;
+        writeCloudBase(session.user.id, result.revision, candidate);
         setCloud((prev) => ({
           ...prev,
           status: "ready",
@@ -383,6 +408,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       );
       cloudRevisionRef.current = result.revision;
       cloudBaseRef.current = remote;
+      writeCloudBase(session.user.id, result.revision, remote);
       rawSetDB(merged);
 
       if (attempt >= 2) {
@@ -393,25 +419,64 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       return pushCloudState(merged, attempt + 1);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Не удалось сохранить данные на сервер";
-      setCloud((prev) => ({ ...prev, status: "error", error: message }));
+      setCloud((prev) => ({ ...prev, status: "error", error: `${message}. Изменения сохранены на устройстве, повторим автоматически.` }));
+      if (attempt < 6) {
+        const delay = Math.min(30_000, 1_000 * (2 ** attempt));
+        cloudRetryTimerRef.current = window.setTimeout(() => {
+          void pushCloudState(dbRef.current, attempt + 1);
+        }, delay);
+      }
       return message;
     }
   }, [cloudConfigured, session]);
 
   useEffect(() => {
-    if (!cloudConfigured || !session || cloud.status !== "ready" || !cloudBaseRef.current) return;
+    if (!cloudConfigured || !session || !cloudBaseRef.current) return;
+    if (cloud.status === "loading" || cloud.status === "needs_upload" || cloud.status === "saving") return;
     if (JSON.stringify(db) === JSON.stringify(cloudBaseRef.current)) return;
 
     if (cloudSaveTimerRef.current) window.clearTimeout(cloudSaveTimerRef.current);
     const candidate = db;
     cloudSaveTimerRef.current = window.setTimeout(() => {
       void pushCloudState(candidate);
-    }, 650);
+    }, cloud.status === "error" ? 1_500 : 650);
 
     return () => {
       if (cloudSaveTimerRef.current) window.clearTimeout(cloudSaveTimerRef.current);
     };
   }, [cloud.status, cloudConfigured, db, pushCloudState, session]);
+
+  useEffect(() => {
+    if (!cloudConfigured || !session) return;
+    const interval = window.setInterval(() => {
+      if (document.visibilityState !== "visible" || cloud.status === "saving") return;
+      void loadFromCloud(false);
+    }, 45_000);
+    return () => window.clearInterval(interval);
+  }, [cloud.status, cloudConfigured, loadFromCloud, session]);
+
+  useEffect(() => {
+    if (!cloudConfigured || !session) return;
+    const handleOnline = () => {
+      const dirty = Boolean(cloudBaseRef.current && JSON.stringify(dbRef.current) !== JSON.stringify(cloudBaseRef.current));
+      if (dirty) void pushCloudState(dbRef.current);
+      else void loadFromCloud(false);
+    };
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [cloudConfigured, loadFromCloud, pushCloudState, session]);
+
+  useEffect(() => {
+    if (!cloudConfigured || !session) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      const dirty = Boolean(cloudBaseRef.current && JSON.stringify(dbRef.current) !== JSON.stringify(cloudBaseRef.current));
+      if (!dirty && cloud.status !== "saving" && cloud.status !== "error") return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [cloud.status, cloudConfigured, session]);
 
   const uploadLocalToCloud = useCallback(async () => {
     if (!cloudConfigured || !session) return "Серверная база не подключена";
@@ -419,6 +484,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     const error = await pushCloudState(dbRef.current);
     if (!error) {
       cloudBaseRef.current = dbRef.current;
+      writeCloudBase(session.user.id, cloudRevisionRef.current, dbRef.current);
       setCloud((prev) => ({ ...prev, status: "ready", lastSyncedAt: new Date().toISOString() }));
     }
     return error;
@@ -439,7 +505,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       ...db,
       cloud,
       uploadLocalToCloud,
-      refreshFromCloud: loadFromCloud,
+      refreshFromCloud: () => loadFromCloud(true),
       backupCloud,
       setDB,
       updateOrder: (id, patch) =>
