@@ -79,6 +79,12 @@ export default function OrderDetail() {
   const [transferAmount, setTransferAmount] = useState("");
   const [payOpen, setPayOpen] = useState(false);
   const [targetTotal, setTargetTotal] = useState("");
+  const [intakeComplaint, setIntakeComplaint] = useState(order?.complaint ?? "");
+  const [intakeDiagnosis, setIntakeDiagnosis] = useState(order?.diagnosis ?? "");
+  const [intakeDefects, setIntakeDefects] = useState(order?.defects ?? "");
+  const [intakeGuarantee, setIntakeGuarantee] = useState(order?.guaranteeMonths ? String(order.guaranteeMonths) : "");
+  const [intakeMileage, setIntakeMileage] = useState("");
+  const [mechanicComment, setMechanicComment] = useState(order?.mechanicComment ?? "");
 
   if (!order) {
     return (
@@ -94,6 +100,15 @@ export default function OrderDetail() {
   const client = clients.find((c) => c.id === order.clientId);
   const vehicle = vehicles.find((v) => v.id === order.vehicleId);
   const lift = lifts.find((l) => l.id === order.liftId);
+
+  useEffect(() => {
+    setIntakeComplaint(order.complaint ?? "");
+    setIntakeDiagnosis(order.diagnosis ?? "");
+    setIntakeDefects(order.defects ?? "");
+    setIntakeGuarantee(order.guaranteeMonths ? String(order.guaranteeMonths) : "");
+    setIntakeMileage(vehicle?.mileage ? String(vehicle.mileage) : "");
+    setMechanicComment(order.mechanicComment ?? "");
+  }, [order.id, order.complaint, order.diagnosis, order.defects, order.guaranteeMonths, order.mechanicComment, vehicle?.mileage]);
 
   const worksTotal = order.works.reduce((s, w) => s + w.price * w.qty, 0);
   const partsTotal = order.parts.reduce((s, p) => s + p.price * p.qty, 0);
@@ -340,6 +355,23 @@ export default function OrderDetail() {
     showToast(`Принята оплата ${formatMoney(total)}`);
   }
 
+  function saveIntake() {
+    if (!order) return;
+    const guaranteeMonths = Number(intakeGuarantee.replace(/\D/g, "")) || undefined;
+    updateOrder(order.id, {
+      complaint: intakeComplaint.trim(),
+      diagnosis: intakeDiagnosis.trim(),
+      defects: intakeDefects.trim(),
+      guaranteeMonths,
+      mechanicComment: mechanicComment.trim(),
+    });
+    const mileage = Number(intakeMileage.replace(/\D/g, ""));
+    if (vehicle && mileage > 0 && mileage !== vehicle.mileage) {
+      updateVehicle(vehicle.id, { mileage });
+    }
+    showToast("Приёмка сохранена");
+  }
+
   async function handleChangeStatus(next: OrderStatus) {
     if (!order || next === order.status) return;
     const issuing = next === "выдан";
@@ -505,22 +537,22 @@ export default function OrderDetail() {
         }
         subtitle={`Заказ-наряд ${order.number} · ${formatDate(order.createdAt)}${order.advisor ? ` · Приёмщик: ${order.advisor}` : ""}`}
         actions={
-          <>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <StatusBadge status={order.status} />
             {canReopen && (
-              <Button variant="secondary" onClick={() => handleChangeStatus("в работе")}>
+              <Button className="max-sm:flex-1" variant="secondary" onClick={() => handleChangeStatus("в работе")}>
                 <IconArrowBackUp size={18} /> Вернуть в работу
               </Button>
             )}
             {nextStatusLabel && (
-              <Button onClick={() => nextStatus && handleChangeStatus(nextStatus)}>
+              <Button className="max-sm:flex-1" onClick={() => nextStatus && handleChangeStatus(nextStatus)}>
                 <IconCheck size={18} /> {nextStatusLabel}
               </Button>
             )}
-            <Button variant="secondary" size="sm" onClick={() => navigate(-1)} aria-label="Назад" title="Назад">
+            <Button className="max-sm:ml-auto" variant="secondary" size="sm" onClick={() => navigate(-1)} aria-label="Назад" title="Назад">
               <IconArrowLeft size={18} />
             </Button>
-          </>
+          </div>
         }
       />
       <Page>
@@ -767,51 +799,54 @@ export default function OrderDetail() {
 
             {tab === "Приёмка" && (
               <Card className="print:hidden">
-                <h2 className="panel-title mb-3 flex items-center gap-2"><IconClipboardText size={18} /> Приёмка автомобиля</h2>
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="panel-title flex items-center gap-2"><IconClipboardText size={18} /> Приёмка автомобиля</h2>
+                    <p className="muted mt-1 text-sm">Заполните нужные поля и нажмите «Сохранить приёмку». Ничего само по себе не теряется между полями.</p>
+                  </div>
+                  <Button onClick={saveIntake}>Сохранить приёмку</Button>
+                </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <label className="block text-sm">
-                    <span className="muted mb-1 block">Жалоба клиента</span>
+                    <span className="muted mb-1 block">Что беспокоит клиента</span>
                     <div className="field-control">
-                      <textarea rows={3} defaultValue={order.complaint || ""} onBlur={(e) => updateOrder(order.id, { complaint: e.target.value })} placeholder="Со слов клиента" />
+                      <textarea rows={3} value={intakeComplaint} onChange={(e) => setIntakeComplaint(e.target.value)} placeholder="Например: стук спереди, вибрация на скорости" />
                     </div>
                   </label>
                   <label className="block text-sm">
-                    <span className="muted mb-1 block">Результат диагностики</span>
+                    <span className="muted mb-1 block">Что нашли при диагностике</span>
                     <div className="field-control">
-                      <textarea rows={3} defaultValue={order.diagnosis || ""} onBlur={(e) => updateOrder(order.id, { diagnosis: e.target.value })} placeholder="Что выявлено" />
+                      <textarea rows={3} value={intakeDiagnosis} onChange={(e) => setIntakeDiagnosis(e.target.value)} placeholder="Коротко: что нашли и что нужно сделать" />
                     </div>
                   </label>
                   <label className="block text-sm">
-                    <span className="muted mb-1 block">Внешние дефекты</span>
+                    <span className="muted mb-1 block">Внешние повреждения</span>
                     <div className="field-control">
-                      <textarea rows={3} defaultValue={order.defects || ""} onBlur={(e) => updateOrder(order.id, { defects: e.target.value })} placeholder="Царапины, сколы и т.п." />
+                      <textarea rows={3} value={intakeDefects} onChange={(e) => setIntakeDefects(e.target.value)} placeholder="Царапины, сколы, вмятины и т.п." />
                     </div>
                   </label>
-                  <div className="space-y-3">
-                    <label className="block text-sm">
-                      <span className="muted mb-1 block">Гарантия, мес.</span>
-                      <div className="field-control">
-                        <input inputMode="numeric" defaultValue={order.guaranteeMonths ?? ""} onBlur={(e) => updateOrder(order.id, { guaranteeMonths: Number(e.target.value.replace(/\D/g, "")) || undefined })} placeholder="Например, 6" />
-                      </div>
-                    </label>
-                    <label className="block text-sm">
-                      <span className="muted mb-1 block">Пробег при приёмке, км</span>
-                      <div className="field-control">
-                        <input
-                          inputMode="numeric"
-                          defaultValue={vehicle?.mileage ?? ""}
-                          onBlur={(event) => {
-                            const mileage = Number(event.target.value.replace(/\D/g, ""));
-                            if (vehicle && mileage > 0 && mileage !== vehicle.mileage) {
-                              updateVehicle(vehicle.id, { mileage });
-                              showToast("Пробег обновлён в карточке автомобиля");
-                            }
-                          }}
-                          placeholder="Например, 82000"
-                        />
-                      </div>
-                    </label>
-                  </div>
+                  <label className="block text-sm sm:col-span-2">
+                    <span className="muted mb-1 block">Комментарий мастера для своих</span>
+                    <div className="field-control">
+                      <textarea rows={3} value={mechanicComment} onChange={(e) => setMechanicComment(e.target.value)} placeholder="Например: клиент просил позвонить после разбора, болт прикипел, нужен повторный контроль" />
+                    </div>
+                    <span className="muted mt-1 block text-xs">Внутренняя заметка: клиенту и в акт выполненных работ не показывается.</span>
+                  </label>
+                  <label className="block text-sm">
+                    <span className="muted mb-1 block">Гарантия на работы, месяцев</span>
+                    <div className="field-control">
+                      <input inputMode="numeric" value={intakeGuarantee} onChange={(e) => setIntakeGuarantee(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="Например, 6" />
+                    </div>
+                  </label>
+                  <label className="block text-sm">
+                    <span className="muted mb-1 block">Пробег при приёмке, км</span>
+                    <div className="field-control">
+                      <input inputMode="numeric" value={intakeMileage} onChange={(e) => setIntakeMileage(e.target.value.replace(/\D/g, "").slice(0, 7))} placeholder="Например, 121000" />
+                    </div>
+                  </label>
+                </div>
+                <div className="mt-4 flex justify-end border-t pt-4" style={{ borderColor: "var(--border)" }}>
+                  <Button onClick={saveIntake}>Сохранить приёмку</Button>
                 </div>
               </Card>
             )}
