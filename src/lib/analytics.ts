@@ -1,6 +1,6 @@
 import type { Client, Expense, Order, Payment, StockItem, Vehicle } from "../types";
-import { orderTotals } from "./order";
-import { paymentInRange, paymentMethodLabel, receivedInRange, signedPaymentAmount } from "./payments";
+import { orderTotals } from "./order.ts";
+import { paymentInRange, paymentMethodLabel, receivedInRange, signedPaymentAmount } from "./payments.ts";
 
 export type PeriodKey = "today" | "week" | "month" | "year" | "all";
 
