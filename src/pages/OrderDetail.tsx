@@ -91,21 +91,23 @@ export default function OrderDetail() {
   const [intakeGuarantee, setIntakeGuarantee] = useState(order?.guaranteeMonths ? String(order.guaranteeMonths) : "");
   const [intakeMileage, setIntakeMileage] = useState("");
   const [mechanicComment, setMechanicComment] = useState(order?.mechanicComment ?? "");
+  const loadedIntakeOrderRef = useRef<string | null>(null);
 
   const client = order ? clients.find((c) => c.id === order.clientId) : undefined;
   const vehicle = order ? vehicles.find((v) => v.id === order.vehicleId) : undefined;
   const lift = order ? lifts.find((l) => l.id === order.liftId) : undefined;
 
   useEffect(() => {
-    if (!order) return;
+    if (!order || loadedIntakeOrderRef.current === order.id) return;
+    loadedIntakeOrderRef.current = order.id;
     setIntakeComplaint(order.complaint ?? "");
     setIntakeDiagnosis(order.diagnosis ?? "");
     setIntakeDefects(order.defects ?? "");
     setIntakeGuarantee(order.guaranteeMonths ? String(order.guaranteeMonths) : "");
     setIntakeMileage(vehicle?.mileage ? String(vehicle.mileage) : "");
     setMechanicComment(order.mechanicComment ?? "");
-    if (!paymentEmployee) setPaymentEmployee(order.advisor ?? "");
-  }, [order, vehicle?.mileage, paymentEmployee]);
+    setPaymentEmployee(order.advisor ?? "");
+  }, [order, vehicle?.mileage]);
 
   if (!order) {
     return (

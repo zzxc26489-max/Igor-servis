@@ -229,6 +229,7 @@ export default function Finance() {
         </div>
         <p className="muted mb-3 text-xs">
           Выручка и прибыль считаются по выданным заказам. «Получено» и зелёные столбцы графика — реальные движения денег по датам оплаты.
+          Возврат клиенту здесь уменьшает кассовые поступления, но сам по себе не пересчитывает стоимость уже выданного заказа и начисление мастеру.
         </p>
 
         {tab === "Обзор" && (
@@ -242,10 +243,10 @@ export default function Finance() {
             <b className="tabular-nums">{formatMoney(metrics.received)}</b>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Row label="Наличные" value={methodSummary.cash} tone="accent" />
-            <Row label="Терминал / карта" value={methodSummary.terminal} tone="accent" />
-            <Row label="Перевод / СБП" value={methodSummary.transfer} tone="accent" />
-            <Row label="Способ не указан" value={methodSummary.unknown} />
+            <Row label="Наличные" value={methodSummary.cash} signed />
+            <Row label="Терминал / карта" value={methodSummary.terminal} signed />
+            <Row label="Перевод / СБП" value={methodSummary.transfer} signed />
+            <Row label="Способ не указан" value={methodSummary.unknown} signed />
           </div>
         </Card>
 
@@ -590,12 +591,26 @@ export default function Finance() {
 }
 
 
-function Row({ label, value, tone, raw = false }: { label: string; value: number; tone?: "accent" | "danger"; raw?: boolean }) {
-  const color = tone === "accent" ? "var(--accent)" : tone === "danger" ? "var(--danger)" : undefined;
+function Row({
+  label, value, tone, raw = false, signed = false,
+}: {
+  label: string;
+  value: number;
+  tone?: "accent" | "danger";
+  raw?: boolean;
+  signed?: boolean;
+}) {
+  const resolvedTone = tone ?? (signed ? (value < 0 ? "danger" : value > 0 ? "accent" : undefined) : undefined);
+  const color = resolvedTone === "accent" ? "var(--accent)" : resolvedTone === "danger" ? "var(--danger)" : undefined;
+  const formatted = raw
+    ? value
+    : signed
+      ? `${value > 0 ? "+" : value < 0 ? "−" : ""}${formatMoney(Math.abs(value))}`
+      : formatMoney(Math.abs(value));
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="muted">{label}</span>
-      <b style={{ color }}>{raw ? value : formatMoney(Math.abs(value))}</b>
+      <b className="tabular-nums" style={{ color }}>{formatted}</b>
     </div>
   );
 }

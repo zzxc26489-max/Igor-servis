@@ -78,7 +78,7 @@ function seedDB(): DB {
     orders: seed.orders,
     expenses: seed.expenses,
     invoices: seed.invoices,
-    payments: [],
+    payments: seed.payments,
   };
 }
 
@@ -522,7 +522,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       receiveStock: (input) =>
         setDB((prev) => {
           const stamp = Date.now();
-          const now = new Date().toISOString();
+          const now = nowISO();
           const total = Math.round(input.qty * input.unitPrice);
           const existing = input.itemId ? prev.stock.find((item) => item.id === input.itemId) : undefined;
           const itemId = existing?.id ?? `st-${stamp}`;
@@ -706,7 +706,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             stockMovements: [
               {
                 id: createId("mv"),
-                date: new Date().toISOString(),
+                date: nowISO(),
                 itemId: item.id,
                 operation: "Резерв" as const,
                 qty,
@@ -737,7 +737,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           const movements = item
             ? [{
                 id: createId("mv"),
-                date: new Date().toISOString(),
+                date: nowISO(),
                 itemId: item.id,
                 operation: "Снят резерв" as const,
                 qty: part.qty,
@@ -846,7 +846,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           const reserved = reservedByItem(prev.orders, prev.stock).get(item.id) ?? 0;
           const qty = Math.min(input.qty, item.qty - reserved);
           if (qty <= 0) return prev;
-          const now = new Date().toISOString();
+          const now = nowISO();
           const amount = Math.round(qty * input.unitPrice);
           return {
             ...prev,
@@ -889,7 +889,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ...prev,
           expenses: prev.expenses.map((expense) =>
             expense.id === expenseId && expense.source === "supplier_refund" && expense.status !== "Возвращено"
-              ? { ...expense, status: "Возвращено" as const, refundConfirmedAt: new Date().toISOString() }
+              ? { ...expense, status: "Возвращено" as const, refundConfirmedAt: nowISO() }
               : expense,
           ),
         })),
@@ -897,7 +897,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         setDB((prev) => {
           const employee = prev.employees.find((item) => item.id === employeeId);
           if (!employee || amount <= 0) return prev;
-          const now = new Date().toISOString();
+          const now = nowISO();
           const sdelnaya = employee.payType !== "salary";
           return {
             ...prev,

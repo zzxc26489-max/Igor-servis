@@ -168,7 +168,7 @@ export function TopBar({
           </div>
           {subtitle && <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 max-sm:w-full sm:shrink-0">
           {actions ?? <NewRecordButton />}
         </div>
       </div>
