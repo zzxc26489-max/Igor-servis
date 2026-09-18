@@ -1,6 +1,6 @@
 import type { Client, Expense, Order, Payment, StockItem, Vehicle } from "../types";
 import { orderTotals } from "./order";
-import { paymentInRange, paymentMethodLabel, receivedInRange } from "./payments";
+import { paymentInRange, paymentMethodLabel, receivedInRange, signedPaymentAmount } from "./payments";
 
 export type PeriodKey = "today" | "week" | "month" | "year" | "all";
 
@@ -229,17 +229,19 @@ export function buildChart(range: Range, payments: Payment[], expenses: Expense[
 
   payments.filter((payment) => paymentInRange(payment, range.from, range.to)).forEach((payment) => {
     const bucket = buckets.get(keyFor(new Date(payment.at)));
-    if (bucket) bucket.revenue += payment.amount;
+    if (bucket) bucket.revenue += signedPaymentAmount(payment);
   });
 
   expenses.forEach((expense) => {
     const bucket = buckets.get(keyFor(new Date(expense.date)));
     if (!bucket) return;
-    if (expense.source === "supplier_refund") {
-      if (expense.status === "Возвращено") bucket.revenue += expense.amount;
+    if (isCostExpense(expense)) {
+      bucket.expenses += expense.amount;
       return;
     }
-    bucket.expenses += expense.amount;
+    if (isConfirmedRefund(expense)) {
+      bucket.expenses -= expense.amount;
+    }
   });
 
   return [...buckets.values()];
@@ -299,6 +301,7 @@ export function stockValue(stock: StockItem[]) {
 /** Заказы с непогашенным долгом — «ожидаем оплату». */
 export function pendingPayments(orders: Order[], clients: Client[], limit = 6) {
   return orders
+    .filter((order) => order.status !== "запись")
     .map((order) => ({
       order,
       client: clients.find((client) => client.id === order.clientId),
@@ -336,7 +339,7 @@ export function buildOperations(range: Range, orders: Order[], expenses: Expense
           : `Поступление · ${paymentMethodLabel(payment.method)}`,
         orderId: order?.id,
         orderNumber: order?.number,
-        amount: payment.amount,
+        amount: signedPaymentAmount(payment),
       };
     });
 
