@@ -78,7 +78,7 @@ function seedDB(): DB {
     orders: seed.orders,
     expenses: seed.expenses,
     invoices: seed.invoices,
-    payments: [],
+    payments: seed.payments,
   };
 }
 
