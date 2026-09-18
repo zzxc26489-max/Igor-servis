@@ -99,12 +99,22 @@ export interface OrderLinePart {
   name: string;
   sku?: string;
   qty: number;
+  unit?: string;
   price: number;
   /** Закупочная цена на момент добавления в заказ. */
   purchasePrice?: number;
   /** true — цену восстановили из текущего склада, а не знаем точно на дату продажи. */
   purchasePriceEstimated?: boolean;
   availability: "in_stock" | "reserved" | "ordered";
+}
+
+export interface OrderConsumable {
+  id: string;
+  key: string;
+  label: string;
+  /** Внутренняя сумма, распределённая по работам. Клиенту отдельной строкой не показывается. */
+  amount: number;
+  appliedAt: string;
 }
 
 export interface Order {
@@ -124,6 +134,8 @@ export interface Order {
   advisor?: string;
   works: OrderLineWork[];
   parts: OrderLinePart[];
+  /** Внутренние расходники: смазки, очистители и аэрозоли. Не выводятся клиенту отдельной строкой. */
+  consumables?: OrderConsumable[];
   discount?: number;
   paid?: number;
   notes?: string;
@@ -163,11 +175,34 @@ export interface StockItem {
   qty: number;
   minQty: number;
   purchasePrice: number;
+  /** Ячейка необязательна: быстрые расходники и детали под текущий ремонт могут лежать без адресного хранения. */
   cell?: string;
   unit: string;
+  /** Кросс-номера и аналоги для поиска одной детали по разным артикулам. */
+  crossNumbers?: string[];
+  /** OE-номера производителя автомобиля. */
+  oeNumbers?: string[];
+  /** Короткие подсказки применяемости. Финальная проверка — по VIN/каталогу. */
+  fitments?: string[];
+  catalogRefId?: string;
   lastPurchasePrice?: number;
   lastPurchaseAt?: string;
   supplier?: string;
+}
+
+export interface PartReference {
+  id: string;
+  name: string;
+  sku: string;
+  brand?: string;
+  category: string;
+  unit: string;
+  crossNumbers?: string[];
+  oeNumbers?: string[];
+  fitments: string[];
+  sourceName?: string;
+  sourceUrl?: string;
+  note?: string;
 }
 
 export interface StockMovement {
