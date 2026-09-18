@@ -24,6 +24,23 @@ export interface CloudSnapshot {
   data: unknown;
 }
 
+export interface CloudBackupInfo {
+  id: string;
+  revision: number;
+  createdAt: string;
+  createdBy: string;
+  reason: "automatic" | "manual" | "before_restore" | string;
+}
+
+export interface CloudAuditInfo {
+  id: number;
+  actorName: string;
+  action: string;
+  revision?: number;
+  changedSections: string[];
+  createdAt: string;
+}
+
 export type CloudSaveResult =
   | { ok: true; revision: number; updatedAt?: string }
   | { ok: false; conflict: true; revision: number; data: unknown };
@@ -109,4 +126,32 @@ export async function createCloudBackup(session: CloudSession): Promise<{ ok: tr
     { method: "POST", body: "{}" },
     session.access_token,
   ) as Promise<{ ok: true; createdAt: string }>;
+}
+
+
+export async function listCloudBackups(session: CloudSession, limit = 20): Promise<CloudBackupInfo[]> {
+  return request(
+    "/rest/v1/rpc/crm_list_backups",
+    { method: "POST", body: JSON.stringify({ p_limit: limit }) },
+    session.access_token,
+  ) as Promise<CloudBackupInfo[]>;
+}
+
+export async function listCloudAudit(session: CloudSession, limit = 50): Promise<CloudAuditInfo[]> {
+  return request(
+    "/rest/v1/rpc/crm_list_audit",
+    { method: "POST", body: JSON.stringify({ p_limit: limit }) },
+    session.access_token,
+  ) as Promise<CloudAuditInfo[]>;
+}
+
+export async function restoreCloudBackup(
+  session: CloudSession,
+  backupId: string,
+): Promise<{ ok: true; revision: number; updatedAt?: string }> {
+  return request(
+    "/rest/v1/rpc/crm_restore_backup",
+    { method: "POST", body: JSON.stringify({ p_backup_id: backupId }) },
+    session.access_token,
+  ) as Promise<{ ok: true; revision: number; updatedAt?: string }>;
 }

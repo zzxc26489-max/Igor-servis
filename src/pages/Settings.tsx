@@ -1,5 +1,5 @@
-import { useRef, useState, type FormEvent } from "react";
-import { IconAdjustments, IconBuildingStore, IconCloud, IconDatabase, IconDownload, IconInfoCircle, IconRefresh, IconUpload } from "@tabler/icons-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { IconAdjustments, IconBuildingStore, IconCloud, IconDatabase, IconDownload, IconHistory, IconInfoCircle, IconRefresh, IconRestore, IconUpload } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
@@ -16,6 +16,7 @@ export default function Settings() {
   const {
     company, settings, updateCompany, updateSettings, resetToSeed, exportDB, importDB,
     orders, clients, stock, expenses, cloud, uploadLocalToCloud, refreshFromCloud, backupCloud,
+    listBackups, listAudit, restoreBackup,
   } = useAppStore();
   const { showToast } = useToast();
   const confirm = useConfirm();
@@ -27,6 +28,24 @@ export default function Settings() {
   const [closeTime, setCloseTime] = useState(company.closeTime);
   const [inn, setInn] = useState(company.inn);
   const [responsible, setResponsible] = useState(company.responsible);
+  const [cloudBackups, setCloudBackups] = useState<Awaited<ReturnType<typeof listBackups>>>([]);
+  const [cloudAudit, setCloudAudit] = useState<Awaited<ReturnType<typeof listAudit>>>([]);
+  const [cloudAdminLoading, setCloudAdminLoading] = useState(false);
+
+  useEffect(() => {
+    if (!cloud.configured || cloud.status === "needs_upload") return;
+    let cancelled = false;
+    setCloudAdminLoading(true);
+    Promise.all([listBackups(), listAudit()])
+      .then(([backups, audit]) => {
+        if (cancelled) return;
+        setCloudBackups(backups);
+        setCloudAudit(audit);
+      })
+      .catch(() => undefined)
+      .finally(() => !cancelled && setCloudAdminLoading(false));
+    return () => { cancelled = true; };
+  }, [cloud.configured, cloud.revision, cloud.status, listAudit, listBackups]);
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -119,6 +138,19 @@ export default function Settings() {
   async function handleCloudBackup() {
     const error = await backupCloud();
     showToast(error ?? "Серверная резервная копия создана", error ? "error" : undefined);
+  }
+
+  async function handleRestoreCloudBackup(id: string, revision: number) {
+    const ok = await confirm({
+      title: "Восстановить серверную копию",
+      question: `Текущая общая база будет заменена данными из ревизии ${revision}.`,
+      note: "Перед восстановлением сервер автоматически сохранит ещё одну копию текущего состояния.",
+      confirmLabel: "Восстановить",
+      danger: true,
+    });
+    if (!ok) return;
+    const error = await restoreBackup(id);
+    showToast(error ?? "Серверная копия восстановлена", error ? "error" : undefined);
   }
 
   async function handleRefreshCloud() {
@@ -333,6 +365,59 @@ export default function Settings() {
               }}
             />
           </Card>
+
+          {cloud.configured && cloud.status !== "needs_upload" && (
+            <Card>
+              <div className="mb-4 flex items-center gap-3">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#edf4ff] text-[#3978c9]"><IconHistory size={22} /></div>
+                <div>
+                  <h2 className="panel-title">История сервера</h2>
+                  <p className="muted text-sm">Резервные копии и последние изменения общей базы</p>
+                </div>
+              </div>
+
+              {cloudAdminLoading ? (
+                <p className="muted text-sm">Загружаем историю…</p>
+              ) : (
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div>
+                    <h3 className="mb-2 text-sm font-semibold">Резервные копии</h3>
+                    <div className="space-y-2">
+                      {cloudBackups.slice(0, 8).map((backup) => (
+                        <div key={backup.id} className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm" style={{ borderColor: "var(--border)" }}>
+                          <div className="min-w-0">
+                            <b className="block">Ревизия {backup.revision}</b>
+                            <span className="muted block text-xs">{new Date(backup.createdAt).toLocaleString("ru-RU")} · {backup.createdBy} · {backup.reason}</span>
+                          </div>
+                          <Button variant="secondary" size="sm" onClick={() => void handleRestoreCloudBackup(backup.id, backup.revision)}>
+                            <IconRestore size={16} /> Восстановить
+                          </Button>
+                        </div>
+                      ))}
+                      {cloudBackups.length === 0 && <p className="muted text-sm">Серверных копий пока нет.</p>}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="mb-2 text-sm font-semibold">Последние действия</h3>
+                    <div className="space-y-2">
+                      {cloudAudit.slice(0, 12).map((entry) => (
+                        <div key={entry.id} className="rounded-lg border p-3 text-sm" style={{ borderColor: "var(--border)" }}>
+                          <div className="flex items-center justify-between gap-2">
+                            <b>{entry.actorName}</b>
+                            <span className="muted text-xs">{new Date(entry.createdAt).toLocaleString("ru-RU")}</span>
+                          </div>
+                          <p className="mt-1">{entry.action === "backup_restored" ? "Восстановил резервную копию" : entry.action === "database_initialized" ? "Создал общую базу" : "Сохранил изменения"}</p>
+                          {entry.changedSections?.length > 0 && <p className="muted mt-1 text-xs">Разделы: {entry.changedSections.join(", ")}</p>}
+                        </div>
+                      ))}
+                      {cloudAudit.length === 0 && <p className="muted text-sm">Записей пока нет.</p>}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
 
           <Card>
             <div className="mb-4 flex items-center gap-3">
