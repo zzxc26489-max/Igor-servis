@@ -1,10 +1,9 @@
 import { Link } from "react-router-dom";
 import { useAppStore } from "../store/AppStore";
-import { bookingLink, bookingTarget, liftLabel, liftState, toMinutes } from "../lib/lift";
+import { WORK_DAY_END, WORK_HOURS, bookingLink, bookingTarget, liftLabel, liftState, toMinutes } from "../lib/lift";
 import { todayISO } from "../lib/date";
 export { orderDay } from "../lib/lift";
 
-const DEFAULT_HOURS = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
 
 const PALETTE = [
   { bg: "#e8f5ed", border: "#c9e6d5" },
@@ -14,7 +13,7 @@ const PALETTE = [
 ];
 
 export default function LiftTimeline({
-  hours = DEFAULT_HOURS,
+  hours = WORK_HOURS,
   date,
 }: {
   hours?: string[];
@@ -23,8 +22,9 @@ export default function LiftTimeline({
 }) {
   const { lifts, orders, clients, vehicles } = useAppStore();
   const day = date ?? todayISO();
+  // Шкала заканчивается концом рабочего дня, а не «последний час плюс час».
   const startMinutes = toMinutes(hours[0]);
-  const endMinutes = toMinutes(hours[hours.length - 1]) + 60;
+  const endMinutes = Math.max(toMinutes(hours[hours.length - 1]) + 60, toMinutes(WORK_DAY_END));
   const span = endMinutes - startMinutes;
 
   const now = new Date();
@@ -38,7 +38,7 @@ export default function LiftTimeline({
 
   return (
     <div className="table-scroll">
-      <div className="min-w-[620px] px-4 pb-4">
+      <div className="min-w-[720px] px-4 pb-4">
         <div className="relative flex border-b pb-2 text-xs muted" style={{ borderColor: "var(--border)" }}>
           <div className="w-[132px] shrink-0" />
           <div className="relative flex-1">
@@ -117,11 +117,11 @@ export default function LiftTimeline({
 
                   {state.freeSlots.length === 0 && (
                     <Link
-                      to={bookingTarget(lift.id, day, state).to}
+                      to={bookingTarget(lift.id, day, state, orders, lift).to}
                       className="absolute inset-y-2 right-0 z-0 flex w-[160px] items-center justify-center rounded-lg border border-dashed px-2 text-xs muted transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
                       style={{ borderColor: "var(--border)" }}
                     >
-                      {bookingTarget(lift.id, day, state).label}
+                      {bookingTarget(lift.id, day, state, orders, lift).label}
                     </Link>
                   )}
                   {/* Показываем все окна, куда влезает час, а не только «после последней записи». */}

@@ -8,8 +8,6 @@ import { bookingTarget, liftLabel, liftState, orderDay } from "../lib/lift";
 import { plural } from "../lib/format";
 import { toISODate, todayISO } from "../lib/date";
 
-const WORK_HOURS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
-
 function shiftDay(day: string, delta: number) {
   const date = new Date(day);
   date.setDate(date.getDate() + delta);
@@ -79,7 +77,7 @@ export default function Schedule() {
           </div>
 
           <div className="hidden lg:block">
-            <LiftTimeline hours={WORK_HOURS} date={day} />
+            <LiftTimeline date={day} />
           </div>
 
           <div className="space-y-3 p-3 lg:hidden">
@@ -95,8 +93,8 @@ export default function Schedule() {
                     </span>
                   </div>
                   {liftOrders.length === 0 ? (
-                    <button onClick={() => navigate(bookingTarget(lift.id, day, state).to)} className="mt-2 w-full rounded-lg border border-dashed py-2 text-sm muted" style={{ borderColor: "var(--border)" }}>
-                      {bookingTarget(lift.id, day, state).label}
+                    <button onClick={() => navigate(bookingTarget(lift.id, day, state, orders, lift).to)} className="mt-2 w-full rounded-lg border border-dashed py-2 text-sm muted" style={{ borderColor: "var(--border)" }}>
+                      {bookingTarget(lift.id, day, state, orders, lift).label}
                     </button>
                   ) : (
                     <div className="mt-2 space-y-2">
@@ -115,11 +113,11 @@ export default function Schedule() {
                         );
                       })}
                       <button
-                        onClick={() => navigate(bookingTarget(lift.id, day, state).to)}
+                        onClick={() => navigate(bookingTarget(lift.id, day, state, orders, lift).to)}
                         className="w-full rounded-lg border border-dashed py-2 text-sm font-semibold text-[var(--accent)]"
                         style={{ borderColor: "var(--border)" }}
                       >
-                        {bookingTarget(lift.id, day, state).label}
+                        {bookingTarget(lift.id, day, state, orders, lift).label}
                       </button>
                     </div>
                   )}

@@ -93,7 +93,7 @@ export default function Dashboard() {
                   return (
                     <button
                       key={lift.id}
-                      onClick={() => navigate(bookingTarget(lift.id, day, state).to)}
+                      onClick={() => navigate(bookingTarget(lift.id, day, state, orders, lift).to)}
                       className="flex w-full items-center justify-between gap-3 rounded-xl border border-dashed px-3 py-3 text-left"
                       style={{ borderColor: "var(--border)" }}
                     >
@@ -146,11 +146,11 @@ export default function Dashboard() {
                       })}
                     </div>
                     <button
-                      onClick={() => navigate(bookingTarget(lift.id, day, state).to)}
+                      onClick={() => navigate(bookingTarget(lift.id, day, state, orders, lift).to)}
                       className="w-full border-t px-3 py-2 text-left text-sm font-semibold text-[var(--accent)]"
                       style={{ borderColor: "var(--border)" }}
                     >
-                      {bookingTarget(lift.id, day, state).label}
+                      {bookingTarget(lift.id, day, state, orders, lift).label}
                     </button>
                   </div>
                 );

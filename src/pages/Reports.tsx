@@ -6,7 +6,7 @@ import {
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { liftState } from "../lib/lift";
-import { getRange, ordersInRange, type PeriodKey } from "../lib/analytics";
+import { getRange, type PeriodKey } from "../lib/analytics";
 
 const PERIODS: { value: PeriodKey; label: string }[] = [
   { value: "week", label: "Неделя" },
@@ -15,7 +15,7 @@ const PERIODS: { value: PeriodKey; label: string }[] = [
   { value: "all", label: "Всё время" },
 ];
 import {
-  biggestDeviations, formatDuration, loadByLift, runningOrders,
+  actualMinutes, biggestDeviations, formatDuration, loadByLift, runningOrders,
   timingByExecutor, timingByService, timingSummary,
 } from "../lib/worktime";
 import { isCostExpense } from "../lib/analytics";
@@ -66,15 +66,20 @@ export default function Reports() {
 
   // Время считаем за выбранный период: за всё время цифры теряют смысл.
   const range = useMemo(() => getRange(period, 0), [period]);
-  const periodOrders = useMemo(() => ordersInRange(range, orders), [orders, range]);
-  const summary = useMemo(() => timingSummary(periodOrders), [periodOrders]);
-  const serviceTiming = useMemo(() => timingByService(periodOrders), [periodOrders]);
-  const executorTiming = useMemo(() => timingByExecutor(periodOrders), [periodOrders]);
-  const liftLoad = useMemo(
-    () => loadByLift(periodOrders, lifts.map((lift) => lift.id), range.from, range.to),
-    [lifts, periodOrders, range],
+  // Время режем по самому периоду: заказ мог начаться вчера, а закрыться сегодня.
+  const window = useMemo(() => ({ from: range.from, to: range.to }), [range]);
+  const timeOrders = useMemo(
+    () => orders.filter((order) => actualMinutes(order, window) > 0),
+    [orders, window],
   );
-  const deviations = useMemo(() => biggestDeviations(periodOrders), [periodOrders]);
+  const summary = useMemo(() => timingSummary(timeOrders, window), [timeOrders, window]);
+  const serviceTiming = useMemo(() => timingByService(timeOrders, window), [timeOrders, window]);
+  const executorTiming = useMemo(() => timingByExecutor(timeOrders, window), [timeOrders, window]);
+  const liftLoad = useMemo(
+    () => loadByLift(timeOrders, lifts.map((lift) => lift.id), window),
+    [lifts, timeOrders, window],
+  );
+  const deviations = useMemo(() => biggestDeviations(timeOrders, window), [timeOrders, window]);
   // Машины, которые стоят на подъёмнике прямо сейчас: видно, где уже перебор.
   const running = useMemo(() => runningOrders(orders), [orders]);
   const employees = computePayroll(rawEmployees, orders);

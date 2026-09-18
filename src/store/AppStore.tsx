@@ -21,6 +21,7 @@ import { orderTotals } from "../lib/order";
 import { reservedByItem } from "../lib/stock";
 import { formatPhone, formatPlate, looksRussian } from "../lib/formats";
 import { nowISO } from "../lib/date";
+import { backfillTimeline } from "../lib/worktime";
 
 const STORAGE_KEY = "igor-servis-db-v1";
 
@@ -92,6 +93,9 @@ function migrate(db: DB): DB {
       phone: formatPhone(client.phone) || client.phone,
       phone2: client.phone2 ? formatPhone(client.phone2) || client.phone2 : undefined,
     })),
+    // Старым заказам восстанавливаем историю статусов, иначе их фактическое
+    // время после ближайшей смены статуса оказалось бы нулевым.
+    orders: db.orders.map((order) => (order.timeline?.length ? order : { ...order, timeline: backfillTimeline(order) })),
     vehicles: withCodes(db.vehicles, CODE_PREFIX.vehicle).map((vehicle) => ({
       ...vehicle,
       plate: looksRussian(vehicle.plate) ? formatPlate(vehicle.plate) : vehicle.plate.trim().toUpperCase(),
@@ -346,10 +350,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           const now = nowISO();
 
           // Пишем историю статусов: из неё считается фактическое время на подъёмнике.
-          const timeline = [
-            ...(order.timeline ?? (order.createdAt ? [{ status: "запись" as const, at: order.createdAt }] : [])),
-            { status, at: now },
-          ];
+          const history = order.timeline?.length ? order.timeline : backfillTimeline(order);
+          const last = history[history.length - 1];
+          // Если текущего статуса в истории нет, дописываем его: иначе отрезок
+          // «на подъёмнике» не откроется и время потеряется.
+          const timeline = last?.status === order.status
+            ? [...history, { status, at: now }]
+            : [...history, { status: order.status, at: last?.at ?? order.createdAt }, { status, at: now }];
           const patch: Partial<Order> = { status, timeline };
           if (status === "готово" && !order.completedAt) patch.completedAt = now;
           if (status !== "готово" && status !== "выдан") patch.completedAt = undefined;

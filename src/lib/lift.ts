@@ -1,13 +1,6 @@
 import type { Lift, Order } from "../types";
 import { shiftISODate, toISODate, todayISO } from "./date";
 
-export const WORK_DAY_START = "08:00";
-export const WORK_DAY_END = "20:00";
-/** Стандартная длительность записи — столько же ставит форма новой записи. */
-export const SLOT_MINUTES = 60;
-/** Время предлагаем кратным четверти часа: «записать с 15:31» неудобно. */
-const STEP_MINUTES = 15;
-
 export function toMinutes(time: string) {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + (minutes || 0);
@@ -17,6 +10,23 @@ export function fromMinutes(minutes: number) {
   const clamped = Math.max(0, Math.min(24 * 60 - 1, Math.round(minutes)));
   return `${String(Math.floor(clamped / 60)).padStart(2, "0")}:${String(clamped % 60).padStart(2, "0")}`;
 }
+
+export const WORK_DAY_START = "08:00";
+export const WORK_DAY_END = "20:00";
+
+/**
+ * Часы для шкалы расписания. Одна константа на главную, расписание и расчёт
+ * свободных окон: раньше шкала на главной шла с 09:00 до 19:00, в расписании
+ * до 21:00, а окна считались с 08:00 до 20:00.
+ */
+export const WORK_HOURS = Array.from(
+  { length: (toMinutes(WORK_DAY_END) - toMinutes(WORK_DAY_START)) / 60 },
+  (_, index) => fromMinutes(toMinutes(WORK_DAY_START) + index * 60),
+);
+/** Стандартная длительность записи — столько же ставит форма новой записи. */
+export const SLOT_MINUTES = 60;
+/** Время предлагаем кратным четверти часа: «записать с 15:31» неудобно. */
+const STEP_MINUTES = 15;
 
 /** Дата визита: плановая, иначе день создания заказа. */
 export function orderDay(order: Order) {
@@ -123,17 +133,50 @@ export function liftLabel(state: LiftState) {
 }
 
 /**
- * Куда и с какой подписью ведёт кнопка записи. Если на сегодня часа уже не
- * осталось, предлагаем ближайший день, а не тупик «нет окна».
+ * Ближайший день и час, когда подъёмник реально свободен. Ищем вперёд, а не
+ * просто «завтра»: завтра стандартные 10:00 тоже могут быть заняты.
  */
-export function bookingTarget(liftId: number, day: string, state: LiftState) {
+export function nextFreeSlot(
+  orders: Order[],
+  lift: Lift,
+  fromDay: string,
+  daysAhead = 14,
+  now = new Date(),
+): { day: string; start: string } | null {
+  for (let offset = 0; offset <= daysAhead; offset += 1) {
+    const day = offset === 0 ? fromDay : shiftISODate(fromDay, offset);
+    const state = liftState(orders, lift, day, now);
+    if (state.suggestedStart) return { day, start: state.suggestedStart };
+  }
+  return null;
+}
+
+/**
+ * Куда и с какой подписью ведёт кнопка записи. Если на сегодня часа уже не
+ * осталось, ведём в первый реально свободный день, а не в пустое «завтра».
+ */
+export function bookingTarget(
+  liftId: number,
+  day: string,
+  state: LiftState,
+  orders?: Order[],
+  lift?: Lift,
+  now = new Date(),
+) {
   if (state.suggestedStart) {
     return {
       to: bookingLink(liftId, day, state.suggestedStart),
       label: state.orders.length === 0 ? "+ Записать" : `+ Записать с ${state.suggestedStart}`,
     };
   }
-  return { to: bookingLink(liftId, shiftISODate(day, 1)), label: "Записать на завтра" };
+
+  const next = orders && lift ? nextFreeSlot(orders, lift, shiftISODate(day, 1), 14, now) : null;
+  if (!next) return { to: bookingLink(liftId, shiftISODate(day, 1)), label: "Записать на другой день" };
+
+  const label = next.day === shiftISODate(day, 1)
+    ? `Записать завтра с ${next.start}`
+    : `Записать ${new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" }).format(new Date(`${next.day}T12:00:00`))} с ${next.start}`;
+  return { to: bookingLink(liftId, next.day, next.start), label };
 }
 
 /** Ссылка на новую запись с уже выбранным подъёмником, датой и временем. */
