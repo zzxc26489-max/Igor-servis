@@ -3,7 +3,7 @@ import { IconMapPin, IconSearch } from "@tabler/icons-react";
 import { Button, Modal } from "../components/ui";
 import { useAppStore } from "../store/AppStore";
 import { formatMoney } from "../lib/format";
-import { moneyInput } from "../lib/formats";
+import { isValidMoney, moneyInput } from "../lib/formats";
 import { clientPrice, margin } from "../lib/price";
 import { reservedByItem } from "../lib/stock";
 import type { StockItem } from "../types";
@@ -58,7 +58,10 @@ export default function AddPart({
     setQty("1");
   }
 
-  const count = Math.max(1, Number(qty) || 1);
+  const numericQty = Number(qty);
+  const validQty = Number.isInteger(numericQty) && numericQty > 0;
+  const count = validQty ? numericQty : 0;
+  const validPrice = isValidMoney(price);
   const clientSum = (Number(price) || 0) * count;
   const purchaseSum = (selected?.purchasePrice ?? 0) * count;
   const profit = margin(selected?.purchasePrice ?? 0, Number(price) || 0, count);
@@ -163,6 +166,7 @@ export default function AddPart({
                 />
               </div>
               {tooMany && <span className="mt-1 block text-xs" style={{ color: "var(--danger)" }}>Свободно только {free}</span>}
+              {!tooMany && qty !== "" && !validQty && <span className="mt-1 block text-xs" style={{ color: "var(--danger)" }}>Количество должно быть больше нуля</span>}
             </label>
             <label className="block text-sm">
               <span className="muted mb-1 block">Цена клиенту за {selected.unit}</span>
@@ -177,6 +181,7 @@ export default function AddPart({
               <span className="muted mt-1 block text-xs">
                 Наценка {settings.partMarkupPercent}% подставлена автоматически
               </span>
+              {price !== "" && !validPrice && <span className="mt-1 block text-xs" style={{ color: "var(--danger)" }}>Цена должна быть больше нуля и не более 10 млн ₽</span>}
             </label>
           </div>
 
@@ -198,7 +203,7 @@ export default function AddPart({
             <div className="flex gap-2">
               <Button variant="secondary" onClick={onClose}>Отмена</Button>
               <Button
-                disabled={tooMany || count <= 0 || !Number(price)}
+                disabled={tooMany || !validQty || !validPrice}
                 onClick={() => onSubmit(selected.id, count, Number(price) || 0)}
               >
                 Добавить в заказ

@@ -110,9 +110,17 @@ function migrate(db: DB): DB {
       phone: formatPhone(client.phone) || client.phone,
       phone2: client.phone2 ? formatPhone(client.phone2) || client.phone2 : undefined,
     })),
-    // Старым заказам восстанавливаем историю статусов, иначе их фактическое
-    // время после ближайшей смены статуса оказалось бы нулевым.
-    orders: db.orders.map((order) => (order.timeline?.length ? order : { ...order, timeline: backfillTimeline(order) })),
+    // Старым заказам восстанавливаем историю статусов и фиксируем закупочную
+    // цену строк запчастей, чтобы историческая маржа не менялась после новых приёмок.
+    orders: db.orders.map((order) => ({
+      ...order,
+      timeline: order.timeline?.length ? order.timeline : backfillTimeline(order),
+      parts: order.parts.map((part) => {
+        if (part.purchasePrice !== undefined) return part;
+        const stockItem = db.stock.find((item) => item.sku === part.sku);
+        return stockItem ? { ...part, purchasePrice: stockItem.purchasePrice } : part;
+      }),
+    })),
     vehicles: withCodes(db.vehicles, CODE_PREFIX.vehicle).map((vehicle) => ({
       ...vehicle,
       plate: looksRussian(vehicle.plate) ? formatPlate(vehicle.plate) : vehicle.plate.trim().toUpperCase(),
@@ -188,8 +196,8 @@ interface AppStoreValue extends DB {
   setOrderStatus: (id: string, status: OrderStatus) => void;
   /** Добавить запчасть со склада в заказ (резерв, без списания остатка). */
   reservePart: (orderId: string, itemId: string, qty: number, price: number) => string | null;
-  /** Убрать запчасть из заказа и снять резерв. */
-  releasePart: (orderId: string, partId: string) => void;
+  /** Убрать запчасть из заказа и снять резерв. Выданный заказ менять нельзя. */
+  releasePart: (orderId: string, partId: string) => string | null;
   /** Принять оплату от клиента; больше долга принять нельзя. */
   acceptPayment: (orderId: string, amount: number) => void;
   /** Возврат запчасти поставщику: списывает со склада и заводит ожидание денег. */
@@ -421,17 +429,33 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             error = "Позиция не найдена";
             return prev;
           }
-          const reserved = reservedByItem(prev.orders, prev.stock).get(item.id) ?? 0;
-          const available = item.qty - reserved;
-          if (qty <= 0) {
-            error = "Количество должно быть больше нуля";
+          if (order.status === "выдан") {
+            error = "Выданный заказ нельзя изменять. Сначала верните автомобиль в работу.";
             return prev;
           }
+          if (!Number.isInteger(qty) || qty <= 0) {
+            error = "Количество должно быть целым числом больше нуля";
+            return prev;
+          }
+          if (!Number.isFinite(price) || price <= 0 || price > 10_000_000) {
+            error = "Цена должна быть больше нуля и не более 10 млн ₽";
+            return prev;
+          }
+          const reserved = reservedByItem(prev.orders, prev.stock).get(item.id) ?? 0;
+          const available = item.qty - reserved;
           if (qty > available) {
             error = `Свободно только ${available} ${item.unit}: ${reserved} уже в резерве`;
             return prev;
           }
-          const part = { id: createId("part"), name: item.name, sku: item.sku, qty, price, availability: "reserved" as const };
+          const part = {
+            id: createId("part"),
+            name: item.name,
+            sku: item.sku,
+            qty,
+            price,
+            purchasePrice: item.purchasePrice,
+            availability: "reserved" as const,
+          };
           return {
             ...prev,
             orders: prev.orders.map((entry) => (entry.id === orderId ? { ...entry, parts: [...entry.parts, part] } : entry)),
@@ -452,16 +476,20 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return error;
       },
-      releasePart: (orderId, partId) =>
+      releasePart: (orderId, partId) => {
+        let error: string | null = null;
         setDB((prev) => {
           const order = prev.orders.find((item) => item.id === orderId);
           const part = order?.parts.find((item) => item.id === partId);
-          if (!order || !part) return prev;
+          if (!order || !part) {
+            error = "Запчасть в заказе не найдена";
+            return prev;
+          }
+          if (order.status === "выдан") {
+            error = "Выданный заказ нельзя изменять. Сначала верните автомобиль в работу.";
+            return prev;
+          }
           const item = prev.stock.find((entry) => entry.sku === part.sku);
-          // Если заказ уже выдан, запчасть была списана — возвращаем её на полку.
-          const stock = order.status === "выдан" && item
-            ? prev.stock.map((entry) => (entry.id === item.id ? { ...entry, qty: entry.qty + part.qty } : entry))
-            : prev.stock;
           const movements = item
             ? [{
                 id: createId("mv"),
@@ -476,13 +504,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             : prev.stockMovements;
           return {
             ...prev,
-            stock,
             stockMovements: movements,
             orders: prev.orders.map((entry) =>
               entry.id === orderId ? { ...entry, parts: entry.parts.filter((item) => item.id !== partId) } : entry,
             ),
           };
-        }),
+        });
+        return error;
+      },
       acceptPayment: (orderId, amount) =>
         setDB((prev) => {
           const order = prev.orders.find((item) => item.id === orderId);

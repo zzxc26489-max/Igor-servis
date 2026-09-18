@@ -141,6 +141,14 @@ export default function OrderDetail() {
 
   function handleAddWork(work: NewWork) {
     if (!order) return;
+    if (order.status === "выдан") {
+      showToast("Выданный заказ нельзя изменять. Сначала верните автомобиль в работу.", "error");
+      return;
+    }
+    if (!Number.isInteger(work.qty) || work.qty <= 0 || work.price <= 0 || work.price > 10_000_000) {
+      showToast("Проверьте количество и цену работы", "error");
+      return;
+    }
     const newWork: OrderLineWork = { id: createId("work"), ...work };
     const nextWorks = [...order.works, newWork];
     const target = Number(targetTotal);
@@ -151,6 +159,10 @@ export default function OrderDetail() {
 
   function handleRemoveWork(workId: string) {
     if (!order) return;
+    if (order.status === "выдан") {
+      showToast("Выданный заказ нельзя изменять. Сначала верните автомобиль в работу.", "error");
+      return;
+    }
     const nextWorks = order.works.filter((w) => w.id !== workId);
     const target = Number(targetTotal);
     updateOrder(order.id, { works: settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(nextWorks, target) : nextWorks });
@@ -159,6 +171,14 @@ export default function OrderDetail() {
 
   async function handleAddPart(itemId: string, qty: number, price: number) {
     if (!order) return;
+    if (order.status === "выдан") {
+      showToast("Выданный заказ нельзя изменять. Сначала верните автомобиль в работу.", "error");
+      return;
+    }
+    if (!Number.isInteger(qty) || qty <= 0 || price <= 0 || price > 10_000_000) {
+      setPartError("Проверьте количество и цену запчасти");
+      return;
+    }
     setPartError("");
     const stockItem = stock.find((item) => item.id === itemId);
     if (!stockItem) return;
@@ -176,7 +196,7 @@ export default function OrderDetail() {
         { label: "Цена клиенту", value: formatMoney(price * qty) },
         { label: "Свободно после резерва", value: `${free - qty} ${stockItem.unit}` },
         {
-          label: "Заработок на запчасти",
+          label: "Наценка до скидки",
           value: `${formatMoney(profit.rub)}${profit.percent !== null ? ` · ${profit.percent}%` : ""}`,
           total: true,
           tone: profit.rub > 0 ? "accent" : "danger",
@@ -198,12 +218,13 @@ export default function OrderDetail() {
 
   async function handleRemovePart(part: OrderLinePart) {
     if (!order) return;
-    const issued = order.status === "выдан";
+    if (order.status === "выдан") {
+      showToast("Выданный заказ нельзя изменять. Сначала верните автомобиль в работу.", "error");
+      return;
+    }
     const ok = await confirm({
       title: "Убрать запчасть из заказа",
-      question: issued
-        ? "Заказ уже выдан — запчасть вернётся на склад, сумма заказа уменьшится."
-        : "Резерв снимется, запчасть снова станет свободной на складе.",
+      question: "Резерв снимется, запчасть снова станет свободной на складе.",
       summary: [
         { label: "Запчасть", value: `${part.name}${part.sku ? ` · ${part.sku}` : ""}` },
         { label: "Количество", value: part.qty },
@@ -213,8 +234,12 @@ export default function OrderDetail() {
       danger: true,
     });
     if (!ok) return;
-    releasePart(order.id, part.id);
-    showToast("Запчасть возвращена на склад", "error");
+    const error = releasePart(order.id, part.id);
+    if (error) {
+      showToast(error, "error");
+      return;
+    }
+    showToast("Резерв запчасти снят");
   }
 
   function handleSaveDiscount() {
@@ -576,7 +601,7 @@ export default function OrderDetail() {
                 <Card className="overflow-hidden p-0">
                   <div className="flex items-center justify-between p-4">
                     <h2 className="panel-title">Работы</h2>
-                    <button onClick={() => setAddingWork(true)} className="text-sm font-semibold print:hidden" style={{ color: "var(--accent)" }}>
+                    <button onClick={() => order.status === "выдан" ? showToast("Сначала верните автомобиль в работу", "error") : setAddingWork(true)} className="text-sm font-semibold print:hidden" style={{ color: order.status === "выдан" ? "var(--text-muted)" : "var(--accent)" }}>
                       + Добавить работу
                     </button>
                   </div>
@@ -626,7 +651,14 @@ export default function OrderDetail() {
                 <Card className="overflow-hidden p-0">
                   <div className="flex items-center justify-between p-4">
                     <h2 className="panel-title">Запчасти</h2>
-                    <button onClick={() => { setPartError(""); setAddingPart(true); }} className="text-sm font-semibold print:hidden" style={{ color: "var(--accent)" }}>
+                    <button onClick={() => {
+                       if (order.status === "выдан") {
+                         showToast("Сначала верните автомобиль в работу", "error");
+                         return;
+                       }
+                       setPartError("");
+                       setAddingPart(true);
+                     }} className="text-sm font-semibold print:hidden" style={{ color: order.status === "выдан" ? "var(--text-muted)" : "var(--accent)" }}>
                       + Со склада
                     </button>
                   </div>
@@ -649,13 +681,14 @@ export default function OrderDetail() {
                               {(() => {
                                 // Показываем заработок на запчасти: закупка есть на складе.
                                 const item = stock.find((entry) => entry.sku === p.sku);
-                                if (!item) return null;
-                                const profit = margin(item.purchasePrice, p.price, p.qty);
+                                const purchasePrice = p.purchasePrice ?? item?.purchasePrice;
+                                if (purchasePrice === undefined) return null;
+                                const profit = margin(purchasePrice, p.price, p.qty);
                                 return (
                                   <>
-                                    {p.sku ? " · " : ""}закупка {formatMoney(item.purchasePrice * p.qty)}
+                                    {p.sku ? " · " : ""}закупка {formatMoney(purchasePrice * p.qty)}
                                     <span style={{ color: profit.rub > 0 ? "var(--accent)" : "var(--danger)" }}>
-                                      {" "}· заработок {formatMoney(profit.rub)}
+                                      {" "}· наценка до скидки {formatMoney(profit.rub)}
                                     </span>
                                   </>
                                 );

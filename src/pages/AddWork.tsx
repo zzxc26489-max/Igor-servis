@@ -3,7 +3,7 @@ import { IconSearch } from "@tabler/icons-react";
 import { Button, Modal } from "../components/ui";
 import { useAppStore } from "../store/AppStore";
 import { formatMoney } from "../lib/format";
-import { moneyInput } from "../lib/formats";
+import { isValidMoney, moneyInput } from "../lib/formats";
 import { formatDuration } from "../lib/worktime";
 import type { Service } from "../types";
 
@@ -64,7 +64,10 @@ export default function AddWork({ onClose, onSubmit }: { onClose: () => void; on
   }
 
   const chosen = selected || custom;
-  const count = Math.max(1, Number(qty) || 1);
+  const numericQty = Number(qty);
+  const validQty = Number.isInteger(numericQty) && numericQty > 0;
+  const count = validQty ? numericQty : 0;
+  const validPrice = isValidMoney(price);
   const total = (Number(price) || 0) * count;
 
   return (
@@ -189,7 +192,7 @@ export default function AddWork({ onClose, onSubmit }: { onClose: () => void; on
             <div className="flex gap-2">
               <Button variant="secondary" onClick={onClose}>Отмена</Button>
               <Button
-                disabled={!name.trim() || !Number(price)}
+                disabled={!name.trim() || !validQty || !validPrice}
                 onClick={() => onSubmit({
                   name: name.trim(),
                   qty: count,

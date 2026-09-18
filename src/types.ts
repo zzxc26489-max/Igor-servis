@@ -100,6 +100,8 @@ export interface OrderLinePart {
   sku?: string;
   qty: number;
   price: number;
+  /** Закупочная цена на момент добавления в заказ. */
+  purchasePrice?: number;
   availability: "in_stock" | "reserved" | "ordered";
 }
 
