@@ -2,6 +2,39 @@
 -- но и данные, которые RPC отдаёт браузеру и принимает обратно.
 -- Выполнять ПОСЛЕ supabase/001_crm_cloud.sql.
 
+create or replace function public.crm_parts_orders_view(p_orders jsonb)
+returns jsonb
+language sql
+immutable
+set search_path = public
+as $
+  select coalesce(
+    jsonb_agg(
+      jsonb_set(
+        item - 'paid' - 'discount',
+        '{works}',
+        coalesce((
+          select jsonb_agg(
+            jsonb_build_object(
+              'id', work ->> 'id',
+              'name', work ->> 'name',
+              'qty', coalesce((work ->> 'qty')::numeric, 1),
+              'price', 0,
+              'normMinutes', work -> 'normMinutes'
+            )
+          )
+          from jsonb_array_elements(coalesce(item -> 'works', '[]'::jsonb)) work
+        ), '[]'::jsonb),
+        true
+      )
+    ),
+    '[]'::jsonb
+  )
+  from jsonb_array_elements(coalesce(p_orders, '[]'::jsonb)) item;
+$;
+
+revoke all on function public.crm_parts_orders_view(jsonb) from public;
+
 create or replace function public.crm_role_view(p_data jsonb, p_role text)
 returns jsonb
 language plpgsql
@@ -48,6 +81,7 @@ begin
 
   return p_data || jsonb_build_object(
     'employees', v_employees,
+    'orders', public.crm_parts_orders_view(p_data -> 'orders'),
     'payments', '[]'::jsonb,
     'invoices', '[]'::jsonb,
     'expenses', v_expenses
@@ -223,7 +257,6 @@ begin
       'lifts', coalesce(p_data -> 'lifts', v_current.data -> 'lifts'),
       'clients', coalesce(p_data -> 'clients', v_current.data -> 'clients'),
       'vehicles', coalesce(p_data -> 'vehicles', v_current.data -> 'vehicles'),
-      'stock', coalesce(p_data -> 'stock', v_current.data -> 'stock'),
       'stockMovements', coalesce(p_data -> 'stockMovements', v_current.data -> 'stockMovements'),
       'orders', coalesce(p_data -> 'orders', v_current.data -> 'orders'),
       'payments', coalesce(p_data -> 'payments', v_current.data -> 'payments')
