@@ -1,4 +1,4 @@
-import { toISODate } from "../lib/date";
+import { toISODate } from "../lib/date.ts";
 import type {
   Client,
   Employee,
