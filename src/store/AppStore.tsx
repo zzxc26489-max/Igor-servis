@@ -900,6 +900,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             .filter((part) => Number.isFinite(part.amount) && part.amount > 0)
             .map((part) => ({ ...part, amount: Math.round(part.amount) }));
           const total = normalized.reduce((sum, part) => sum + part.amount, 0);
+          const shift = activeCashShift(prev.cashShifts);
+          if (normalized.some((part) => part.method === "cash") && !shift) {
+            error = "Для оплаты наличными сначала откройте кассовую смену в Финансах → Касса";
+            return prev;
+          }
           if (total <= 0) {
             error = "Укажите сумму хотя бы для одного способа оплаты";
             return prev;
@@ -910,7 +915,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             return prev;
           }
           const at = nowISO();
-          const shiftId = activeCashShift(prev.cashShifts)?.id;
+          const shiftId = shift?.id;
           return {
             ...prev,
             orders: prev.orders.map((item) =>
@@ -942,6 +947,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             return prev;
           }
           const accepted = Math.round(amount);
+          const shift = activeCashShift(prev.cashShifts);
+          if (method === "cash" && !shift) {
+            error = "Для возврата наличными сначала откройте кассовую смену в Финансах → Касса";
+            return prev;
+          }
           if (!Number.isFinite(accepted) || accepted <= 0) {
             error = "Сумма возврата должна быть больше нуля";
             return prev;
@@ -952,7 +962,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             return prev;
           }
           const at = nowISO();
-          const shiftId = activeCashShift(prev.cashShifts)?.id;
+          const shiftId = shift?.id;
           return {
             ...prev,
             orders: prev.orders.map((item) =>
