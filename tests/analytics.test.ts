@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildChart, computeMetrics, type Range } from "../src/lib/analytics.ts";
+import { buildChart, computeMetrics, pendingPayments, type Range } from "../src/lib/analytics.ts";
 import { computePayroll } from "../src/lib/payroll.ts";
 import type { Employee, Expense, Order, Payment } from "../src/types.ts";
 
@@ -60,4 +60,29 @@ test("payroll uses only issued orders everywhere", () => {
     order("ready", "готово"),
   ]);
   assert.equal(result[0].accrued, 1_000);
+});
+
+
+test("confirmed supplier refund belongs to confirmation date", () => {
+  const expenses: Expense[] = [{
+    id: "refund-late",
+    date: "2026-08-31",
+    category: "Возврат поставщику",
+    description: "Возврат",
+    amount: 700,
+    counterparty: "Поставщик",
+    status: "Возвращено",
+    source: "supplier_refund",
+    refundConfirmedAt: "2026-09-05T12:00:00",
+  }];
+  const metrics = computeMetrics(range, [], expenses, 0, []);
+  assert.equal(metrics.refunds, 700);
+  assert.equal(metrics.expenses, -700);
+  assert.equal(buildChart(range, [], expenses).reduce((sum, point) => sum + point.expenses, 0), -700);
+});
+
+test("future booking is not shown as waiting for payment", () => {
+  const booking = order("future", "запись");
+  booking.paid = 0;
+  assert.equal(pendingPayments([booking], [], 10).length, 0);
 });
