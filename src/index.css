@@ -127,6 +127,49 @@ button { cursor: pointer; }
   }
   .act-table { font-size: 8.5pt; }
 
+  /* Заказ-наряд печатается как документ: без вкладок, кнопок и боковой колонки. */
+  .order-doc {
+    font-size: 9.5pt;
+    line-height: 1.3;
+  }
+  .order-doc .rounded-xl,
+  .order-doc .rounded-lg {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .order-doc > *:not(:first-child) {
+    margin-top: 3mm !important;
+  }
+  /* Полоса «клиент / авто / подъёмник» на бумаге — плотная таблица без плашек. */
+  .order-doc .order-facts {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 6mm !important;
+    border: 0 !important;
+    background: transparent !important;
+    margin-bottom: 2mm !important;
+  }
+  .order-doc .order-facts > div {
+    background: transparent !important;
+    padding: 0.6mm 0 !important;
+  }
+  .order-doc .order-facts .fact-icon { display: none !important; }
+  /* Боковая колонка скрыта — таблицы должны занять всю ширину листа. */
+  .order-doc .order-body {
+    display: block !important;
+    gap: 0 !important;
+  }
+  .order-doc .order-body > div { width: 100% !important; }
+  .order-doc .app-table { font-size: 9pt; }
+  .order-doc .app-table th,
+  .order-doc .app-table td { padding: 0.3rem 0.4rem; }
+  .order-doc .app-table th { background: #f4f6f4 !important; }
+  .order-doc .panel-title { font-size: 10pt !important; }
+  .order-doc .space-y-4 > * + * { margin-top: 3mm !important; }
+  .order-doc section,
+  .order-doc table tr { break-inside: avoid; page-break-inside: avoid; }
+  .order-print-signs { break-inside: avoid; page-break-inside: avoid; }
+
   /* Акт печатается в альбомной ориентации: короткий заказ помещается на один лист. */
   .work-act .act-tables {
     display: grid;

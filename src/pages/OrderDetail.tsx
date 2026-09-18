@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
-  IconArrowLeft, IconCalendarTime, IconCar, IconCheck, IconClipboardText, IconFileDescription,
-  IconNotes, IconPrinter, IconTool, IconTrash, IconUser,
+  IconArrowBackUp, IconArrowLeft, IconCalendarTime, IconCar, IconCheck, IconClipboardText,
+  IconFileDescription, IconNotes, IconPrinter, IconTool, IconTrash, IconUser,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
@@ -96,6 +96,8 @@ export default function OrderDetail() {
     : null;
   const nextStatusLabel =
     nextStatus === "готово" ? "Завершить работы" : nextStatus === "выдан" ? "Выдать автомобиль" : nextStatus ? `В статус «${nextStatus}»` : null;
+  // Клиенту приспичило доделать — машину надо вернуть в работу с любого этапа.
+  const canReopen = order.status === "готово" || order.status === "выдан";
 
   function adjustWorkPrices(works: OrderLineWork[], target: number, partsAmount = partsTotal, discountAmount = discount) {
     const targetWorksTotal = target - partsAmount + discountAmount;
@@ -292,6 +294,7 @@ export default function OrderDetail() {
     if (!order || next === order.status) return;
     const issuing = next === "выдан";
     const reverting = order.status === "выдан" && next !== "выдан";
+    const reopening = canReopen && (next === "в работе" || next === "диагностика");
     const summary: Parameters<typeof confirm>[0]["summary"] = [
       { label: "Заказ-наряд", value: order.number },
       { label: "Автомобиль", value: carTitle },
@@ -309,12 +312,14 @@ export default function OrderDetail() {
       summary.push({ label: "Останется долг клиента", value: formatMoney(debt), total: true, tone: "danger" });
     }
     const ok = await confirm({
-      title: issuing ? "Выдать автомобиль" : `Перевести в статус «${next}»`,
+      title: issuing ? "Выдать автомобиль" : reopening ? "Вернуть в работу" : `Перевести в статус «${next}»`,
       question: issuing
         ? "Запчасти спишутся со склада, заказ попадёт в закрытые и в статистику по выработке."
         : reverting
-          ? "Выдача откатится, списанные запчасти вернутся на склад."
-          : "Статус заказ-наряда изменится.",
+          ? "Выдача откатится, списанные запчасти вернутся на склад — заказ снова можно дополнять работами и запчастями."
+          : reopening
+            ? "Заказ снова станет открытым: можно добавить работы и запчасти, принять доплату."
+            : "Статус заказ-наряда изменится.",
       summary,
       note: issuing && debt > 0 ? "Клиент остаётся должен — заказ попадёт в «Ожидаем оплату»." : undefined,
       confirmLabel: issuing ? "Выдать" : "Изменить статус",
@@ -345,6 +350,11 @@ export default function OrderDetail() {
         actions={
           <>
             <StatusBadge status={order.status} />
+            {canReopen && (
+              <Button variant="secondary" onClick={() => handleChangeStatus("в работе")}>
+                <IconArrowBackUp size={18} /> Вернуть в работу
+              </Button>
+            )}
             {nextStatusLabel && (
               <Button onClick={() => nextStatus && handleChangeStatus(nextStatus)}>
                 <IconCheck size={18} /> {nextStatusLabel}
@@ -357,6 +367,7 @@ export default function OrderDetail() {
         }
       />
       <Page>
+        <div className="order-doc">
         <div className="mb-4 hidden print:block">
           <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--border)" }}>
             <div>
@@ -372,7 +383,7 @@ export default function OrderDetail() {
         </div>
 
         <div
-          className="mb-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border shadow-[0_2px_8px_rgba(23,34,30,0.045)] sm:grid-cols-2 lg:grid-cols-4"
+          className="order-facts mb-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border shadow-[0_2px_8px_rgba(23,34,30,0.045)] sm:grid-cols-2 lg:grid-cols-4"
           style={{ background: "var(--border)", borderColor: "var(--border)" }}
         >
           <InfoCell icon={<IconUser size={18} />} tone="#e9f5ed" color="var(--accent)" label="Клиент">
@@ -410,6 +421,7 @@ export default function OrderDetail() {
         </div>
 
         <Card className="mb-4 p-3 print:hidden">
+          <p className="muted mb-2 text-center text-[11px]">Нажмите на этап, чтобы перевести заказ вперёд или вернуть назад</p>
           <div className="flex items-center justify-between">
             {STATUS_FLOW.map((step, idx) => (
               <div key={step} className="relative flex min-w-0 flex-1 flex-col items-center">
@@ -433,7 +445,7 @@ export default function OrderDetail() {
           </div>
         </Card>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="order-body grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0">
             <div className="mb-3 flex gap-1 overflow-x-auto rounded-xl border bg-white p-1 print:hidden" style={{ borderColor: "var(--border)" }}>
               {TABS.map((item) => (
@@ -643,7 +655,7 @@ export default function OrderDetail() {
             </div>
 
             {tab === "Приёмка" && (
-              <Card>
+              <Card className="print:hidden">
                 <h2 className="panel-title mb-3 flex items-center gap-2"><IconClipboardText size={18} /> Приёмка автомобиля</h2>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <label className="block text-sm">
@@ -694,7 +706,7 @@ export default function OrderDetail() {
             )}
 
             {tab === "Оплаты" && (
-              <Card className="overflow-hidden p-0">
+              <Card className="overflow-hidden p-0 print:hidden">
                 <div className="p-4">
                   <h2 className="panel-title">Оплаты по заказу</h2>
                 </div>
@@ -725,7 +737,7 @@ export default function OrderDetail() {
             )}
 
             {tab === "Документы" && (
-              <Card>
+              <Card className="print:hidden">
                 <h2 className="panel-title mb-3">Документы по заказу</h2>
                 <div className="flex flex-wrap gap-2">
                   <Link to={`/orders/${order.id}/act`}>
@@ -747,7 +759,7 @@ export default function OrderDetail() {
             )}
           </div>
 
-          <div className="hidden min-w-0 space-y-4 xl:block">
+          <div className="hidden min-w-0 space-y-4 xl:block print:hidden">
             <Card className="xl:sticky xl:top-20">
               <div className="muted text-xs font-semibold uppercase tracking-[.07em]">
                 {debt < 0 ? "Переплата клиента" : "Осталось оплатить"}
@@ -846,12 +858,31 @@ export default function OrderDetail() {
         <div className="h-16 xl:hidden print:hidden" />
 
         <div className="hidden print:block">
-          <div className="mt-4 text-sm">
+          <div className="order-print-notes mt-3 text-sm">
             <div><b>Жалоба клиента:</b> {order.complaint || "—"}</div>
             <div><b>Диагностика:</b> {order.diagnosis || "—"}</div>
             <div><b>Внешние дефекты:</b> {order.defects || "—"}</div>
-            <div><b>К оплате:</b> {formatMoney(due)} · <b>Оплачено:</b> {formatMoney(paid)} · <b>Долг:</b> {formatMoney(debt)}</div>
+            {order.guaranteeMonths ? <div><b>Гарантия:</b> {order.guaranteeMonths} мес.</div> : null}
           </div>
+
+          <div className="order-print-total mt-3 border-t pt-2 text-sm" style={{ borderColor: "var(--border)" }}>
+            <div>Работы: {formatMoney(worksTotal)} · Запчасти: {formatMoney(partsTotal)}{discount > 0 ? ` · Скидка: −${formatMoney(discount)}` : ""}</div>
+            <div className="text-base font-bold">
+              К оплате: {formatMoney(due)} · Оплачено: {formatMoney(paid)} · Долг: {formatMoney(Math.max(0, debt))}
+            </div>
+          </div>
+
+          <div className="order-print-signs mt-6 grid grid-cols-2 gap-10 text-sm">
+            <div>
+              <div>Работы сдал (исполнитель)</div>
+              <div className="mt-6 border-t pt-1" style={{ borderColor: "var(--text)" }}>{order.advisor || company.responsible}</div>
+            </div>
+            <div>
+              <div>Работы принял (заказчик)</div>
+              <div className="mt-6 border-t pt-1" style={{ borderColor: "var(--text)" }}>{client?.name ?? ""}</div>
+            </div>
+          </div>
+        </div>
         </div>
       </Page>
 
@@ -912,7 +943,7 @@ function InfoCell({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-3 bg-white p-3.5">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: tone, color }}>{icon}</span>
+      <span className="fact-icon grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: tone, color }}>{icon}</span>
       <span className="min-w-0 flex-1">
         <span className="muted block text-[11px]">{label}</span>
         {children}

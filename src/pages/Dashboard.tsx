@@ -83,32 +83,72 @@ export default function Dashboard() {
               <LiftTimeline date={day} />
             </div>
 
-            <div className="p-3 pt-0 lg:hidden">
-              <div className="flex flex-wrap gap-2">
-                {lifts.map((lift) => {
-                  const order = orders.find(
-                    (item) => item.liftId === lift.id && item.status !== "выдан" && orderDay(item) === day,
-                  );
+            {/* На телефоне показываем сразу, какая машина на каком подъёмнике. */}
+            <div className="space-y-2 p-3 pt-0 lg:hidden">
+              {lifts.map((lift) => {
+                const liftOrders = orders
+                  .filter((item) => item.liftId === lift.id && item.status !== "выдан" && orderDay(item) === day)
+                  .sort((a, b) => (a.scheduledStart ?? "").localeCompare(b.scheduledStart ?? ""));
+
+                if (liftOrders.length === 0) {
                   return (
                     <button
                       key={lift.id}
-                      onClick={() => (order ? navigate(`/orders/${order.id}`) : navigate("/orders/new"))}
-                      className="flex min-w-[84px] flex-1 flex-col items-center gap-1 rounded-xl border px-3 py-3 text-sm"
-                      style={{
-                        borderColor: order ? "transparent" : "var(--border)",
-                        borderStyle: order ? "solid" : "dashed",
-                        background: order ? "var(--accent-soft)" : "white",
-                        color: order ? "var(--accent-strong)" : "var(--text-muted)",
-                      }}
+                      onClick={() => navigate("/orders/new")}
+                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-dashed px-3 py-3 text-left"
+                      style={{ borderColor: "var(--border)" }}
                     >
-                      <IconTool size={18} />
-                      <span className="font-semibold">{order ? lift.id : `+ ${lift.id}`}</span>
+                      <span className="flex items-center gap-2 text-sm font-semibold">
+                        <IconTool size={17} className="muted" /> {lift.name}
+                      </span>
+                      <span className="text-sm font-semibold text-[var(--accent)]">+ Записать</span>
                     </button>
                   );
-                })}
-              </div>
-              <p className="muted mt-2 px-1 text-xs">Нажмите на подъёмник, чтобы открыть заказ или записать машину</p>
+                }
+
+                return (
+                  <div key={lift.id} className="rounded-xl border" style={{ borderColor: "var(--border)" }}>
+                    <div className="flex items-center justify-between gap-2 border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
+                      <span className="flex items-center gap-2 text-sm font-semibold">
+                        <IconTool size={17} style={{ color: "var(--accent)" }} /> {lift.name}
+                      </span>
+                      <span className="muted text-xs">
+                        {liftOrders.length > 1 ? `${liftOrders.length} записи` : liftOrders[0].scheduledStart ? `с ${liftOrders[0].scheduledStart}` : "без времени"}
+                      </span>
+                    </div>
+                    <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                      {liftOrders.map((item) => {
+                        const vehicle = vehicles.find((entry) => entry.id === item.vehicleId);
+                        const client = clients.find((entry) => entry.id === item.clientId);
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => navigate(`/orders/${item.id}`)}
+                            className="flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-semibold">
+                                {vehicle ? `${vehicle.make} ${vehicle.model}` : item.number}
+                              </span>
+                              <span className="muted block truncate text-xs">
+                                {vehicle?.plate ?? client?.name} · {item.works[0]?.name ?? item.complaint ?? "Осмотр"}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-right">
+                              <span className="block text-xs font-semibold tabular-nums">
+                                {item.scheduledStart ? `${item.scheduledStart}–${item.scheduledEnd ?? ""}` : "—"}
+                              </span>
+                              <span className="mt-1 block"><StatusBadge status={item.status} /></span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+
           </Card>
 
           <Card className="overflow-hidden p-0">
