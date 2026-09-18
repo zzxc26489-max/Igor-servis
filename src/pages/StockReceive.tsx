@@ -119,7 +119,6 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
       return;
     }
 
-    const total = Math.round(receivedQty * price);
     const nextQty = (matched?.qty ?? 0) + receivedQty;
     const nextPrice = matched && price > 0 && nextQty > 0
       ? Math.round((matched.qty * matched.purchasePrice + total) / nextQty)
