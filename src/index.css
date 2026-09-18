@@ -126,6 +126,12 @@ button { cursor: pointer; }
     page-break-inside: avoid;
   }
   .act-table { font-size: 8.5pt; }
+  .document-logo {
+    width: 16mm !important;
+    height: 16mm !important;
+    border-radius: 2mm !important;
+    object-fit: contain !important;
+  }
 
   /* Заказ-наряд печатается как документ: без вкладок, кнопок и боковой колонки. */
   .order-doc {
