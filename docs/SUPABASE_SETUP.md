@@ -30,7 +30,9 @@ insert into public.crm_members(workshop_id, user_id, role, display_name) values
 ('<WORKSHOP_UUID>', '<IGOR_USER_UUID>', 'owner', 'Игорь'),
 ('<WORKSHOP_UUID>', '<PARTNER_USER_UUID>', 'partner', 'Партнёр'),
 ('<WORKSHOP_UUID>', '<ADVISOR_USER_UUID>', 'advisor', 'Юра'),
-('<WORKSHOP_UUID>', '<PARTS_USER_UUID>', 'parts', 'Запчастист');
+('<WORKSHOP_UUID>', '<PARTS_USER_UUID>', 'parts', 'Запчастист'),
+('<WORKSHOP_UUID>', '<MECH1_USER_UUID>', 'mechanic', 'Механик 1'),
+('<WORKSHOP_UUID>', '<ACCOUNTANT_USER_UUID>', 'accountant', 'Елена');
 ```
 
 Роли: `owner`, `partner`, `advisor`, `parts`, `mechanic`, `accountant`.
