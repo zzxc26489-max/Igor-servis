@@ -16,6 +16,10 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+env:
+  VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+  VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+
 jobs:
   build:
     runs-on: ubuntu-latest

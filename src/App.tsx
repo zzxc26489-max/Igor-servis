@@ -1,5 +1,9 @@
-import { HashRouter, Route, Routes } from "react-router-dom";
-import { AppStoreProvider } from "./store/AppStore";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import type { ReactNode } from "react";
+import { AppStoreProvider, useAppStore } from "./store/AppStore";
+import { AuthProvider } from "./auth/AuthContext";
+import AuthGate from "./auth/AuthGate";
+import { canOpenPath } from "./lib/access";
 import { ToastProvider } from "./components/Toast";
 import { ConfirmProvider } from "./components/Confirm";
 import { MobileMenuProvider } from "./components/MobileMenu";
@@ -20,37 +24,54 @@ import NewOrder from "./pages/NewOrder";
 import Settings from "./pages/Settings";
 import WorkAct from "./pages/WorkAct";
 
-function App() {
+function RoleRoute({ path, children }: { path: string; children: ReactNode }) {
+  const { cloud } = useAppStore();
+  if (cloud.role && !canOpenPath(cloud.role, path)) return <Navigate to="/" replace />;
+  return children;
+}
+
+function AppRoutes() {
   return (
-    <AppStoreProvider>
-      <ToastProvider>
-        <ConfirmProvider>
+    <ToastProvider>
+      <ConfirmProvider>
         <MobileMenuProvider>
           <HashRouter>
             <Routes>
               <Route element={<Layout />}>
                 <Route index element={<Dashboard />} />
-                <Route path="schedule" element={<Schedule />} />
-                <Route path="orders" element={<Orders />} />
-                <Route path="orders/new" element={<NewOrder />} />
-                <Route path="orders/:orderId" element={<OrderDetail />} />
-                <Route path="orders/:orderId/act" element={<WorkAct />} />
-                <Route path="stock" element={<Stock />} />
-                <Route path="purchases" element={<Purchases />} />
-                <Route path="services" element={<Services />} />
-                <Route path="clients" element={<Clients />} />
-                <Route path="clients/:clientId" element={<ClientDetail />} />
-                <Route path="employees" element={<Employees />} />
-                <Route path="finance" element={<Finance />} />
-                <Route path="reports" element={<Reports />} />
-                <Route path="settings" element={<Settings />} />
+                <Route path="schedule" element={<RoleRoute path="/schedule"><Schedule /></RoleRoute>} />
+                <Route path="orders" element={<RoleRoute path="/orders"><Orders /></RoleRoute>} />
+                <Route path="orders/new" element={<RoleRoute path="/orders"><NewOrder /></RoleRoute>} />
+                <Route path="orders/:orderId" element={<RoleRoute path="/orders"><OrderDetail /></RoleRoute>} />
+                <Route path="orders/:orderId/act" element={<RoleRoute path="/orders"><WorkAct /></RoleRoute>} />
+                <Route path="stock" element={<RoleRoute path="/stock"><Stock /></RoleRoute>} />
+                <Route path="purchases" element={<RoleRoute path="/purchases"><Purchases /></RoleRoute>} />
+                <Route path="services" element={<RoleRoute path="/services"><Services /></RoleRoute>} />
+                <Route path="clients" element={<RoleRoute path="/clients"><Clients /></RoleRoute>} />
+                <Route path="clients/:clientId" element={<RoleRoute path="/clients"><ClientDetail /></RoleRoute>} />
+                <Route path="employees" element={<RoleRoute path="/employees"><Employees /></RoleRoute>} />
+                <Route path="finance" element={<RoleRoute path="/finance"><Finance /></RoleRoute>} />
+                <Route path="reports" element={<RoleRoute path="/reports"><Reports /></RoleRoute>} />
+                <Route path="settings" element={<RoleRoute path="/settings"><Settings /></RoleRoute>} />
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>
           </HashRouter>
         </MobileMenuProvider>
-        </ConfirmProvider>
-      </ToastProvider>
-    </AppStoreProvider>
+      </ConfirmProvider>
+    </ToastProvider>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AuthGate>
+        <AppStoreProvider>
+          <AppRoutes />
+        </AppStoreProvider>
+      </AuthGate>
+    </AuthProvider>
   );
 }
 
