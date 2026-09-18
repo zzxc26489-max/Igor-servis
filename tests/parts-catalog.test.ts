@@ -15,4 +15,6 @@ test("part reference search finds OE, cross-number and vehicle", () => {
   assert.ok(findPartReferences("26300-35500").some((item) => item.sku === "26300-35505"));
   assert.ok(findPartReferences("Kia Rio").some((item) => item.sku === "26300-35505"));
   assert.ok(findPartReferences("Golf VI").some((item) => item.sku === "CUK 2939/1"));
+  assert.ok(findPartReferences("W 712/95").some((item) => item.sku === "W 712/95"));
+  assert.ok(findPartReferences("Passat B8").some((item) => item.sku === "C 30 005"));
 });
