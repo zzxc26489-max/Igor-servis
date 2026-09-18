@@ -164,15 +164,16 @@ export function computeMetrics(
   });
   const received = receivedInRange(payments, range.from, range.to);
 
-  const periodExpenses = expenses.filter((expense) => inRange(expense.date, range));
-  const costs = periodExpenses.filter(isCostExpense);
+  const costs = expenses.filter((expense) => isCostExpense(expense) && inRange(expense.date, range));
   const stockPurchases = costs
     .filter((expense) => expense.source === "stock_purchase" || expense.category === "Закупка запчастей")
     .reduce((sum, expense) => sum + expense.amount, 0);
   const gross = costs.reduce((sum, expense) => sum + expense.amount, 0);
-  const refunds = periodExpenses.filter(isConfirmedRefund).reduce((sum, expense) => sum + expense.amount, 0);
-  const payouts = periodExpenses
-    .filter((expense) => expense.source === "payroll")
+  const refunds = expenses
+    .filter((expense) => isConfirmedRefund(expense) && inRange(expense.refundConfirmedAt ?? expense.date, range))
+    .reduce((sum, expense) => sum + expense.amount, 0);
+  const payouts = expenses
+    .filter((expense) => expense.source === "payroll" && inRange(expense.date, range))
     .reduce((sum, expense) => sum + expense.amount, 0);
   const total = gross - refunds;
 
@@ -233,14 +234,14 @@ export function buildChart(range: Range, payments: Payment[], expenses: Expense[
   });
 
   expenses.forEach((expense) => {
-    const bucket = buckets.get(keyFor(new Date(expense.date)));
-    if (!bucket) return;
     if (isCostExpense(expense)) {
-      bucket.expenses += expense.amount;
+      const bucket = buckets.get(keyFor(new Date(expense.date)));
+      if (bucket) bucket.expenses += expense.amount;
       return;
     }
     if (isConfirmedRefund(expense)) {
-      bucket.expenses -= expense.amount;
+      const bucket = buckets.get(keyFor(new Date(expense.refundConfirmedAt ?? expense.date)));
+      if (bucket) bucket.expenses -= expense.amount;
     }
   });
 
@@ -345,18 +346,23 @@ export function buildOperations(range: Range, orders: Order[], expenses: Expense
     });
 
   const outcome: Operation[] = expenses
-    .filter((expense) => inRange(expense.date, range))
-    .map((expense) => ({
-      id: `out-${expense.id}`,
-      date: expense.date,
-      title: expense.description,
-      category: expense.category,
-      // Возврат поставщику — приход денег, но только когда он подтверждён.
-      amount: expense.source === "supplier_refund"
-        ? (expense.status === "Возвращено" ? expense.amount : 0)
-        : -expense.amount,
-      pending: expense.source === "supplier_refund" && expense.status !== "Возвращено",
-    }));
+    .map((expense) => {
+      const date = expense.source === "supplier_refund" && expense.status === "Возвращено"
+        ? (expense.refundConfirmedAt ?? expense.date)
+        : expense.date;
+      return {
+        id: `out-${expense.id}`,
+        date,
+        title: expense.description,
+        category: expense.category,
+        // Возврат поставщику — приход денег, но только когда он подтверждён.
+        amount: expense.source === "supplier_refund"
+          ? (expense.status === "Возвращено" ? expense.amount : 0)
+          : -expense.amount,
+        pending: expense.source === "supplier_refund" && expense.status !== "Возвращено",
+      };
+    })
+    .filter((operation) => inRange(operation.date, range));
 
   return [...income, ...outcome].sort((a, b) => b.date.localeCompare(a.date));
 }
