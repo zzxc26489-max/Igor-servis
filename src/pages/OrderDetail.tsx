@@ -24,6 +24,7 @@ import { CONSUMABLE_PRESETS } from "../data/consumables";
 import { formatQuantity, isValidQuantity } from "../lib/quantity";
 import { nowISO } from "../lib/date";
 import type { OrderConsumable, OrderLinePart, OrderLineWork, OrderStatus, PaymentMethod } from "../types";
+import defaultLogo from "../assets/logo.jpg";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
 const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "Документы"] as const;
@@ -515,7 +516,7 @@ export default function OrderDetail() {
     vehicle: carTitle,
     orderNumber: order.number,
     serviceName: company.shortName || company.name,
-    phone: company.phone,
+    phone: [company.phone, company.phone2].filter(Boolean).join(" / "),
   });
   const whatsappReadyHref = client?.phone ? whatsappMessageHref(client.phone, readyText) : "";
   const smsReadyHref = client?.phone ? smsMessageHref(client.phone, readyText) : "";
@@ -680,10 +681,19 @@ export default function OrderDetail() {
         <div className="order-doc">
         <div className="mb-4 hidden print:block">
           <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--border)" }}>
-            <div>
-              <div className="text-lg font-bold">{company.shortName}</div>
-              <div className="text-sm">{company.address}</div>
-              <div className="text-sm">{[company.phone, formatWorkHours({ start: company.openTime, end: company.closeTime })].filter(Boolean).join(" · ")}</div>
+            <div className="flex items-center gap-3">
+              <img
+                src={company.logoDataUrl || defaultLogo}
+                alt=""
+                className="document-logo h-14 w-14 shrink-0 rounded-xl object-contain"
+              />
+              <div>
+                <div className="text-lg font-bold">{company.shortName}</div>
+                <div className="text-sm">{company.address}</div>
+                <div className="text-sm">
+                  {[company.phone, company.phone2, formatWorkHours({ start: company.openTime, end: company.closeTime })].filter(Boolean).join(" · ")}
+                </div>
+              </div>
             </div>
             <div className="text-right">
               <div className="text-lg font-bold">Заказ-наряд {order.number}</div>
