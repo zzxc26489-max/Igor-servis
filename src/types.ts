@@ -174,7 +174,7 @@ export interface StockMovement {
   id: string;
   date: string;
   itemId: string;
-  operation: "Приёмка" | "Списание" | "Перемещение" | "Резерв" | "Возврат" | "Возврат поставщику";
+  operation: "Приёмка" | "Списание" | "Перемещение" | "Резерв" | "Снят резерв" | "Возврат" | "Возврат поставщику";
   qty: number;
   from?: string;
   to?: string;
@@ -209,15 +209,21 @@ export interface Expense {
 export type ExpenseStatus = "Оплачено" | "Ожидает" | "Ждём возврат" | "Возвращено";
 
 export type PaymentMethod = "cash" | "terminal" | "transfer";
+export type PaymentKind = "payment" | "refund";
 
 export interface Payment {
   id: string;
   orderId: string;
-  /** Реальный момент приёма денег. */
+  /** Реальный момент движения денег. */
   at: string;
+  /** Сумма хранится положительной, направление задаёт kind. */
   amount: number;
+  /** payment — клиент заплатил; refund — деньги вернули клиенту. */
+  kind?: PaymentKind;
   /** Способ оплаты. У старых мигрированных платежей может быть неизвестен. */
   method?: PaymentMethod;
+  /** Кто принял оплату или оформил возврат. */
+  employee?: string;
   /** Старые оплаты без истории получают приблизительную дату при миграции. */
   estimated?: boolean;
 }
