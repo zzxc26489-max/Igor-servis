@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { paymentInRange, paymentMethodLabel, paymentsInRange, receivedInRange, recordedForOrder } from "../src/lib/payments.ts";
+import { paymentInRange, paymentMethodLabel, paymentMethodSummary, paymentsInRange, receivedInRange, recordedForOrder } from "../src/lib/payments.ts";
 
 const from = new Date("2026-09-18T00:00:00");
 const to = new Date("2026-09-18T23:59:59.999");
@@ -31,4 +31,16 @@ test("payment method labels are explicit", () => {
   assert.equal(paymentMethodLabel("terminal"), "Терминал / карта");
   assert.equal(paymentMethodLabel("transfer"), "Перевод / СБП");
   assert.equal(paymentMethodLabel(undefined), "Способ не указан");
+});
+
+
+test("refunds reduce received money and method totals", () => {
+  const withRefund = [
+    ...payments,
+    { orderId: "a", at: "2026-09-18T19:00:00", amount: 400, kind: "refund" as const, method: "cash" as const },
+    { orderId: "a", at: "2026-09-18T20:00:00", amount: 600, kind: "payment" as const, method: "cash" as const },
+  ];
+  assert.equal(receivedInRange(withRefund, from, to), 1_700);
+  const summary = paymentMethodSummary(withRefund, from, to);
+  assert.equal(summary.cash, 200);
 });
