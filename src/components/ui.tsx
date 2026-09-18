@@ -144,7 +144,7 @@ export function TopBar({
         </div>
       </header>
 
-      <div className="flex flex-wrap items-start justify-between gap-3 px-4 pt-4 sm:px-5 lg:px-5 print:hidden">
+      <div className="flex flex-wrap items-start justify-between gap-3 px-3 pt-3 sm:px-5 sm:pt-4 lg:px-5 print:hidden">
         <div className="min-w-0">
           {breadcrumbs && breadcrumbs.length > 0 && (
             <nav className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }} aria-label="Хлебные крошки">
