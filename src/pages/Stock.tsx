@@ -13,11 +13,13 @@ import { useConfirm } from "../components/Confirm";
 import { useToast } from "../components/Toast";
 import StockReceive from "./StockReceive";
 import type { Order, StockItem } from "../types";
+import { canManageStock } from "../lib/access";
 
 type Chip = "all" | "low" | "reserved" | "movements";
 
 export default function Stock() {
-  const { stock, stockMovements, orders, vehicles, employees, returnToSupplier } = useAppStore();
+  const { stock, stockMovements, orders, vehicles, employees, returnToSupplier, cloud } = useAppStore();
+  const stockWritable = !cloud.role || canManageStock(cloud.role);
   const confirm = useConfirm();
   const { showToast } = useToast();
   const [returnFor, setReturnFor] = useState<string | null>(null);
@@ -112,8 +114,8 @@ export default function Stock() {
       reservedOrders={reservingOrders(orders, selected)}
       vehicles={vehicles}
       movements={movementsOf(selected.id)}
-      onReceive={() => openReceive(selected.id)}
-      onReturn={() => setReturnFor(selected.id)}
+      onReceive={stockWritable ? () => openReceive(selected.id) : undefined}
+      onReturn={stockWritable ? () => setReturnFor(selected.id) : undefined}
     />
   );
 
@@ -123,9 +125,11 @@ export default function Stock() {
         title="Склад"
         subtitle={`${stock.length} ${plural(stock.length, "позиция", "позиции", "позиций")} · остаток на ${formatMoney(totalValue)}`}
         actions={
-          <Button onClick={() => openReceive()}>
-            <IconPackageImport size={18} /> Приёмка
-          </Button>
+          stockWritable ? (
+            <Button onClick={() => openReceive()}>
+              <IconPackageImport size={18} /> Приёмка
+            </Button>
+          ) : undefined
         }
       />
       <Page>
@@ -357,7 +361,7 @@ export default function Stock() {
         />
       )}
 
-      {receiveOpen && <StockReceive onClose={() => setReceiveOpen(false)} presetItemId={receiveFor ?? undefined} />}
+      {stockWritable && receiveOpen && <StockReceive onClose={() => setReceiveOpen(false)} presetItemId={receiveFor ?? undefined} />}
     </>
   );
 }
@@ -400,8 +404,8 @@ function ItemCard({
   reservedOrders: Order[];
   vehicles: { id: string; make: string; model: string; plate: string }[];
   movements: { id: string; date: string; operation: string; qty: number; from?: string; to?: string; employee: string }[];
-  onReceive: () => void;
-  onReturn: () => void;
+  onReceive?: () => void;
+  onReturn?: () => void;
 }) {
   const reservedQty = reserved;
   const available = item.qty - reservedQty;
@@ -472,12 +476,16 @@ function ItemCard({
         )}
       </div>
 
-      <Button className="mt-3 w-full justify-center" onClick={onReceive}>
-        <IconPackageImport size={18} /> Принять на склад
-      </Button>
-      <Button variant="secondary" className="mt-2 w-full justify-center" onClick={onReturn} disabled={available <= 0}>
-        <IconArrowBackUp size={18} /> Вернуть поставщику
-      </Button>
+      {onReceive && (
+        <Button className="mt-3 w-full justify-center" onClick={onReceive}>
+          <IconPackageImport size={18} /> Принять на склад
+        </Button>
+      )}
+      {onReturn && (
+        <Button variant="secondary" className="mt-2 w-full justify-center" onClick={onReturn} disabled={available <= 0}>
+          <IconArrowBackUp size={18} /> Вернуть поставщику
+        </Button>
+      )}
     </div>
   );
 }
