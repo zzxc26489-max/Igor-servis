@@ -11,6 +11,7 @@ import { formatMoney } from "../lib/format";
 import { APP_BUILD_DATE, APP_VERSION, DB_VERSION } from "../data/version";
 import { todayISO } from "../lib/date";
 import { isValidTime, timeToMinutes } from "../lib/workday";
+import defaultLogo from "../assets/logo.jpg";
 
 export default function Settings() {
   const {
@@ -316,21 +317,17 @@ export default function Settings() {
                   <span className="mb-1 block muted">Логотип в документах</span>
                   <div className="flex items-center gap-3 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
                     <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-[var(--bg)]">
-                      {logoDataUrl ? (
-                        <img src={logoDataUrl} alt="Логотип сервиса" className="h-full w-full object-contain" />
-                      ) : (
-                        <span className="muted text-center text-[10px] leading-tight">Логотип<br />не выбран</span>
-                      )}
+                      <img src={logoDataUrl || defaultLogo} alt="Логотип сервиса" className="h-full w-full object-contain" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs muted">Печатается в заказ-наряде и акте. PNG/JPG/WEBP, изображение автоматически уменьшается.</p>
+                      <p className="text-xs muted">Печатается в заказ-наряде и акте. По умолчанию используется текущий логотип CRM; можно загрузить свой PNG/JPG/WEBP.</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <Button type="button" size="sm" variant="secondary" onClick={() => logoFileRef.current?.click()}>
                           Выбрать файл
                         </Button>
                         {logoDataUrl && (
                           <Button type="button" size="sm" variant="secondary" onClick={() => setLogoDataUrl("")}>
-                            Убрать
+                            Вернуть стандартный
                           </Button>
                         )}
                       </div>
