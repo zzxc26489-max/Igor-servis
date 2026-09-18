@@ -7,6 +7,7 @@ import type {
   Expense,
   Invoice,
   Lift,
+  Payment,
   Order,
   OrderStatus,
   Service,
@@ -49,6 +50,7 @@ interface DB {
   orders: Order[];
   expenses: Expense[];
   invoices: Invoice[];
+  payments: Payment[];
 }
 
 const defaultSettings: AppSettings = {
@@ -71,6 +73,7 @@ function seedDB(): DB {
     orders: seed.orders,
     expenses: seed.expenses,
     invoices: seed.invoices,
+    payments: [],
   };
 }
 
@@ -94,6 +97,44 @@ function migrate(db: DB): DB {
       : legacyHours ?? undefined,
   );
 
+  const orders = db.orders.map((order) => ({
+    ...order,
+    timeline: order.timeline?.length ? order.timeline : backfillTimeline(order),
+    issuedAt: order.status === "выдан"
+      ? (order.issuedAt ?? order.completedAt ?? (order.plannedAt ? `${order.plannedAt}T12:00:00` : order.createdAt))
+      : order.issuedAt,
+    issuedAtEstimated: order.status === "выдан" && !order.issuedAt ? true : order.issuedAtEstimated,
+    workDayStart: order.workDayStart ?? hours.start,
+    workDayEnd: order.workDayEnd ?? hours.end,
+    workDayEstimated: order.workDayStart && order.workDayEnd ? order.workDayEstimated : true,
+    parts: order.parts.map((part) => {
+      if (part.purchasePrice !== undefined) {
+        return { ...part, purchasePriceEstimated: part.purchasePriceEstimated ?? true };
+      }
+      const stockItem = db.stock.find((item) => item.sku === part.sku);
+      return stockItem
+        ? { ...part, purchasePrice: stockItem.purchasePrice, purchasePriceEstimated: true }
+        : part;
+    }),
+  }));
+
+  const payments: Payment[] = Array.isArray(db.payments) ? [...db.payments] : [];
+  for (const order of orders) {
+    const recorded = payments
+      .filter((payment) => payment.orderId === order.id)
+      .reduce((sum, payment) => sum + Math.max(0, payment.amount), 0);
+    const paid = Math.max(0, order.paid ?? 0);
+    if (paid > recorded) {
+      payments.push({
+        id: `legacy-payment-${order.id}`,
+        orderId: order.id,
+        at: order.issuedAt ?? order.completedAt ?? (order.plannedAt ? `${order.plannedAt}T12:00:00` : order.createdAt),
+        amount: paid - recorded,
+        estimated: true,
+      });
+    }
+  }
+
   return {
     ...db,
     company: {
@@ -110,17 +151,8 @@ function migrate(db: DB): DB {
       phone: formatPhone(client.phone) || client.phone,
       phone2: client.phone2 ? formatPhone(client.phone2) || client.phone2 : undefined,
     })),
-    // Старым заказам восстанавливаем историю статусов и фиксируем закупочную
-    // цену строк запчастей, чтобы историческая маржа не менялась после новых приёмок.
-    orders: db.orders.map((order) => ({
-      ...order,
-      timeline: order.timeline?.length ? order.timeline : backfillTimeline(order),
-      parts: order.parts.map((part) => {
-        if (part.purchasePrice !== undefined) return part;
-        const stockItem = db.stock.find((item) => item.sku === part.sku);
-        return stockItem ? { ...part, purchasePrice: stockItem.purchasePrice } : part;
-      }),
-    })),
+    orders,
+    payments,
     vehicles: withCodes(db.vehicles, CODE_PREFIX.vehicle).map((vehicle) => ({
       ...vehicle,
       plate: looksRussian(vehicle.plate) ? formatPlate(vehicle.plate) : vehicle.plate.trim().toUpperCase(),
@@ -177,7 +209,7 @@ export interface ReceiveStockInput {
 interface AppStoreValue extends DB {
   setDB: React.Dispatch<React.SetStateAction<DB>>;
   updateOrder: (id: string, patch: Partial<Order>) => void;
-  deleteOrder: (id: string) => void;
+  deleteOrder: (id: string) => string | null;
   addClient: (client: Client) => void;
   updateClient: (id: string, patch: Partial<Client>) => void;
   addVehicle: (vehicle: Vehicle) => void;
@@ -249,7 +281,45 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ...prev,
           orders: prev.orders.map((o) => (o.id === id ? { ...o, ...patch } : o)),
         })),
-      deleteOrder: (id) => setDB((prev) => ({ ...prev, orders: prev.orders.filter((o) => o.id !== id) })),
+      deleteOrder: (id) => {
+        let error: string | null = null;
+        setDB((prev) => {
+          const order = prev.orders.find((item) => item.id === id);
+          if (!order) {
+            error = "Заказ-наряд не найден";
+            return prev;
+          }
+          if (order.status === "выдан") {
+            error = "Выданный заказ нельзя удалить. История склада и денег должна сохраниться.";
+            return prev;
+          }
+          if ((order.paid ?? 0) > 0 || prev.payments.some((payment) => payment.orderId === id)) {
+            error = "Заказ с оплатами нельзя удалить — история денег должна сохраниться.";
+            return prev;
+          }
+          const released: StockMovement[] = order.parts.flatMap((part) => {
+            const item = prev.stock.find((entry) => entry.sku === part.sku);
+            return item
+              ? [{
+                  id: createId("mv"),
+                  date: nowISO(),
+                  itemId: item.id,
+                  operation: "Возврат" as const,
+                  qty: part.qty,
+                  to: item.cell,
+                  employee: order.advisor || "—",
+                  note: `Заказ ${order.number} удалён, резерв снят`,
+                }]
+              : [];
+          });
+          return {
+            ...prev,
+            orders: prev.orders.filter((item) => item.id !== id),
+            stockMovements: [...released, ...prev.stockMovements],
+          };
+        });
+        return error;
+      },
       addClient: (client) =>
         setDB((prev) => ({
           ...prev,
@@ -392,6 +462,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           const patch: Partial<Order> = { status, timeline };
           if (status === "готово" && !order.completedAt) patch.completedAt = now;
           if (status !== "готово" && status !== "выдан") patch.completedAt = undefined;
+          if (willIssue) {
+            patch.issuedAt = now;
+            patch.issuedAtEstimated = false;
+          } else if (wasIssued) {
+            patch.issuedAt = undefined;
+            patch.issuedAtEstimated = undefined;
+          }
 
           const orders = prev.orders.map((item) => (item.id === id ? { ...item, ...patch } : item));
 
@@ -454,6 +531,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             qty,
             price,
             purchasePrice: item.purchasePrice,
+            purchasePriceEstimated: false,
             availability: "reserved" as const,
           };
           return {
@@ -516,15 +594,19 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         setDB((prev) => {
           const order = prev.orders.find((item) => item.id === orderId);
           if (!order || amount <= 0) return prev;
-          // Переплату не принимаем: иначе «долг» уходит в минус и портит статистику.
           const debt = Math.max(0, orderTotals(order).debt);
           const accepted = Math.min(amount, debt);
           if (accepted <= 0) return prev;
+          const at = nowISO();
           return {
             ...prev,
             orders: prev.orders.map((item) =>
               item.id === orderId ? { ...item, paid: (item.paid ?? 0) + accepted } : item,
             ),
+            payments: [
+              { id: createId("pay"), orderId, at, amount: accepted },
+              ...prev.payments,
+            ],
           };
         }),
       returnToSupplier: (input) =>
