@@ -187,7 +187,7 @@ function NewRecordButton() {
 }
 
 export function Page({ children }: { children: ReactNode }) {
-  return <main className="min-w-0 flex-1 overflow-auto overflow-x-hidden p-4 pb-24 sm:p-5 sm:pb-6 lg:px-5 lg:py-5 print:flex-none print:overflow-visible print:p-0">{children}</main>;
+  return <main className="min-w-0 flex-1 overflow-auto overflow-x-hidden px-3 py-3 pb-24 sm:p-5 sm:pb-6 lg:px-5 lg:py-5 print:flex-none print:overflow-visible print:p-0">{children}</main>;
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
