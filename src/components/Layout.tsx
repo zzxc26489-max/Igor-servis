@@ -2,7 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import {
   IconCalendarEvent, IconChartBar, IconChevronDown, IconClipboardList, IconCoin,
   IconCube, IconDotsCircleHorizontal, IconHome2, IconSettings, IconShoppingCart,
-  IconTool, IconUsers, IconUsersGroup, IconX,
+  IconTool, IconUsers, IconUsersGroup, IconX, IconGauge,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { lowStockItems } from "../lib/lowStock";
@@ -28,6 +28,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: "/", label: "Сегодня", icon: IconHome2, end: true },
       { to: "/schedule", label: "Расписание", icon: IconCalendarEvent },
       { to: "/orders", label: "Заказ-наряды", icon: IconClipboardList, badge: "orders" },
+      { to: "/my-work", label: "Мои работы", icon: IconGauge },
     ],
   },
   {
@@ -53,6 +54,16 @@ const MOBILE_NAV_ITEMS = [
   { to: "/", label: "Сегодня", icon: IconHome2, end: true },
   { to: "/orders", label: "Заказы", icon: IconClipboardList },
   { to: "/stock", label: "Склад", icon: IconCube },
+];
+
+const MECHANIC_MOBILE_NAV = [
+  { to: "/my-work", label: "Мои работы", icon: IconGauge, end: true },
+];
+
+const ACCOUNTANT_MOBILE_NAV = [
+  { to: "/finance", label: "Финансы", icon: IconCoin, end: true },
+  { to: "/reports", label: "Отчёты", icon: IconChartBar },
+  { to: "/employees", label: "Сотрудники", icon: IconUsersGroup },
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -209,7 +220,8 @@ export default function Layout() {
         style={{ borderColor: "var(--border)" }}
         aria-label="Основная навигация"
       >
-        {MOBILE_NAV_ITEMS.filter((item) => !cloud.role || canOpenPath(cloud.role, item.to)).map((item) => (
+        {(cloud.role === "mechanic" ? MECHANIC_MOBILE_NAV : cloud.role === "accountant" ? ACCOUNTANT_MOBILE_NAV : MOBILE_NAV_ITEMS)
+          .filter((item) => !cloud.role || canOpenPath(cloud.role, item.to)).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
