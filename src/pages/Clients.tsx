@@ -44,8 +44,8 @@ export default function Clients() {
           </Card>
         </div>
 
-        <Card className="p-0 overflow-hidden">
-          <div className="space-y-2 p-3 lg:hidden">
+        <Card className="overflow-hidden p-0 max-sm:-mx-3 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
+          <div className="space-y-2 p-3 max-sm:p-2 lg:hidden">
             {filteredClients.map((c) => {
               const clientVehicles = vehicles.filter((v) => v.clientId === c.id);
               const clientOrders = orders.filter((o) => o.clientId === c.id);
