@@ -130,6 +130,8 @@ export interface Order {
   scheduledStart?: string;
   scheduledEnd?: string;
   complaint?: string;
+  /** Внутренний комментарий мастера. Клиенту и в акт не выводится. */
+  mechanicComment?: string;
   /** История статусов: когда машина встала на подъёмник и когда сошла. */
   timeline?: StatusEvent[];
   /** Рабочие часы, действовавшие для этого заказа. */
