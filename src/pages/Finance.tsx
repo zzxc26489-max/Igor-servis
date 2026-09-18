@@ -290,7 +290,7 @@ export default function Finance() {
                           className="flex h-full flex-1 items-end gap-px rounded-t-sm transition"
                           style={{ background: pickedDay === index ? "var(--accent-soft)" : undefined }}
                         >
-                          <div className="flex-1 rounded-t-sm bg-[#1f9d63]" style={{ height: `${(point.revenue / axisMax) * 100}%` }} />
+                          <div className="flex-1 rounded-t-sm bg-[#1f9d63]" style={{ height: `${(Math.max(0, point.revenue) / axisMax) * 100}%` }} />
                           <div className="flex-1 rounded-t-sm bg-[#e39230]" style={{ height: `${(Math.max(0, point.expenses) / axisMax) * 100}%` }} />
                         </button>
                       ))}
