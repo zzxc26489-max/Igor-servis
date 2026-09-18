@@ -3,6 +3,10 @@ export interface CompanyInfo {
   shortName: string;
   address: string;
   phone: string;
+  /** Второй контактный номер сервиса, например телефон второго совладельца. */
+  phone2?: string;
+  /** Пользовательский логотип для печатных документов. Храним компактным data URL. */
+  logoDataUrl?: string;
   /** Часы работы, «ЧЧ:ММ». По ним строится расписание и считается загрузка. */
   openTime: string;
   closeTime: string;
