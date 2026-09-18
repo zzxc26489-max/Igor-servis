@@ -52,6 +52,7 @@ interface DB {
 
 const defaultSettings: AppSettings = {
   autoPriceAdjustment: true,
+  partMarkupPercent: 40,
 };
 
 function seedDB(): DB {

@@ -5,7 +5,9 @@ import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
 import { PhoneField } from "../components/fields";
 import { formatPhone, isValidInn, isValidPhone } from "../lib/formats";
+import { clientPrice } from "../lib/price";
 import { Button, Card, Page, TopBar } from "../components/ui";
+import { formatMoney } from "../lib/format";
 import { APP_BUILD_DATE, APP_VERSION, DB_VERSION } from "../data/version";
 import { todayISO } from "../lib/date";
 
@@ -177,6 +179,30 @@ export default function Settings() {
                 }}
                 className="mt-1 h-5 w-5 shrink-0 accent-[var(--accent)]"
               />
+            </label>
+
+            <label className="mt-3 block rounded-xl border p-4" style={{ borderColor: "var(--border)" }}>
+              <b className="block text-sm">Наценка на запчасти по умолчанию</b>
+              <span className="muted mt-1 block text-xs">
+                Подставляется в цену для клиента при добавлении запчасти в заказ. Цену всегда можно поправить вручную.
+              </span>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="field-control w-28">
+                  <input
+                    inputMode="numeric"
+                    aria-label="Наценка на запчасти, проценты"
+                    value={String(settings.partMarkupPercent)}
+                    onChange={(event) => {
+                      const value = Math.min(500, Number(event.target.value.replace(/\D/g, "").slice(0, 3)) || 0);
+                      updateSettings({ partMarkupPercent: value });
+                    }}
+                  />
+                </div>
+                <span className="muted text-sm">%</span>
+                <span className="muted ml-auto text-sm">
+                  Закупка 500 ₽ → клиенту {formatMoney(clientPrice(500, settings.partMarkupPercent))}
+                </span>
+              </div>
             </label>
           </Card>
 

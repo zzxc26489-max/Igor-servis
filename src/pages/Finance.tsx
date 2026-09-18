@@ -455,21 +455,33 @@ export default function Finance() {
           </div>
 
           {addingExpense && (
-            <form onSubmit={handleAddExpense} className="grid grid-cols-1 gap-3 border-t p-4 sm:grid-cols-2 lg:grid-cols-5" style={{ borderColor: "var(--border)" }}>
-              <div className="field-control">
-                <select value={category} onChange={(event) => setCategory(event.target.value)}>
-                  {EXPENSE_CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}
-                </select>
-              </div>
-              <div className="field-control lg:col-span-2">
-                <input placeholder="Описание" value={description} onChange={(event) => setDescription(event.target.value)} required />
-              </div>
-              <div className="field-control">
-                <input placeholder="Сумма, ₽" inputMode="numeric" value={amount} onChange={(event) => setAmount(moneyInput(event.target.value))} required />
-              </div>
-              <div className="field-control">
-                <input placeholder="Поставщик" value={counterparty} onChange={(event) => setCounterparty(event.target.value)} />
-              </div>
+            <form onSubmit={handleAddExpense} className="grid grid-cols-1 gap-3 border-t p-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-end" style={{ borderColor: "var(--border)" }}>
+              <label className="block text-sm">
+                <span className="muted mb-1 block">Категория</span>
+                <div className="field-control">
+                  <select value={category} onChange={(event) => setCategory(event.target.value)} aria-label="Категория расхода">
+                    {EXPENSE_CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </div>
+              </label>
+              <label className="block text-sm lg:col-span-2">
+                <span className="muted mb-1 block">За что</span>
+                <div className="field-control">
+                  <input placeholder="Например, поставка масел" value={description} onChange={(event) => setDescription(event.target.value)} aria-label="За что расход" required />
+                </div>
+              </label>
+              <label className="block text-sm">
+                <span className="muted mb-1 block">Сумма, ₽</span>
+                <div className="field-control">
+                  <input placeholder="12000" inputMode="numeric" value={amount} onChange={(event) => setAmount(moneyInput(event.target.value))} aria-label="Сумма расхода" required />
+                </div>
+              </label>
+              <label className="block text-sm">
+                <span className="muted mb-1 block">Кому платим</span>
+                <div className="field-control">
+                  <input placeholder="Exist.ru" value={counterparty} onChange={(event) => setCounterparty(event.target.value)} aria-label="Кому платим" />
+                </div>
+              </label>
               <div className="flex gap-2 sm:col-span-2 lg:col-span-5 lg:justify-end">
                 <Button variant="secondary" onClick={resetExpenseForm}>Отмена</Button>
                 <Button type="submit">Добавить</Button>

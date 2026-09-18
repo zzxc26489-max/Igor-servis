@@ -10,6 +10,8 @@ export interface CompanyInfo {
 
 export interface AppSettings {
   autoPriceAdjustment: boolean;
+  /** Наценка на запчасти по умолчанию, проценты от цены закупки. */
+  partMarkupPercent: number;
 }
 
 export type LiftStatus = "free" | "busy";

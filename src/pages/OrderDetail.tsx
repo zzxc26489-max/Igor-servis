@@ -9,15 +9,17 @@ import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
 import RowMenu from "../components/RowMenu";
+import AddPart from "./AddPart";
+import AddWork, { type NewWork } from "./AddWork";
 import { reservedByItem } from "../lib/stock";
-import { isValidMoney, moneyInput } from "../lib/formats";
+import { moneyInput } from "../lib/formats";
+import { margin } from "../lib/price";
 import { actualMinutes, deviationPercent, formatDuration, normMinutes } from "../lib/worktime";
 import { Button, Card, Modal, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
 import type { OrderLinePart, OrderLineWork, OrderStatus } from "../types";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
-const CUSTOM_SERVICE = "custom";
 const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "Документы"] as const;
 type Tab = (typeof TABS)[number];
 
@@ -28,9 +30,7 @@ export default function OrderDetail() {
     orders,
     clients,
     vehicles,
-    services,
     stock,
-    employees,
     lifts,
     company,
     settings,
@@ -66,17 +66,7 @@ export default function OrderDetail() {
   }, [tab]);
 
   const [addingWork, setAddingWork] = useState(false);
-  const [workServiceId, setWorkServiceId] = useState("");
-  const [workCustomName, setWorkCustomName] = useState("");
-  const [workCustomPrice, setWorkCustomPrice] = useState("");
-  const [workCustomNorm, setWorkCustomNorm] = useState("");
-  const [workQty, setWorkQty] = useState("1");
-  const [workExecutor, setWorkExecutor] = useState("");
-
   const [addingPart, setAddingPart] = useState(false);
-  const [partItemId, setPartItemId] = useState("");
-  const [partQty, setPartQty] = useState("1");
-  const [partPrice, setPartPrice] = useState("");
   const [partError, setPartError] = useState("");
 
   const [editingDiscount, setEditingDiscount] = useState(false);
@@ -148,47 +138,14 @@ export default function OrderDetail() {
     showToast("Цены работ подогнаны под согласованную сумму");
   }
 
-  function resetWorkForm() {
-    setAddingWork(false);
-    setWorkServiceId("");
-    setWorkCustomName("");
-    setWorkCustomPrice("");
-    setWorkCustomNorm("");
-    setWorkQty("1");
-    setWorkExecutor("");
-  }
-
-  function handleAddWork() {
+  function handleAddWork(work: NewWork) {
     if (!order) return;
-    const qty = Math.max(1, Number(workQty) || 1);
-    let name = "";
-    let price = 0;
-    let norm: number | undefined;
-    if (workServiceId === CUSTOM_SERVICE) {
-      name = workCustomName.trim();
-      norm = Number(workCustomNorm) || undefined;
-      price = Number(workCustomPrice) || 0;
-      if (!name) {
-        showToast("Укажите название работы", "error");
-        return;
-      }
-      if (!isValidMoney(workCustomPrice)) {
-        showToast("Цена работы должна быть больше нуля и не более 10 млн ₽", "error");
-        return;
-      }
-    } else {
-      const service = services.find((s) => s.id === workServiceId);
-      if (!service) return;
-      name = service.name;
-      price = service.price;
-      norm = service.normMinutes;
-    }
-    const newWork: OrderLineWork = { id: createId("work"), name, qty, price, executor: workExecutor || undefined, normMinutes: norm };
+    const newWork: OrderLineWork = { id: createId("work"), ...work };
     const nextWorks = [...order.works, newWork];
     const target = Number(targetTotal);
     updateOrder(order.id, { works: settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(nextWorks, target) : nextWorks });
-    resetWorkForm();
-    showToast(`Добавлена работа «${name}»`);
+    setAddingWork(false);
+    showToast(`Добавлена работа «${work.name}»`);
   }
 
   function handleRemoveWork(workId: string) {
@@ -199,26 +156,13 @@ export default function OrderDetail() {
     showToast("Работа удалена", "error");
   }
 
-  function resetPartForm() {
-    setAddingPart(false);
-    setPartItemId("");
-    setPartQty("1");
-    setPartPrice("");
-    setPartError("");
-  }
-
-  async function handleAddPart() {
+  async function handleAddPart(itemId: string, qty: number, price: number) {
     if (!order) return;
     setPartError("");
-    const stockItem = stock.find((s) => s.id === partItemId);
+    const stockItem = stock.find((item) => item.id === itemId);
     if (!stockItem) return;
-    const qty = Math.max(1, Number(partQty) || 1);
-    const available = stockItem.qty - (reserved.get(stockItem.id) ?? 0);
-    if (qty > available) {
-      setPartError(`Свободно только ${available} ${stockItem.unit} — остальное в резерве по другим заказам.`);
-      return;
-    }
-    const price = Number(partPrice) || stockItem.purchasePrice;
+    const free = stockItem.qty - (reserved.get(stockItem.id) ?? 0);
+    const profit = margin(stockItem.purchasePrice, price, qty);
 
     const ok = await confirm({
       title: "Добавить запчасть в заказ",
@@ -227,10 +171,17 @@ export default function OrderDetail() {
         { label: "Запчасть", value: `${stockItem.name} · ${stockItem.sku}` },
         { label: "Ячейка", value: stockItem.cell || "—" },
         { label: "Количество", value: `${qty} ${stockItem.unit}` },
-        { label: "Цена для клиента", value: formatMoney(price) },
-        { label: "Свободно после резерва", value: `${available - qty} ${stockItem.unit}` },
-        { label: "Добавится к сумме заказа", value: formatMoney(price * qty), total: true, tone: "accent" },
+        { label: "Закупка", value: formatMoney(stockItem.purchasePrice * qty) },
+        { label: "Цена клиенту", value: formatMoney(price * qty) },
+        { label: "Свободно после резерва", value: `${free - qty} ${stockItem.unit}` },
+        {
+          label: "Заработок на запчасти",
+          value: `${formatMoney(profit.rub)}${profit.percent !== null ? ` · ${profit.percent}%` : ""}`,
+          total: true,
+          tone: profit.rub > 0 ? "accent" : "danger",
+        },
       ],
+      note: profit.rub <= 0 ? "Цена клиенту не выше закупки — сервис ничего не заработает." : undefined,
       confirmLabel: "Добавить",
     });
     if (!ok) return;
@@ -240,7 +191,7 @@ export default function OrderDetail() {
       setPartError(error);
       return;
     }
-    resetPartForm();
+    setAddingPart(false);
     showToast(`Добавлена запчасть «${stockItem.name}»`);
   }
 
@@ -622,11 +573,9 @@ export default function OrderDetail() {
                 <Card className="overflow-hidden p-0">
                   <div className="flex items-center justify-between p-4">
                     <h2 className="panel-title">Работы</h2>
-                    {!addingWork && (
-                      <button onClick={() => setAddingWork(true)} className="text-sm font-semibold print:hidden" style={{ color: "var(--accent)" }}>
-                        + Добавить работу
-                      </button>
-                    )}
+                    <button onClick={() => setAddingWork(true)} className="text-sm font-semibold print:hidden" style={{ color: "var(--accent)" }}>
+                      + Добавить работу
+                    </button>
                   </div>
                   <table className="app-table">
                     <thead>
@@ -660,53 +609,12 @@ export default function OrderDetail() {
                           </td>
                         </tr>
                       ))}
-                      {order.works.length === 0 && !addingWork && (
+                      {order.works.length === 0 && (
                         <tr><td colSpan={4} className="muted py-3 text-center">Работы не добавлены</td></tr>
                       )}
                     </tbody>
                   </table>
 
-                  {addingWork && (
-                    <div className="m-4 mt-3 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
-                      <div className="field-control mb-2">
-                        <select value={workServiceId} onChange={(e) => setWorkServiceId(e.target.value)} aria-label="Услуга">
-                          <option value="">Выберите услугу…</option>
-                          {services.map((s) => (
-                            <option key={s.id} value={s.id}>{s.name} · {formatMoney(s.price)}{s.normMinutes ? ` · ${s.normMinutes} мин` : ""}</option>
-                          ))}
-                          <option value={CUSTOM_SERVICE}>Другое (ввести вручную)</option>
-                        </select>
-                      </div>
-                      {workServiceId === CUSTOM_SERVICE && (
-                        <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                          <div className="field-control">
-                            <input placeholder="Название работы" value={workCustomName} onChange={(e) => setWorkCustomName(e.target.value)} />
-                          </div>
-                          <div className="field-control">
-                            <input placeholder="Цена, ₽" inputMode="numeric" value={workCustomPrice} onChange={(e) => setWorkCustomPrice(moneyInput(e.target.value))} />
-                          </div>
-                          <div className="field-control">
-                            <input placeholder="Норматив, мин" inputMode="numeric" aria-label="Норматив, минут" value={workCustomNorm} onChange={(e) => setWorkCustomNorm(e.target.value.replace(/\D/g, "").slice(0, 4))} />
-                          </div>
-                        </div>
-                      )}
-                      <div className="mb-3 grid grid-cols-2 gap-2">
-                        <div className="field-control">
-                          <input placeholder="Количество" inputMode="numeric" value={workQty} onChange={(e) => setWorkQty(e.target.value.replace(/\D/g, "").slice(0, 3))} aria-label="Количество" />
-                        </div>
-                        <div className="field-control">
-                          <select value={workExecutor} onChange={(e) => setWorkExecutor(e.target.value)} aria-label="Исполнитель">
-                            <option value="">Исполнитель не указан</option>
-                            {employees.map((e) => <option key={e.id} value={e.name}>{e.name}</option>)}
-                          </select>
-                        </div>
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button variant="secondary" onClick={resetWorkForm}>Отмена</Button>
-                        <Button onClick={handleAddWork}>Добавить</Button>
-                      </div>
-                    </div>
-                  )}
                   <div className="border-t bg-[#fafbfa] p-4 text-right text-sm font-semibold" style={{ borderColor: "var(--border)" }}>
                     Итого за работы: {formatMoney(worksTotal)}
                   </div>
@@ -715,11 +623,9 @@ export default function OrderDetail() {
                 <Card className="overflow-hidden p-0">
                   <div className="flex items-center justify-between p-4">
                     <h2 className="panel-title">Запчасти</h2>
-                    {!addingPart && (
-                      <button onClick={() => setAddingPart(true)} className="text-sm font-semibold print:hidden" style={{ color: "var(--accent)" }}>
-                        + Со склада
-                      </button>
-                    )}
+                    <button onClick={() => { setPartError(""); setAddingPart(true); }} className="text-sm font-semibold print:hidden" style={{ color: "var(--accent)" }}>
+                      + Со склада
+                    </button>
                   </div>
                   <table className="app-table">
                     <thead>
@@ -735,7 +641,23 @@ export default function OrderDetail() {
                         <tr key={p.id} className="group">
                           <td>
                             {p.name}
-                            {p.sku && <div className="muted text-xs">Артикул: {p.sku}</div>}
+                            <div className="muted text-xs">
+                              {p.sku ? `Артикул: ${p.sku}` : ""}
+                              {(() => {
+                                // Показываем заработок на запчасти: закупка есть на складе.
+                                const item = stock.find((entry) => entry.sku === p.sku);
+                                if (!item) return null;
+                                const profit = margin(item.purchasePrice, p.price, p.qty);
+                                return (
+                                  <>
+                                    {p.sku ? " · " : ""}закупка {formatMoney(item.purchasePrice * p.qty)}
+                                    <span style={{ color: profit.rub > 0 ? "var(--accent)" : "var(--danger)" }}>
+                                      {" "}· заработок {formatMoney(profit.rub)}
+                                    </span>
+                                  </>
+                                );
+                              })()}
+                            </div>
                           </td>
                           <td className="text-right tabular-nums">{p.qty}</td>
                           <td className="whitespace-nowrap text-right tabular-nums">{formatMoney(p.price * p.qty)}</td>
@@ -749,60 +671,12 @@ export default function OrderDetail() {
                           </td>
                         </tr>
                       ))}
-                      {order.parts.length === 0 && !addingPart && (
+                      {order.parts.length === 0 && (
                         <tr><td colSpan={4} className="muted py-3 text-center">Запчасти не добавлены</td></tr>
                       )}
                     </tbody>
                   </table>
 
-                  {addingPart && (
-                    <div className="m-4 mt-3 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
-                      <div className="field-control mb-2">
-                        <select
-                          value={partItemId}
-                          aria-label="Запчасть со склада"
-                          onChange={(e) => {
-                            setPartItemId(e.target.value);
-                            setPartError("");
-                            const item = stock.find((s) => s.id === e.target.value);
-                            setPartPrice(item ? String(item.purchasePrice) : "");
-                          }}
-                        >
-                          <option value="">Выберите запчасть со склада…</option>
-                          {stock.map((s) => (
-                            <option key={s.id} value={s.id} disabled={s.qty === 0}>
-                              {s.name} — в наличии {s.qty} {s.unit} · {s.cell}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="mb-2 grid grid-cols-2 gap-2">
-                        <div className="field-control">
-                          <input
-                            placeholder="Количество"
-                            inputMode="numeric"
-                            aria-label="Количество запчастей"
-                            value={partQty}
-                            onChange={(e) => { setPartQty(e.target.value.replace(/\D/g, "")); setPartError(""); }}
-                          />
-                        </div>
-                        <div className="field-control">
-                          <input
-                            placeholder="Цена для клиента, ₽"
-                            inputMode="numeric"
-                            aria-label="Цена для клиента"
-                            value={partPrice}
-                            onChange={(e) => setPartPrice(moneyInput(e.target.value))}
-                          />
-                        </div>
-                      </div>
-                      {partError && <div className="mb-2 text-xs" style={{ color: "var(--danger)" }}>{partError}</div>}
-                      <div className="flex justify-end gap-2">
-                        <Button variant="secondary" onClick={resetPartForm}>Отмена</Button>
-                        <Button onClick={handleAddPart}>Добавить</Button>
-                      </div>
-                    </div>
-                  )}
                   <div className="border-t bg-[#fafbfa] p-4 text-right text-sm font-semibold" style={{ borderColor: "var(--border)" }}>
                     Итого за запчасти: {formatMoney(partsTotal)}
                   </div>
@@ -969,6 +843,11 @@ export default function OrderDetail() {
           <span className="shrink-0 text-sm font-semibold" style={{ color: "var(--accent)" }}>Заказ оплачен</span>
         )}
       </div>
+
+      {addingWork && <AddWork onClose={() => setAddingWork(false)} onSubmit={handleAddWork} />}
+      {addingPart && (
+        <AddPart onClose={() => setAddingPart(false)} onSubmit={handleAddPart} error={partError} />
+      )}
 
       {payOpen && (
         <Modal title="Принять оплату" subtitle={`${carTitle} · ${order.number}`} onClose={() => setPayOpen(false)}>
