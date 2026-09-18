@@ -1,3 +1,15 @@
+import type { PaymentMethod } from "../types";
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: "Наличные",
+  terminal: "Терминал / карта",
+  transfer: "Перевод / СБП",
+};
+
+export function paymentMethodLabel(method?: PaymentMethod) {
+  return method ? PAYMENT_METHOD_LABELS[method] : "Способ не указан";
+}
+
 export interface PaymentLike {
   orderId: string;
   at: string;
