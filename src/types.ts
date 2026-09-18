@@ -206,12 +206,16 @@ export interface Expense {
 
 export type ExpenseStatus = "Оплачено" | "Ожидает" | "Ждём возврат" | "Возвращено";
 
+export type PaymentMethod = "cash" | "terminal" | "transfer";
+
 export interface Payment {
   id: string;
   orderId: string;
   /** Реальный момент приёма денег. */
   at: string;
   amount: number;
+  /** Способ оплаты. У старых мигрированных платежей может быть неизвестен. */
+  method?: PaymentMethod;
   /** Старые оплаты без истории получают приблизительную дату при миграции. */
   estimated?: boolean;
 }
