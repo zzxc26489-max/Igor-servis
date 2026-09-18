@@ -97,6 +97,10 @@ export default function Finance() {
       showToast("Выберите, как поставщик вернул деньги", "error");
       return;
     }
+    if (method === "cash" && !currentShift) {
+      showToast("Для возврата наличными сначала откройте кассовую смену", "error");
+      return;
+    }
     const ok = await confirm({
       title: "Подтвердить возврат денег",
       question: "Подтвердите, что деньги от поставщика пришли. Сумма уменьшит расходы периода и появится в ленте операций.",
@@ -154,6 +158,10 @@ export default function Finance() {
     }
     if (!expenseMethod) {
       showToast("Выберите способ оплаты расхода", "error");
+      return;
+    }
+    if (expenseMethod === "cash" && !currentShift) {
+      showToast("Для расхода наличными сначала откройте кассовую смену", "error");
       return;
     }
     const ok = await confirm({
