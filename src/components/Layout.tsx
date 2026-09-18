@@ -9,6 +9,9 @@ import { lowStockItems } from "../lib/lowStock";
 import { useMobileMenu } from "./MobileMenu";
 import logo from "../assets/logo.jpg";
 import { APP_VERSION } from "../data/version";
+import { canManageSettings, canOpenPath, ROLE_LABELS } from "../lib/access";
+import type { CloudRole } from "../lib/cloud";
+import { useAuth } from "../auth/AuthContext";
 
 type NavItem = {
   to: string;
@@ -61,10 +64,18 @@ const navLinkStyle = ({ isActive }: { isActive: boolean }) => (isActive ? { back
 
 function SidebarContent({
   badges,
+  role,
+  displayName,
+  cloudConnected,
   onNavigate,
+  onSignOut,
 }: {
   badges: { orders: number; purchases: number };
+  role?: CloudRole;
+  displayName?: string;
+  cloudConnected?: boolean;
   onNavigate?: () => void;
+  onSignOut?: () => void;
 }) {
   return (
     <>
@@ -83,7 +94,7 @@ function SidebarContent({
           <div key={group.label}>
             <div className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[.12em] opacity-38">{group.label}</div>
             <div className="flex flex-col gap-1">
-              {group.items.map((item) => {
+              {group.items.filter((item) => !role || canOpenPath(role, item.to)).map((item) => {
                 const badge = item.badge ? badges[item.badge] : 0;
                 return (
                   <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass} style={navLinkStyle} onClick={onNavigate}>
@@ -102,28 +113,40 @@ function SidebarContent({
         ))}
       </nav>
 
-      <div className="px-2.5 pb-2.5">
-        <NavLink to="/settings" className={navLinkClass} style={navLinkStyle} onClick={onNavigate}>
-          <IconSettings size={20} stroke={1.8} />
-          <span>Настройки</span>
-        </NavLink>
-      </div>
-      <div className="border-t px-3 py-3" style={{ borderColor: "var(--sidebar-border)" }}>
-        <div className="flex items-center gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/10 text-sm font-bold text-white">И</span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-white">Игорь</span>
-            <span className="block truncate text-[11px] opacity-55">Рабочее место · v{APP_VERSION}</span>
-          </span>
-          <IconChevronDown size={16} className="shrink-0 opacity-50" />
+      {(!role || canManageSettings(role)) && (
+        <div className="px-2.5 pb-2.5">
+          <NavLink to="/settings" className={navLinkClass} style={navLinkStyle} onClick={onNavigate}>
+            <IconSettings size={20} stroke={1.8} />
+            <span>Настройки</span>
+          </NavLink>
         </div>
+      )}
+      <div className="border-t px-3 py-3" style={{ borderColor: "var(--sidebar-border)" }}>
+        <button
+          type="button"
+          onClick={cloudConnected ? onSignOut : undefined}
+          className="flex w-full items-center gap-3 rounded-lg text-left"
+          title={cloudConnected ? "Выйти из CRM" : undefined}
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/10 text-sm font-bold text-white">
+            {(displayName || "И").slice(0, 1).toUpperCase()}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-white">{displayName || "Игорь"}</span>
+            <span className="block truncate text-[11px] opacity-55">
+              {role ? ROLE_LABELS[role] : "Локальное рабочее место"} · v{APP_VERSION}
+            </span>
+          </span>
+          {cloudConnected && <IconChevronDown size={16} className="shrink-0 opacity-50" />}
+        </button>
       </div>
     </>
   );
 }
 
 export default function Layout() {
-  const { orders, stock } = useAppStore();
+  const { orders, stock, cloud } = useAppStore();
+  const { session, signOut } = useAuth();
   const { open, setOpen } = useMobileMenu();
 
   const badges = {
@@ -137,7 +160,13 @@ export default function Layout() {
         className="hidden w-[240px] shrink-0 flex-col lg:flex print:hidden"
         style={{ background: "var(--sidebar-bg)", color: "var(--sidebar-text)" }}
       >
-        <SidebarContent badges={badges} />
+        <SidebarContent
+          badges={badges}
+          role={cloud.role}
+          displayName={cloud.displayName}
+          cloudConnected={Boolean(session)}
+          onSignOut={() => void signOut()}
+        />
       </aside>
 
       {open && (
@@ -154,7 +183,14 @@ export default function Layout() {
             >
               <IconX size={20} />
             </button>
-            <SidebarContent badges={badges} onNavigate={() => setOpen(false)} />
+            <SidebarContent
+              badges={badges}
+              role={cloud.role}
+              displayName={cloud.displayName}
+              cloudConnected={Boolean(session)}
+              onNavigate={() => setOpen(false)}
+              onSignOut={() => void signOut()}
+            />
           </div>
         </div>
       )}
@@ -168,7 +204,7 @@ export default function Layout() {
         style={{ borderColor: "var(--border)" }}
         aria-label="Основная навигация"
       >
-        {MOBILE_NAV_ITEMS.map((item) => (
+        {MOBILE_NAV_ITEMS.filter((item) => !cloud.role || canOpenPath(cloud.role, item.to)).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
