@@ -1,18 +1,9 @@
 import { Link } from "react-router-dom";
 import { useAppStore } from "../store/AppStore";
-import type { Order } from "../types";
+import { bookingLink, liftLabel, liftState, toMinutes } from "../lib/lift";
+export { orderDay } from "../lib/lift";
 
 const DEFAULT_HOURS = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
-
-function toMinutes(time: string) {
-  const [hours, minutes] = time.split(":").map(Number);
-  return hours * 60 + (minutes || 0);
-}
-
-/** Дата визита: плановая, иначе день создания заказа. */
-export function orderDay(order: Order) {
-  return order.plannedAt ?? order.createdAt.slice(0, 10);
-}
 
 const PALETTE = [
   { bg: "#e8f5ed", border: "#c9e6d5" },
@@ -46,9 +37,9 @@ export default function LiftTimeline({
 
   return (
     <div className="table-scroll">
-      <div className="min-w-[660px] px-4 pb-4">
+      <div className="min-w-[620px] px-4 pb-4">
         <div className="relative flex border-b pb-2 text-xs muted" style={{ borderColor: "var(--border)" }}>
-          <div className="w-[128px] shrink-0" />
+          <div className="w-[132px] shrink-0" />
           <div className="relative flex-1">
             {hours.map((hour) => (
               <span
@@ -74,27 +65,23 @@ export default function LiftTimeline({
           {showNow && (
             <div
               className="pointer-events-none absolute top-0 z-20 w-px"
-              style={{ left: `calc(128px + ${percent(nowMinutes)}% * (100% - 128px) / 100%)`, bottom: 0, background: "var(--text)" }}
+              style={{ left: `calc(132px + ${percent(nowMinutes)}% * (100% - 132px) / 100%)`, bottom: 0, background: "var(--text)" }}
             />
           )}
 
           {lifts.map((lift) => {
-            // Все визиты этого подъёмника за выбранный день, а не первый попавшийся заказ.
-            const dayOrders = orders
-              .filter((order) => order.liftId === lift.id && order.status !== "выдан" && orderDay(order) === day)
-              .sort((a, b) => (a.scheduledStart ?? "").localeCompare(b.scheduledStart ?? ""));
+            const state = liftState(orders, lift, day);
+            const dayOrders = state.orders;
             const busy = dayOrders.length > 0;
-            const freeFrom = dayOrders.length
-              ? dayOrders[dayOrders.length - 1].scheduledEnd
-              : null;
+            const freeFrom = dayOrders.length ? dayOrders[dayOrders.length - 1].scheduledEnd : null;
 
             return (
               <div key={lift.id} className="flex min-h-[86px] items-stretch border-b last:border-b-0" style={{ borderColor: "var(--border)" }}>
-                <div className="flex w-[128px] shrink-0 flex-col justify-center pr-3">
-                  <b className="text-sm">{lift.name}</b>
-                  <span className="mt-1 flex items-center gap-1.5 text-xs muted">
-                    <i className="h-2 w-2 rounded-full" style={{ background: busy ? "var(--accent)" : "var(--border)" }} />
-                    {busy ? "Занят" : "Свободен"}
+                <div className="flex w-[132px] shrink-0 flex-col justify-center pr-3">
+                  <b className="whitespace-nowrap text-[13px]">{lift.name}</b>
+                  <span className="mt-1 flex items-center gap-1.5 whitespace-nowrap text-[11px] muted">
+                    <i className="h-2 w-2 rounded-full" style={{ background: state.busyNow ? "var(--accent)" : state.orders.length ? "var(--warning)" : "var(--border)" }} />
+                    {liftLabel(state)}
                   </span>
                 </div>
 
@@ -130,7 +117,7 @@ export default function LiftTimeline({
 
                   {!busy && (
                     <Link
-                      to="/orders/new"
+                      to={bookingLink(lift.id, day)}
                       className="absolute inset-y-2 left-0 right-0 z-10 flex items-center justify-center rounded-lg border border-dashed text-xs muted transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
                       style={{ borderColor: "var(--border)" }}
                     >
@@ -138,12 +125,13 @@ export default function LiftTimeline({
                     </Link>
                   )}
                   {busy && freeFrom && toMinutes(freeFrom) < endMinutes - 30 && (
-                    <span
-                      className="absolute inset-y-2 z-0 flex items-center justify-center text-xs muted"
-                      style={{ left: `${percent(toMinutes(freeFrom))}%`, right: 0 }}
+                    <Link
+                      to={bookingLink(lift.id, day, freeFrom)}
+                      className="absolute inset-y-2 z-0 flex items-center justify-center rounded-lg border border-dashed text-xs muted transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                      style={{ left: `${percent(toMinutes(freeFrom))}%`, right: 0, borderColor: "transparent" }}
                     >
-                      Свободен с {freeFrom}
-                    </span>
+                      + Записать с {freeFrom}
+                    </Link>
                   )}
                 </div>
               </div>

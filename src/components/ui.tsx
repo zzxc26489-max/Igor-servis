@@ -23,7 +23,7 @@ export function TopBar({
 }) {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
-  const { clients, vehicles, orders } = useAppStore();
+  const { clients, vehicles, orders, demo } = useAppStore();
   const { setOpen } = useMobileMenu();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -120,12 +120,20 @@ export function TopBar({
         </div>
 
         <div className="hidden shrink-0 items-center gap-4 text-xs md:flex" style={{ color: "var(--text-muted)" }}>
-          <span className="font-semibold uppercase tracking-[.08em]">Демо-данные</span>
+          {demo && (
+            <span
+              className="rounded-md px-2 py-1 font-semibold uppercase tracking-[.08em]"
+              style={{ background: "#fdf3e0", color: "var(--warning)" }}
+              title="В базе только демонстрационные записи. Метка исчезнет после первого изменения."
+            >
+              Демо-данные
+            </span>
+          )}
           <span>{today}</span>
         </div>
       </header>
 
-      <div className="flex flex-wrap items-start justify-between gap-3 px-4 pt-5 sm:px-5 lg:px-6 print:hidden">
+      <div className="flex flex-wrap items-start justify-between gap-3 px-4 pt-4 sm:px-5 lg:px-5 print:hidden">
         <div className="min-w-0">
           {breadcrumbs && breadcrumbs.length > 0 && (
             <nav className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }} aria-label="Хлебные крошки">
@@ -168,7 +176,7 @@ function NewRecordButton() {
 }
 
 export function Page({ children }: { children: ReactNode }) {
-  return <main className="min-w-0 flex-1 overflow-auto overflow-x-hidden p-4 pb-24 sm:p-5 sm:pb-6 lg:p-6 print:flex-none print:overflow-visible print:p-0">{children}</main>;
+  return <main className="min-w-0 flex-1 overflow-auto overflow-x-hidden p-4 pb-24 sm:p-5 sm:pb-6 lg:px-5 lg:py-5 print:flex-none print:overflow-visible print:p-0">{children}</main>;
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {

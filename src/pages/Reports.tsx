@@ -1,21 +1,33 @@
 import { Link } from "react-router-dom";
 import {
-  IconCar, IconChartBar, IconClipboardList, IconClockHour4, IconGauge, IconTool, IconUsersGroup,
+  IconCar, IconChartBar, IconClipboardList, IconClockHour4, IconCoin, IconGauge, IconTool, IconUsersGroup,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
+import { liftState } from "../lib/lift";
+import { isCostExpense } from "../lib/analytics";
 import { Card, EmptyState, Metric, Page, TopBar } from "../components/ui";
 import { formatMoney, plural } from "../lib/format";
 import { computePayroll } from "../lib/payroll";
 import { orderTotals } from "../lib/order";
 
 export default function Reports() {
-  const { orders, employees: rawEmployees, vehicles, lifts, clients } = useAppStore();
+  const { orders, employees: rawEmployees, vehicles, lifts, clients, expenses } = useAppStore();
+  const today = new Date().toISOString().slice(0, 10);
   const employees = computePayroll(rawEmployees, orders);
 
   const active = orders.filter((order) => order.status !== "выдан");
   const done = orders.filter((order) => order.status === "выдан");
-  const busyLifts = lifts.filter((lift) => orders.some((order) => order.liftId === lift.id && order.status !== "выдан")).length;
+  // Занят именно сейчас, а не «есть запись на сегодня».
+  const liftStates = lifts.map((lift) => ({ lift, state: liftState(orders, lift, today) }));
+  const busyLifts = liftStates.filter(({ state }) => state.busyNow).length;
   const loadPercent = lifts.length ? Math.round((busyLifts / lifts.length) * 100) : 0;
+
+  const expensesByCategory = (() => {
+    const map = new Map<string, number>();
+    expenses.filter(isCostExpense).forEach((expense) => map.set(expense.category, (map.get(expense.category) ?? 0) + expense.amount));
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  })();
+  const expensesTotal = expensesByCategory.reduce((sum, [, value]) => sum + value, 0);
 
   const averageCheck = orders.length
     ? Math.round(orders.reduce((sum, order) => sum + orderTotals(order).due, 0) / orders.length)
@@ -78,13 +90,13 @@ export default function Reports() {
               <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${loadPercent}%` }} />
             </div>
             <div className="mt-4 space-y-2 text-sm">
-              {lifts.map((lift) => {
-                const order = orders.find((item) => item.liftId === lift.id && item.status !== "выдан");
+              {liftStates.map(({ lift, state }) => {
+                const order = state.current;
                 const client = order && clients.find((item) => item.id === order.clientId);
                 return (
                   <div key={lift.id} className="flex items-center justify-between gap-3">
                     <span className="flex min-w-0 items-center gap-2">
-                      <i className="h-2 w-2 shrink-0 rounded-full" style={{ background: order ? "var(--accent)" : "var(--border)" }} />
+                      <i className="h-2 w-2 shrink-0 rounded-full" style={{ background: order ? "var(--accent)" : state.orders.length ? "var(--warning)" : "var(--border)" }} />
                       <span className="truncate">{lift.name}</span>
                     </span>
                     {order ? (
@@ -92,7 +104,9 @@ export default function Reports() {
                         {client?.name ?? order.number}
                       </Link>
                     ) : (
-                      <span className="muted shrink-0">свободен</span>
+                      <span className="muted shrink-0">
+                        {state.next?.scheduledStart ? `свободен до ${state.next.scheduledStart}` : "свободен"}
+                      </span>
                     )}
                   </div>
                 );
@@ -189,6 +203,27 @@ export default function Reports() {
             </div>
           </Card>
         </div>
+
+        <Card className="mt-3">
+          <h2 className="panel-title mb-3 flex items-center gap-2"><IconCoin size={18} /> Расходы по категориям</h2>
+          {expensesByCategory.length === 0 ? (
+            <p className="muted text-sm">Расходов пока не было.</p>
+          ) : (
+            <div className="space-y-2 text-sm">
+              {expensesByCategory.map(([name, value]) => (
+                <div key={name}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate">{name}</span>
+                    <b className="shrink-0 tabular-nums">{formatMoney(value)}</b>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full" style={{ background: "var(--bg)" }}>
+                    <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${Math.min(100, (value / Math.max(1, expensesTotal)) * 100)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
 
         <Card className="mt-3">
           <p className="muted text-sm">

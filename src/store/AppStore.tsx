@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type {
   Client,
   AppSettings,
@@ -31,6 +31,8 @@ export const CODE_PREFIX = {
 } as const;
 
 interface DB {
+  /** База ещё не тронута руками — показываем метку «Демо-данные». */
+  demo?: boolean;
   company: CompanyInfo;
   settings: AppSettings;
   lifts: Lift[];
@@ -51,6 +53,7 @@ const defaultSettings: AppSettings = {
 
 function seedDB(): DB {
   return {
+    demo: true,
     company: companySeed,
     settings: defaultSettings,
     lifts: seed.lifts,
@@ -173,7 +176,18 @@ interface AppStoreValue extends DB {
 const AppStoreContext = createContext<AppStoreValue | null>(null);
 
 export function AppStoreProvider({ children }: { children: ReactNode }) {
-  const [db, setDB] = useState<DB>(loadInitial);
+  const [db, rawSetDB] = useState<DB>(loadInitial);
+
+  /**
+   * Любое изменение данных снимает метку «Демо-данные»: как только в базе
+   * появились настоящие записи, называть её демонстрационной нечестно.
+   */
+  const setDB = useCallback<React.Dispatch<React.SetStateAction<DB>>>((value) => {
+    rawSetDB((prev) => {
+      const next = typeof value === "function" ? (value as (state: DB) => DB)(prev) : value;
+      return next.demo ? { ...next, demo: false } : next;
+    });
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
@@ -521,14 +535,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             ],
           };
         }),
-      resetToSeed: () => setDB(seedDB()),
+      resetToSeed: () => rawSetDB(seedDB()),
       exportDB: () => JSON.stringify(db, null, 2),
       importDB: (json) => {
         try {
           const parsed = JSON.parse(json) as Partial<DB>;
           if (!Array.isArray(parsed.orders) || !Array.isArray(parsed.clients)) return false;
-          setDB(migrate({
+          rawSetDB(migrate({
             ...seedDB(),
+            demo: false,
             ...parsed,
             company: { ...companySeed, ...parsed.company },
             settings: { ...defaultSettings, ...parsed.settings },
@@ -539,7 +554,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [db],
+    [db, setDB],
   );
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;

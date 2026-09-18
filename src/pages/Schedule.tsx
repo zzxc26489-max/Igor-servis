@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { Card, ListCard, Page, StatusBadge, TopBar } from "../components/ui";
-import LiftTimeline, { orderDay } from "../components/LiftTimeline";
+import LiftTimeline from "../components/LiftTimeline";
+import { bookingLink, liftLabel, liftState, orderDay } from "../lib/lift";
 import { plural } from "../lib/format";
 
 const WORK_HOURS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
@@ -29,7 +30,8 @@ export default function Schedule() {
     [day, orders],
   );
 
-  const busy = lifts.filter((lift) => dayOrders.some((order) => order.liftId === lift.id)).length;
+  const states = useMemo(() => lifts.map((lift) => ({ lift, state: liftState(orders, lift, day) })), [day, lifts, orders]);
+  const busy = states.filter(({ state }) => state.busyNow).length;
   const unassigned = dayOrders.filter((order) => !order.liftId);
 
   const dayLabel = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long" }).format(new Date(day));
@@ -38,7 +40,7 @@ export default function Schedule() {
     <>
       <TopBar
         title="Расписание"
-        subtitle={`${busy} из ${lifts.length} подъёмников занято · ${dayOrders.length} ${plural(dayOrders.length, "запись", "записи", "записей")}`}
+        subtitle={`${busy} из ${lifts.length} подъёмников занято сейчас · ${dayOrders.length} ${plural(dayOrders.length, "запись", "записи", "записей")} на день`}
       />
       <Page>
         <Card className="overflow-hidden p-0">
@@ -73,20 +75,20 @@ export default function Schedule() {
           </div>
 
           <div className="space-y-3 p-3 lg:hidden">
-            {lifts.map((lift) => {
-              const liftOrders = dayOrders.filter((order) => order.liftId === lift.id);
+            {states.map(({ lift, state }) => {
+              const liftOrders = state.orders;
               return (
                 <div key={lift.id} className="rounded-xl border p-3" style={{ borderColor: "var(--border)" }}>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <b className="text-sm">{lift.name}</b>
                     <span className="flex items-center gap-1.5 text-xs muted">
-                      <i className="h-2 w-2 rounded-full" style={{ background: liftOrders.length ? "var(--accent)" : "var(--border)" }} />
-                      {liftOrders.length ? "Занят" : "Свободен"}
+                      <i className="h-2 w-2 rounded-full" style={{ background: state.busyNow ? "var(--accent)" : liftOrders.length ? "var(--warning)" : "var(--border)" }} />
+                      {liftLabel(state)}
                     </span>
                   </div>
                   {liftOrders.length === 0 ? (
-                    <button onClick={() => navigate("/orders/new")} className="mt-2 w-full rounded-lg border border-dashed py-2 text-sm muted" style={{ borderColor: "var(--border)" }}>
-                      + Записать на подъёмник
+                    <button onClick={() => navigate(bookingLink(lift.id, day, state.freeFrom))} className="mt-2 w-full rounded-lg border border-dashed py-2 text-sm muted" style={{ borderColor: "var(--border)" }}>
+                      {state.busyNow ? `+ Записать с ${state.freeFrom}` : "+ Записать"}
                     </button>
                   ) : (
                     <div className="mt-2 space-y-2">
@@ -104,6 +106,13 @@ export default function Schedule() {
                           />
                         );
                       })}
+                      <button
+                        onClick={() => navigate(bookingLink(lift.id, day, state.freeFrom))}
+                        className="w-full rounded-lg border border-dashed py-2 text-sm font-semibold text-[var(--accent)]"
+                        style={{ borderColor: "var(--border)" }}
+                      >
+                        {state.busyNow ? `+ Записать с ${state.freeFrom}` : "+ Записать"}
+                      </button>
                     </div>
                   )}
                 </div>

@@ -8,6 +8,7 @@ import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
+import RowMenu from "../components/RowMenu";
 import { reservedByItem } from "../lib/stock";
 import { Button, Card, Modal, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
@@ -331,6 +332,107 @@ export default function OrderDetail() {
 
   const carTitle = vehicle ? `${vehicle.make} ${vehicle.model}` : order.number;
 
+  /**
+   * Деньги по заказу: итог, скидка, подгонка суммы и договорённость.
+   * Один и тот же блок показываем в правой колонке на компьютере и во
+   * вкладке «Оплаты» на телефоне — иначе на узком экране часть настроек
+   * просто пропадала.
+   */
+  const moneyPanel = (
+    <>
+            <div className="muted text-xs font-semibold uppercase tracking-[.07em]">
+              {debt < 0 ? "Переплата клиента" : "Осталось оплатить"}
+            </div>
+            <div className="mt-1 text-[32px] font-bold leading-none tabular-nums" style={{ color: debt > 0 ? "var(--text)" : "var(--accent)" }}>
+              {formatMoney(Math.abs(debt))}
+            </div>
+            <div className="muted mt-1 text-sm">Всего по заказу {formatMoney(due)} · оплачено {formatMoney(paid)}</div>
+
+            <div className="mt-3 space-y-1 border-t pt-3 text-sm" style={{ borderColor: "var(--border)" }}>
+              <div className="flex justify-between"><span className="muted">Работы</span><span className="tabular-nums">{formatMoney(worksTotal)}</span></div>
+              <div className="flex justify-between"><span className="muted">Запчасти</span><span className="tabular-nums">{formatMoney(partsTotal)}</span></div>
+              <div className="flex items-center justify-between">
+                {editingDiscount ? (
+                  <>
+                    <span className="muted">Скидка</span>
+                    <span className="flex items-center gap-1">
+                      <input
+                        autoFocus
+                        value={discountInput}
+                        onChange={(e) => setDiscountInput(e.target.value.replace(/\D/g, ""))}
+                        onKeyDown={(e) => e.key === "Enter" && handleSaveDiscount()}
+                        onBlur={handleSaveDiscount}
+                        className="w-20 rounded border px-2 py-0.5 text-right text-sm"
+                        style={{ borderColor: "var(--border)" }}
+                        inputMode="numeric"
+                        aria-label="Скидка, ₽"
+                      />
+                      ₽
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => { setDiscountInput(String(discount)); setEditingDiscount(true); }}
+                      className="muted underline decoration-dotted"
+                    >
+                      Скидка
+                    </button>
+                    <span className="tabular-nums" style={{ color: discount > 0 ? "var(--danger)" : undefined }}>
+                      {discount > 0 ? `-${formatMoney(discount)}` : "нет"}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {clientDiscount > 0 && discount !== clientDiscount && (
+              <button
+                onClick={() => updateOrder(order.id, { discount: clientDiscount })}
+                className="mt-2 w-full rounded-lg border border-dashed px-2 py-1.5 text-xs transition hover:bg-[var(--bg)]"
+                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+              >
+                Скидка клиента {client?.discountPercent}% — применить {formatMoney(clientDiscount)}
+              </button>
+            )}
+
+            {debt > 0 && (
+              <Button className="mt-3 w-full justify-center" onClick={() => setPayOpen(true)}>Принять оплату</Button>
+            )}
+            <Link to={`/orders/${order.id}/act`} className="mt-2 block">
+              <Button variant="secondary" className="w-full justify-center"><IconFileDescription size={18} /> Акт работ</Button>
+            </Link>
+
+            {settings.autoPriceAdjustment && (
+              <div className="mt-3 rounded-lg border bg-[#f7faf8] p-3" style={{ borderColor: "var(--border)" }}>
+                <label className="text-xs font-semibold">Подогнать сумму заказа</label>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={targetTotal}
+                    onChange={(event) => setTargetTotal(event.target.value.replace(/\D/g, ""))}
+                    onKeyDown={(event) => event.key === "Enter" && applyTargetTotal()}
+                    placeholder={String(due)}
+                    inputMode="numeric"
+                    aria-label="Согласованная сумма"
+                    className="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm"
+                    style={{ borderColor: "var(--border)" }}
+                  />
+                  <Button variant="secondary" onClick={applyTargetTotal}>ОК</Button>
+                </div>
+                <p className="muted mt-2 text-xs">Пересчитываются только цены работ, с округлением до 10 ₽.</p>
+              </div>
+            )}
+
+            <label className="mt-3 block text-sm">
+              <span className="muted mb-1 flex items-center gap-1.5"><IconNotes size={14} /> Договорённость с клиентом</span>
+              <div className="field-control">
+                <textarea rows={3} defaultValue={order.notes || ""} onBlur={(e) => updateOrder(order.id, { notes: e.target.value })} placeholder="Не попадает в акт для клиента" />
+              </div>
+            </label>
+    </>
+  );
+
+
   return (
     <>
       <TopBar
@@ -445,12 +547,14 @@ export default function OrderDetail() {
           </div>
         </Card>
 
-        <div className="order-body grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="order-body grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
           <div className="min-w-0">
             <div className="mb-3 flex gap-1 overflow-x-auto rounded-xl border bg-white p-1 print:hidden" style={{ borderColor: "var(--border)" }}>
               {TABS.map((item) => (
                 <button
                   key={item}
+                  // Активная вкладка подтягивается в видимую часть: на телефоне ряд прокручивается.
+                  ref={(node) => { if (node && tab === item) node.scrollIntoView({ block: "nearest", inline: "nearest" }); }}
                   onClick={() => setTab(item)}
                   className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition"
                   style={{
@@ -480,7 +584,7 @@ export default function OrderDetail() {
                         <th>Наименование</th>
                         <th className="w-20 text-right">Кол-во</th>
                         <th className="w-28 text-right">Сумма</th>
-                        <th className="w-8 print:hidden" />
+                        <th className="w-12 print:hidden" />
                       </tr>
                     </thead>
                     <tbody>
@@ -493,15 +597,12 @@ export default function OrderDetail() {
                           <td className="text-right tabular-nums">{w.qty}</td>
                           <td className="whitespace-nowrap text-right tabular-nums">{formatMoney(w.price * w.qty)}</td>
                           <td className="text-right print:hidden">
-                            <button
-                              onClick={() => handleRemoveWork(w.id)}
-                              className="rounded px-1 text-xs opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
-                              style={{ color: "var(--danger)" }}
-                              aria-label={`Удалить работу «${w.name}»`}
-                              title="Удалить"
-                            >
-                              ✕
-                            </button>
+                            <RowMenu
+                              label={`Действия по работе «${w.name}»`}
+                              actions={[
+                                { label: "Удалить работу", icon: <IconTrash size={16} />, danger: true, onSelect: () => handleRemoveWork(w.id) },
+                              ]}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -569,7 +670,7 @@ export default function OrderDetail() {
                         <th>Наименование</th>
                         <th className="w-20 text-right">Кол-во</th>
                         <th className="w-28 text-right">Сумма</th>
-                        <th className="w-8 print:hidden" />
+                        <th className="w-12 print:hidden" />
                       </tr>
                     </thead>
                     <tbody>
@@ -582,15 +683,12 @@ export default function OrderDetail() {
                           <td className="text-right tabular-nums">{p.qty}</td>
                           <td className="whitespace-nowrap text-right tabular-nums">{formatMoney(p.price * p.qty)}</td>
                           <td className="text-right print:hidden">
-                            <button
-                              onClick={() => handleRemovePart(p)}
-                              className="rounded px-1 text-xs opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
-                              style={{ color: "var(--danger)" }}
-                              aria-label={`Убрать запчасть «${p.name}»`}
-                              title="Убрать (вернуть на склад)"
-                            >
-                              ✕
-                            </button>
+                            <RowMenu
+                              label={`Действия по запчасти «${p.name}»`}
+                              actions={[
+                                { label: "Вернуть на склад", icon: <IconArrowBackUp size={16} />, danger: true, onSelect: () => handleRemovePart(p) },
+                              ]}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -706,34 +804,34 @@ export default function OrderDetail() {
             )}
 
             {tab === "Оплаты" && (
-              <Card className="overflow-hidden p-0 print:hidden">
-                <div className="p-4">
-                  <h2 className="panel-title">Оплаты по заказу</h2>
-                </div>
-                <table className="app-table">
-                  <tbody>
-                    <tr><td>Работы</td><td className="text-right tabular-nums">{formatMoney(worksTotal)}</td></tr>
-                    <tr><td>Запчасти</td><td className="text-right tabular-nums">{formatMoney(partsTotal)}</td></tr>
-                    <tr>
-                      <td>Скидка</td>
-                      <td className="text-right tabular-nums" style={{ color: discount > 0 ? "var(--danger)" : undefined }}>
-                        {discount > 0 ? `-${formatMoney(discount)}` : "нет"}
-                      </td>
-                    </tr>
-                    <tr><td className="font-semibold">К оплате</td><td className="text-right font-semibold tabular-nums">{formatMoney(due)}</td></tr>
-                    <tr><td>Оплачено</td><td className="text-right tabular-nums">{formatMoney(paid)}</td></tr>
-                    <tr>
-                      <td className="font-semibold">Осталось</td>
-                      <td className="text-right font-semibold tabular-nums" style={{ color: debt > 0 ? "var(--danger)" : "var(--accent)" }}>{formatMoney(debt)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                {debt > 0 && (
-                  <div className="border-t p-4 print:hidden" style={{ borderColor: "var(--border)" }}>
-                    <Button onClick={() => setPayOpen(true)}>Принять оплату</Button>
+              <>
+                <Card className="overflow-hidden p-0 print:hidden">
+                  <div className="p-4">
+                    <h2 className="panel-title">Оплаты по заказу</h2>
                   </div>
-                )}
-              </Card>
+                  <table className="app-table">
+                    <tbody>
+                      <tr><td>Работы</td><td className="text-right tabular-nums">{formatMoney(worksTotal)}</td></tr>
+                      <tr><td>Запчасти</td><td className="text-right tabular-nums">{formatMoney(partsTotal)}</td></tr>
+                      <tr>
+                        <td>Скидка</td>
+                        <td className="text-right tabular-nums" style={{ color: discount > 0 ? "var(--danger)" : undefined }}>
+                          {discount > 0 ? `-${formatMoney(discount)}` : "нет"}
+                        </td>
+                      </tr>
+                      <tr><td className="font-semibold">К оплате</td><td className="text-right font-semibold tabular-nums">{formatMoney(due)}</td></tr>
+                      <tr><td>Оплачено</td><td className="text-right tabular-nums">{formatMoney(paid)}</td></tr>
+                      <tr>
+                        <td className="font-semibold">Осталось</td>
+                        <td className="text-right font-semibold tabular-nums" style={{ color: debt > 0 ? "var(--danger)" : "var(--accent)" }}>{formatMoney(debt)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </Card>
+
+                {/* На узком экране правой колонки нет — показываем её содержимое здесь. */}
+                <Card className="mt-4 xl:hidden print:hidden">{moneyPanel}</Card>
+              </>
             )}
 
             {tab === "Документы" && (
@@ -760,97 +858,7 @@ export default function OrderDetail() {
           </div>
 
           <div className="hidden min-w-0 space-y-4 xl:block print:hidden">
-            <Card className="xl:sticky xl:top-20">
-              <div className="muted text-xs font-semibold uppercase tracking-[.07em]">
-                {debt < 0 ? "Переплата клиента" : "Осталось оплатить"}
-              </div>
-              <div className="mt-1 text-[32px] font-bold leading-none tabular-nums" style={{ color: debt > 0 ? "var(--text)" : "var(--accent)" }}>
-                {formatMoney(Math.abs(debt))}
-              </div>
-              <div className="muted mt-1 text-sm">Всего по заказу {formatMoney(due)} · оплачено {formatMoney(paid)}</div>
-
-              <div className="mt-3 space-y-1 border-t pt-3 text-sm" style={{ borderColor: "var(--border)" }}>
-                <div className="flex justify-between"><span className="muted">Работы</span><span className="tabular-nums">{formatMoney(worksTotal)}</span></div>
-                <div className="flex justify-between"><span className="muted">Запчасти</span><span className="tabular-nums">{formatMoney(partsTotal)}</span></div>
-                <div className="flex items-center justify-between">
-                  {editingDiscount ? (
-                    <>
-                      <span className="muted">Скидка</span>
-                      <span className="flex items-center gap-1">
-                        <input
-                          autoFocus
-                          value={discountInput}
-                          onChange={(e) => setDiscountInput(e.target.value.replace(/\D/g, ""))}
-                          onKeyDown={(e) => e.key === "Enter" && handleSaveDiscount()}
-                          onBlur={handleSaveDiscount}
-                          className="w-20 rounded border px-2 py-0.5 text-right text-sm"
-                          style={{ borderColor: "var(--border)" }}
-                          inputMode="numeric"
-                          aria-label="Скидка, ₽"
-                        />
-                        ₽
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => { setDiscountInput(String(discount)); setEditingDiscount(true); }}
-                        className="muted underline decoration-dotted"
-                      >
-                        Скидка
-                      </button>
-                      <span className="tabular-nums" style={{ color: discount > 0 ? "var(--danger)" : undefined }}>
-                        {discount > 0 ? `-${formatMoney(discount)}` : "нет"}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {clientDiscount > 0 && discount !== clientDiscount && (
-                <button
-                  onClick={() => updateOrder(order.id, { discount: clientDiscount })}
-                  className="mt-2 w-full rounded-lg border border-dashed px-2 py-1.5 text-xs transition hover:bg-[var(--bg)]"
-                  style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-                >
-                  Скидка клиента {client?.discountPercent}% — применить {formatMoney(clientDiscount)}
-                </button>
-              )}
-
-              {debt > 0 && (
-                <Button className="mt-3 w-full justify-center" onClick={() => setPayOpen(true)}>Принять оплату</Button>
-              )}
-              <Link to={`/orders/${order.id}/act`} className="mt-2 block">
-                <Button variant="secondary" className="w-full justify-center"><IconFileDescription size={18} /> Акт работ</Button>
-              </Link>
-
-              {settings.autoPriceAdjustment && (
-                <div className="mt-3 rounded-lg border bg-[#f7faf8] p-3" style={{ borderColor: "var(--border)" }}>
-                  <label className="text-xs font-semibold">Подогнать сумму заказа</label>
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      value={targetTotal}
-                      onChange={(event) => setTargetTotal(event.target.value.replace(/\D/g, ""))}
-                      onKeyDown={(event) => event.key === "Enter" && applyTargetTotal()}
-                      placeholder={String(due)}
-                      inputMode="numeric"
-                      aria-label="Согласованная сумма"
-                      className="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm"
-                      style={{ borderColor: "var(--border)" }}
-                    />
-                    <Button variant="secondary" onClick={applyTargetTotal}>ОК</Button>
-                  </div>
-                  <p className="muted mt-2 text-xs">Пересчитываются только цены работ, с округлением до 10 ₽.</p>
-                </div>
-              )}
-
-              <label className="mt-3 block text-sm">
-                <span className="muted mb-1 flex items-center gap-1.5"><IconNotes size={14} /> Договорённость с клиентом</span>
-                <div className="field-control">
-                  <textarea rows={3} defaultValue={order.notes || ""} onBlur={(e) => updateOrder(order.id, { notes: e.target.value })} placeholder="Не попадает в акт для клиента" />
-                </div>
-              </label>
-            </Card>
+            <Card className="xl:sticky xl:top-20">{moneyPanel}</Card>
           </div>
         </div>
 

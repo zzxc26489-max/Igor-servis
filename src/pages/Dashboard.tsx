@@ -5,7 +5,8 @@ import {
   IconClipboardList, IconPackage, IconPhone, IconTool,
 } from "@tabler/icons-react";
 import { Card, ListCard, Page, StatusBadge, TopBar } from "../components/ui";
-import LiftTimeline, { orderDay } from "../components/LiftTimeline";
+import LiftTimeline from "../components/LiftTimeline";
+import { bookingLink, liftLabel, liftState, orderDay } from "../lib/lift";
 import { useAppStore } from "../store/AppStore";
 import { formatMoney, plural } from "../lib/format";
 import { orderTotals } from "../lib/order";
@@ -29,10 +30,9 @@ export default function Dashboard() {
   const inWork = orders.filter((order) => order.status === "в работе" || order.status === "диагностика");
   const ready = orders.filter((order) => order.status === "готово");
   const waitingParts = orders.filter((order) => order.status === "ожидает запчасти");
-  const busyLifts = lifts.filter((lift) =>
-    orders.some((order) => order.liftId === lift.id && order.status !== "выдан" && orderDay(order) === day),
-  ).length;
-  const freeLifts = lifts.length - busyLifts;
+  // «Свободен» = свободен прямо сейчас; запись на вечер подъёмник не занимает.
+  const liftStates = useMemo(() => lifts.map((lift) => ({ lift, state: liftState(orders, lift, day) })), [day, lifts, orders]);
+  const freeLifts = liftStates.filter(({ state }) => !state.busyNow).length;
 
   const attention = useMemo(() => [...ready, ...waitingParts].slice(0, 6), [ready, waitingParts]);
 
@@ -61,7 +61,7 @@ export default function Dashboard() {
           <Stat icon={<IconClipboardList size={17} />} label="Свободные подъёмники" value={freeLifts} unit={`из ${lifts.length}`} />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
           <Card className="overflow-hidden p-0">
             <div className="flex flex-wrap items-center justify-between gap-3 p-4">
               <h2 className="panel-title">Подъёмники</h2>
@@ -85,16 +85,12 @@ export default function Dashboard() {
 
             {/* На телефоне показываем сразу, какая машина на каком подъёмнике. */}
             <div className="space-y-2 p-3 pt-0 lg:hidden">
-              {lifts.map((lift) => {
-                const liftOrders = orders
-                  .filter((item) => item.liftId === lift.id && item.status !== "выдан" && orderDay(item) === day)
-                  .sort((a, b) => (a.scheduledStart ?? "").localeCompare(b.scheduledStart ?? ""));
-
-                if (liftOrders.length === 0) {
+              {liftStates.map(({ lift, state }) => {
+                if (state.orders.length === 0) {
                   return (
                     <button
                       key={lift.id}
-                      onClick={() => navigate("/orders/new")}
+                      onClick={() => navigate(bookingLink(lift.id, day, state.freeFrom))}
                       className="flex w-full items-center justify-between gap-3 rounded-xl border border-dashed px-3 py-3 text-left"
                       style={{ borderColor: "var(--border)" }}
                     >
@@ -107,24 +103,26 @@ export default function Dashboard() {
                 }
 
                 return (
-                  <div key={lift.id} className="rounded-xl border" style={{ borderColor: "var(--border)" }}>
+                  <div key={lift.id} className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--border)" }}>
                     <div className="flex items-center justify-between gap-2 border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
                       <span className="flex items-center gap-2 text-sm font-semibold">
-                        <IconTool size={17} style={{ color: "var(--accent)" }} /> {lift.name}
+                        <IconTool size={17} style={{ color: state.busyNow ? "var(--accent)" : "var(--text-muted)" }} /> {lift.name}
                       </span>
-                      <span className="muted text-xs">
-                        {liftOrders.length > 1 ? `${liftOrders.length} записи` : liftOrders[0].scheduledStart ? `с ${liftOrders[0].scheduledStart}` : "без времени"}
+                      <span className="text-xs" style={{ color: state.busyNow ? "var(--accent)" : "var(--text-muted)" }}>
+                        {liftLabel(state)}
                       </span>
                     </div>
                     <div className="divide-y" style={{ borderColor: "var(--border)" }}>
-                      {liftOrders.map((item) => {
+                      {state.orders.map((item) => {
                         const vehicle = vehicles.find((entry) => entry.id === item.vehicleId);
                         const client = clients.find((entry) => entry.id === item.clientId);
+                        const isNow = state.current?.id === item.id;
                         return (
                           <button
                             key={item.id}
                             onClick={() => navigate(`/orders/${item.id}`)}
                             className="flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left"
+                            style={{ background: isNow ? "var(--accent-soft)" : undefined }}
                           >
                             <span className="min-w-0">
                               <span className="block truncate text-sm font-semibold">
@@ -144,6 +142,13 @@ export default function Dashboard() {
                         );
                       })}
                     </div>
+                    <button
+                      onClick={() => navigate(bookingLink(lift.id, day, state.freeFrom))}
+                      className="w-full border-t px-3 py-2 text-left text-sm font-semibold text-[var(--accent)]"
+                      style={{ borderColor: "var(--border)" }}
+                    >
+                      {state.busyNow ? `+ Записать с ${state.freeFrom}` : "+ Записать"}
+                    </button>
                   </div>
                 );
               })}

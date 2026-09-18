@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  IconArrowBackUp, IconBox, IconBriefcase, IconChartBar, IconChevronLeft,
+  IconArrowBackUp, IconBriefcase, IconChartBar, IconChevronLeft,
   IconChevronRight, IconCoin, IconCreditCardPay, IconPlus, IconUsers,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
@@ -11,10 +11,9 @@ import { useConfirm } from "../components/Confirm";
 import { Button, Card, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatMoney, plural } from "../lib/format";
 import { computePayroll } from "../lib/payroll";
-import { lowStockItems } from "../lib/lowStock";
 import {
-  buildChart, buildOperations, byVehicleMake, clientsBreakdown, computeMetrics, getRange,
-  isCostExpense, ordersInRange, pendingPayments, previousRange, stockValue, topServices, type PeriodKey,
+  buildChart, buildOperations, computeMetrics, getRange,
+  ordersInRange, pendingPayments, previousRange, type PeriodKey,
 } from "../lib/analytics";
 
 const EXPENSE_CATEGORIES = ["Закупка запчастей", "Аренда", "Доставка", "Коммунальные услуги", "Инструмент", "Реклама", "Прочее"];
@@ -30,7 +29,7 @@ const PERIODS: { value: PeriodKey; label: string }[] = [
 ];
 
 export default function Finance() {
-  const { orders, expenses, employees: rawEmployees, clients, vehicles, stock, addExpense, confirmRefund } = useAppStore();
+  const { orders, expenses, employees: rawEmployees, clients, addExpense, confirmRefund } = useAppStore();
   const { showToast } = useToast();
   const confirm = useConfirm();
   const navigate = useNavigate();
@@ -38,6 +37,7 @@ export default function Finance() {
   const [tab, setTab] = useState<Tab>("Обзор");
   const [period, setPeriod] = useState<PeriodKey>("month");
   const [offset, setOffset] = useState(0);
+  const [pickedDay, setPickedDay] = useState<number | null>(null);
 
   const range = useMemo(() => getRange(period, offset), [period, offset]);
 
@@ -59,9 +59,6 @@ export default function Finance() {
     return time >= range.from.getTime() && time <= range.to.getTime();
   })), [expenses, metrics.orders, range]);
 
-  const services = useMemo(() => topServices(metrics.orders), [metrics.orders]);
-  const makes = useMemo(() => byVehicleMake(metrics.orders, vehicles), [metrics.orders, vehicles]);
-  const clientStats = useMemo(() => clientsBreakdown(range, metrics.orders, orders), [metrics.orders, orders, range]);
   const pending = useMemo(() => pendingPayments(orders, clients), [clients, orders]);
   // Возвраты, по которым деньги ещё не пришли: в расчёт не идут, пока не подтвердят.
   const awaitingRefunds = useMemo(
@@ -97,13 +94,6 @@ export default function Finance() {
       .sort((a, b) => b.date.localeCompare(a.date)),
     [expenses, range],
   );
-  const expensesByCategory = useMemo(() => {
-    const map = new Map<string, number>();
-    // В разбивку идут только настоящие затраты: выплаты зарплат и возвраты считаются отдельно.
-    periodExpenses.filter(isCostExpense).forEach((expense) => map.set(expense.category, (map.get(expense.category) ?? 0) + expense.amount));
-    return [...map.entries()].sort((a, b) => b[1] - a[1]);
-  }, [periodExpenses]);
-  const expensesTotal = expensesByCategory.reduce((sum, [, value]) => sum + value, 0);
 
   const [addingExpense, setAddingExpense] = useState(false);
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0]);
@@ -151,6 +141,7 @@ export default function Finance() {
   function changePeriod(next: PeriodKey) {
     setPeriod(next);
     setOffset(0);
+    setPickedDay(null);
   }
 
   const maxChartValue = Math.max(1, ...chart.map((point) => Math.max(point.revenue, point.expenses)));
@@ -161,7 +152,7 @@ export default function Finance() {
     <>
       <TopBar
         title="Финансы"
-        subtitle={`${range.title} · ${range.label}`}
+        subtitle="Выручка, расходы и прибыль за выбранный период"
         actions={
           <Button onClick={() => { setTab("Операции"); setAddingExpense(true); }}>
             <IconPlus size={18} /> Добавить расход
@@ -185,17 +176,20 @@ export default function Finance() {
           ))}
         </div>
 
-        <Card className="mb-3">
-          <div className="flex flex-wrap gap-1.5">
+        {/* Одна строка периода: переключатель, стрелки и сам период рядом. */}
+        <div
+          className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border bg-white px-3 py-2"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <div className="flex flex-wrap gap-1">
             {PERIODS.map((item) => (
               <button
                 key={item.value}
                 onClick={() => changePeriod(item.value)}
-                className="rounded-lg border px-3 py-1.5 text-sm transition"
+                className="rounded-lg px-2.5 py-1.5 text-sm font-medium transition"
                 style={{
-                  borderColor: period === item.value ? "var(--accent)" : "var(--border)",
-                  background: period === item.value ? "var(--accent)" : "white",
-                  color: period === item.value ? "white" : "var(--text)",
+                  background: period === item.value ? "var(--accent)" : "transparent",
+                  color: period === item.value ? "white" : "var(--text-muted)",
                 }}
               >
                 {item.label}
@@ -203,24 +197,22 @@ export default function Finance() {
             ))}
           </div>
           {period !== "all" && (
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <Button size="icon" variant="secondary" onClick={() => setOffset((value) => value - 1)} aria-label="Предыдущий период">
+            <div className="ml-auto flex items-center gap-1">
+              <button onClick={() => setOffset((value) => value - 1)} aria-label="Предыдущий период" className="grid h-8 w-8 place-items-center rounded-lg hover:bg-gray-100">
                 <IconChevronLeft size={18} />
-              </Button>
-              <div className="min-w-0 text-center">
-                <div className="truncate text-sm font-semibold">{range.title}</div>
-                <div className="muted truncate text-xs">{range.label}</div>
-              </div>
-              <Button size="icon" variant="secondary" onClick={() => setOffset((value) => Math.min(0, value + 1))} disabled={offset >= 0} aria-label="Следующий период">
+              </button>
+              <span className="min-w-0 px-1 text-sm font-semibold">{range.title}</span>
+              <button onClick={() => setOffset((value) => Math.min(0, value + 1))} disabled={offset >= 0} aria-label="Следующий период" className="grid h-8 w-8 place-items-center rounded-lg hover:bg-gray-100 disabled:opacity-40">
                 <IconChevronRight size={18} />
-              </Button>
+              </button>
+              <span className="muted hidden text-xs sm:inline">{range.label}</span>
             </div>
           )}
-        </Card>
+        </div>
 
         <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
           <Metric icon={<IconCreditCardPay size={18} />} label="Выручка" value={formatMoney(metrics.revenue)} current={metrics.revenue} previous={previous?.revenue} hint={`${metrics.orders.length} ${plural(metrics.orders.length, "заказ", "заказа", "заказов")}`} />
-          <Metric icon={<IconBriefcase size={18} />} tone="blue" label="Расходы" value={formatMoney(metrics.expenses)} current={metrics.expenses} previous={previous?.expenses} lowerIsBetter hint="Закупки и прочее" />
+          <Metric icon={<IconBriefcase size={18} />} tone="warning" label="Расходы" value={formatMoney(metrics.expenses)} current={metrics.expenses} previous={previous?.expenses} lowerIsBetter hint="Закупки и прочее" />
           <Metric icon={<IconCoin size={18} />} tone="violet" label="Зарплаты" value={formatMoney(metrics.salaries)} hint="Начислено мастерам" />
           <Metric icon={<IconChartBar size={18} />} label="Прибыль" value={formatMoney(metrics.profit)} current={metrics.profit} previous={previous?.profit} hint="После расходов и зарплат" />
         </div>
@@ -257,25 +249,43 @@ export default function Finance() {
                       ))}
                     </div>
                     <div className="relative flex h-full items-end gap-0.5 border-b" style={{ borderColor: "var(--border)" }}>
+                      {/* Точные суммы доступны нажатием: на телефоне наведения нет. */}
                       {chart.map((point, index) => (
-                        <div
+                        <button
                           key={index}
-                          className="flex h-full flex-1 items-end gap-px"
+                          type="button"
+                          onClick={() => setPickedDay(pickedDay === index ? null : index)}
+                          aria-label={`${point.label}: выручка ${formatMoney(point.revenue)}, расходы ${formatMoney(point.expenses)}`}
                           title={`${point.label}: выручка ${formatMoney(point.revenue)}, расходы ${formatMoney(point.expenses)}`}
+                          className="flex h-full flex-1 items-end gap-px rounded-t-sm transition"
+                          style={{ background: pickedDay === index ? "var(--accent-soft)" : undefined }}
                         >
                           <div className="flex-1 rounded-t-sm bg-[#1f9d63]" style={{ height: `${(point.revenue / axisMax) * 100}%` }} />
                           <div className="flex-1 rounded-t-sm bg-[#e39230]" style={{ height: `${(point.expenses / axisMax) * 100}%` }} />
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
                   <div className="mt-1 flex gap-0.5 text-[10px] muted">
                     {chart.map((point, index) => (
-                      <span key={index} className="min-w-0 flex-1 text-center">
-                        {chart.length <= 14 || index % Math.ceil(chart.length / 10) === 0 ? point.label : ""}
+                      <span
+                        key={index}
+                        className="min-w-0 flex-1 text-center"
+                        style={{ color: pickedDay === index ? "var(--accent)" : undefined, fontWeight: pickedDay === index ? 700 : undefined }}
+                      >
+                        {chart.length <= 14 || index % Math.ceil(chart.length / 10) === 0 || pickedDay === index ? point.label : ""}
                       </span>
                     ))}
                   </div>
+
+                  {pickedDay !== null && chart[pickedDay] && (
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg px-3 py-2 text-sm" style={{ background: "var(--bg)" }}>
+                      <b>{chart[pickedDay].label}</b>
+                      <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#1f9d63]" /> {formatMoney(chart[pickedDay].revenue)}</span>
+                      <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#e39230]" /> {formatMoney(chart[pickedDay].expenses)}</span>
+                      <button onClick={() => setPickedDay(null)} className="muted ml-auto text-xs underline decoration-dotted">Скрыть</button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -289,7 +299,7 @@ export default function Finance() {
               <Row label="Прочие расходы" value={-metrics.otherExpenses} tone="danger" />
               <Row label="Зарплаты (начислено)" value={-metrics.salaries} tone="danger" />
               {metrics.refunds > 0 && <Row label="Возвраты поставщикам" value={metrics.refunds} tone="accent" />}
-              {metrics.payouts > 0 && <Row label="Выплачено зарплат" value={-metrics.payouts} />}
+              {metrics.payouts > 0 && <Row label="Выплачено зарплат (движение денег)" value={metrics.payouts} />}
               <div className="flex items-center justify-between border-t pt-2 text-base font-semibold" style={{ borderColor: "var(--border)" }}>
                 <span>Прибыль</span>
                 <span style={{ color: metrics.profit >= 0 ? "var(--accent)" : "var(--danger)" }}>{formatMoney(metrics.profit)}</span>
@@ -298,28 +308,6 @@ export default function Finance() {
           </Card>
 
           <div className="space-y-3">
-            <Card>
-              <h2 className="panel-title mb-3">Ключевые показатели</h2>
-              <div className="grid grid-cols-2 gap-3">
-                <Tile label="Средний чек" value={formatMoney(metrics.averageCheck)} />
-                <Tile label="Выдано машин" value={String(metrics.closed.length)} />
-                <Tile label="Новых клиентов" value={String(clientStats.fresh)} />
-                <Tile label="Повторных" value={String(clientStats.repeat)} />
-              </div>
-            </Card>
-
-            <Card>
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="panel-title flex items-center gap-2"><IconBox size={18} /> Склад</h2>
-                <Link to="/stock" className="text-sm font-semibold text-[var(--accent)]">Открыть</Link>
-              </div>
-              <div className="space-y-2 text-sm">
-                <Row label="Стоимость остатка" value={stockValue(stock)} />
-                <Row label="Закуплено за период" value={metrics.stockPurchases} />
-                <Row label="Заканчивается" value={lowStockItems(stock, orders).length} raw />
-              </div>
-            </Card>
-
             {awaitingRefunds.length > 0 && (
               <Card>
                 <h2 className="panel-title mb-3 flex items-center gap-2"><IconArrowBackUp size={18} /> Ждём возврат от поставщика</h2>
@@ -369,54 +357,10 @@ export default function Finance() {
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-          <Card>
-            <h2 className="panel-title mb-3">Популярные работы</h2>
-            {services.length === 0 ? <p className="muted text-sm">Работ за период нет.</p> : (
-              <div className="space-y-2 text-sm">
-                {services.map((service) => (
-                  <div key={service.name} className="flex items-center justify-between gap-2">
-                    <span className="min-w-0"><b className="block truncate">{service.name}</b><span className="muted text-xs">{service.count} раз</span></span>
-                    <b className="shrink-0">{formatMoney(service.revenue)}</b>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-
-          <Card>
-            <h2 className="panel-title mb-3">По маркам авто</h2>
-            {makes.length === 0 ? <p className="muted text-sm">Данных за период нет.</p> : (
-              <div className="space-y-2 text-sm">
-                {makes.map((make) => (
-                  <div key={make.make} className="flex items-center justify-between gap-2">
-                    <span className="min-w-0"><b className="block truncate">{make.make}</b><span className="muted text-xs">{make.count} {plural(make.count, "заказ", "заказа", "заказов")}</span></span>
-                    <b className="shrink-0">{formatMoney(make.revenue)}</b>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-
-          <Card>
-            <h2 className="panel-title mb-3">Расходы по категориям</h2>
-            {expensesByCategory.length === 0 ? <p className="muted text-sm">Расходов за период нет.</p> : (
-              <div className="space-y-2 text-sm">
-                {expensesByCategory.map(([name, value]) => (
-                  <div key={name}>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate">{name}</span>
-                      <b className="shrink-0">{formatMoney(value)}</b>
-                    </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full" style={{ background: "var(--bg)" }}>
-                      <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${Math.min(100, (value / Math.max(1, expensesTotal)) * 100)}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        </div>
+        <p className="muted mt-3 text-sm">
+          Средний чек, популярные работы, марки и разбивка расходов — в разделе{" "}
+          <Link to="/reports" className="font-semibold text-[var(--accent)]">Отчёты</Link>.
+        </p>
 
         </>
         )}
@@ -610,15 +554,6 @@ function Row({ label, value, tone, raw = false }: { label: string; value: number
     <div className="flex items-center justify-between gap-2">
       <span className="muted">{label}</span>
       <b style={{ color }}>{raw ? value : formatMoney(Math.abs(value))}</b>
-    </div>
-  );
-}
-
-function Tile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg p-3" style={{ background: "var(--bg)" }}>
-      <p className="muted text-xs">{label}</p>
-      <p className="mt-0.5 text-lg font-semibold">{value}</p>
     </div>
   );
 }

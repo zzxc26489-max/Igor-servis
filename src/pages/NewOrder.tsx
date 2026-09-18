@@ -47,9 +47,13 @@ export default function NewOrder() {
   const [model, setModel] = useState(presetVehicle?.model ?? "");
   const [plate, setPlate] = useState(presetVehicle?.plate ?? "");
   const [mileage, setMileage] = useState(presetVehicle?.mileage ? String(presetVehicle.mileage) : "");
-  const [date, setDate] = useState(today);
-  const [time, setTime] = useState("10:00");
-  const [liftId, setLiftId] = useState("");
+  // Подъёмник, дату и время можно передать ссылкой из расписания и с главной.
+  const presetDate = searchParams.get("date");
+  const presetTime = searchParams.get("time");
+  const presetLift = searchParams.get("lift");
+  const [date, setDate] = useState(presetDate && /^\d{4}-\d{2}-\d{2}$/.test(presetDate) ? presetDate : today);
+  const [time, setTime] = useState(presetTime && /^\d{2}:\d{2}$/.test(presetTime) ? presetTime : "10:00");
+  const [liftId, setLiftId] = useState(presetLift && lifts.some((lift) => String(lift.id) === presetLift) ? presetLift : "");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
 

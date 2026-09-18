@@ -53,7 +53,7 @@ const MOBILE_NAV_ITEMS = [
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+  `relative flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
     isActive ? "font-semibold text-white" : "text-[var(--sidebar-text)] hover:bg-white/8 hover:text-white"
   }`;
 
@@ -68,8 +68,8 @@ function SidebarContent({
 }) {
   return (
     <>
-      <div className="flex items-center gap-3 px-4 py-5">
-        <img src={logo} alt="" className="h-11 w-11 shrink-0 rounded-xl bg-white object-cover ring-1 ring-white/10" />
+      <div className="flex items-center gap-2.5 px-3 py-4">
+        <img src={logo} alt="" className="h-10 w-10 shrink-0 rounded-xl bg-white object-cover ring-1 ring-white/10" />
         <div className="min-w-0">
           <div className="truncate text-[15px] font-bold uppercase leading-tight tracking-[0.01em] text-white">
             The Service
@@ -78,7 +78,7 @@ function SidebarContent({
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 pb-3">
+      <nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-2.5 pb-3">
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
             <div className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[.12em] opacity-38">{group.label}</div>
@@ -102,15 +102,15 @@ function SidebarContent({
         ))}
       </nav>
 
-      <div className="px-3 pb-3">
+      <div className="px-2.5 pb-2.5">
         <NavLink to="/settings" className={navLinkClass} style={navLinkStyle} onClick={onNavigate}>
           <IconSettings size={20} stroke={1.8} />
           <span>Настройки</span>
         </NavLink>
       </div>
-      <div className="border-t px-4 py-4" style={{ borderColor: "var(--sidebar-border)" }}>
+      <div className="border-t px-3 py-3" style={{ borderColor: "var(--sidebar-border)" }}>
         <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10 text-sm font-bold text-white">И</span>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/10 text-sm font-bold text-white">И</span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-semibold text-white">Игорь</span>
             <span className="block truncate text-[11px] opacity-55">Рабочее место · v{APP_VERSION}</span>
@@ -134,7 +134,7 @@ export default function Layout() {
   return (
     <div className="app-shell flex min-h-screen print:min-h-0">
       <aside
-        className="hidden w-[300px] shrink-0 flex-col lg:flex print:hidden"
+        className="hidden w-[240px] shrink-0 flex-col lg:flex print:hidden"
         style={{ background: "var(--sidebar-bg)", color: "var(--sidebar-text)" }}
       >
         <SidebarContent badges={badges} />

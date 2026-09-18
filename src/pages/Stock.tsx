@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   IconAlertTriangle, IconArrowBackUp, IconBox, IconCoin, IconLock, IconMapPin,
@@ -25,6 +25,7 @@ export default function Stock() {
   const [chip, setChip] = useState<Chip>("all");
   const [category, setCategory] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [receiveFor, setReceiveFor] = useState<string | null>(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
 
@@ -140,6 +141,7 @@ export default function Stock() {
             <div className="relative min-w-0 flex-1 basis-full sm:basis-0">
               <IconSearch className="pointer-events-none absolute left-3 top-3" size={18} color="var(--text-muted)" />
               <input
+                ref={searchRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Название, артикул, штрихкод или ячейка"
@@ -150,8 +152,14 @@ export default function Stock() {
             </div>
             <Button
               variant="secondary"
-              onClick={() => { setQuery(""); setChip("all"); }}
-              title="Сканер штрихкодов подключается как клавиатура: отсканируйте код в поле поиска"
+              onClick={() => {
+                // Сканер работает как клавиатура: наша задача — поставить курсор в поле.
+                setQuery("");
+                setChip("all");
+                searchRef.current?.focus();
+                showToast("Поле готово — отсканируйте штрихкод или введите артикул");
+              }}
+              title="Курсор встанет в поле поиска: сканер вводит код как клавиатура"
             >
               <IconScan size={18} /> Сканировать
             </Button>
@@ -241,7 +249,7 @@ export default function Stock() {
             </div>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
             <Card className="overflow-hidden p-0">
               <div className="flex items-center justify-between gap-2 border-b p-4" style={{ borderColor: "var(--border)" }}>
                 <h2 className="panel-title">Позиции{shown.length !== stock.length ? `: ${shown.length}` : ""}</h2>
