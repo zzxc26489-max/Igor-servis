@@ -12,7 +12,7 @@ import { formatDate, formatMoney, plural } from "../lib/format";
 import { computePayroll } from "../lib/payroll";
 import {
   buildChart, buildOperations, byVehicleMake, clientsBreakdown, computeMetrics, getRange,
-  pendingPayments, previousRange, stockValue, topServices, type PeriodKey,
+  ordersInRange, pendingPayments, previousRange, stockValue, topServices, type PeriodKey,
 } from "../lib/analytics";
 
 const EXPENSE_CATEGORIES = ["Закупка запчастей", "Аренда", "Доставка", "Коммунальные услуги", "Инструмент", "Реклама", "Прочее"];
@@ -36,15 +36,20 @@ export default function Finance() {
   const [period, setPeriod] = useState<PeriodKey>("month");
   const [offset, setOffset] = useState(0);
 
-  const employees = computePayroll(rawEmployees, orders);
-  const totalSalaries = employees.reduce((sum, employee) => sum + employee.accrued, 0);
-
   const range = useMemo(() => getRange(period, offset), [period, offset]);
+
+  // Зарплату считаем по заказам периода, иначе за «день» прилетает начисление за всё время.
+  const periodOrders = useMemo(() => ordersInRange(range, orders), [orders, range]);
+  const employees = useMemo(() => computePayroll(rawEmployees, periodOrders), [periodOrders, rawEmployees]);
+  const totalSalaries = employees.reduce((sum, employee) => sum + employee.accrued, 0);
   const metrics = useMemo(() => computeMetrics(range, orders, expenses, totalSalaries), [expenses, orders, range, totalSalaries]);
   const previous = useMemo(() => {
     const prev = previousRange(range);
-    return prev ? computeMetrics(prev, orders, expenses, totalSalaries) : null;
-  }, [expenses, orders, range, totalSalaries]);
+    if (!prev) return null;
+    const prevSalaries = computePayroll(rawEmployees, ordersInRange(prev, orders))
+      .reduce((sum, employee) => sum + employee.accrued, 0);
+    return computeMetrics(prev, orders, expenses, prevSalaries);
+  }, [expenses, orders, range, rawEmployees]);
 
   const chart = useMemo(() => buildChart(range, metrics.orders, expenses.filter((expense) => {
     const time = new Date(expense.date).getTime();

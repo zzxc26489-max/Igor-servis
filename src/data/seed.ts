@@ -83,16 +83,37 @@ export const clients: Client[] = [
   { id: "cl-1", code: "К-0001", name: "Смирнов Алексей", phone: "+7 916 000-00-01", isRegular: true, discountPercent: 5, source: "Сарафанное радио", createdAt: day(-900), birthday: "1988-06-04", notes: "Приезжает по субботам, просит звонить заранее" },
   { id: "cl-2", code: "К-0002", name: "Кузнецова Мария", phone: "+7 916 000-00-02", isRegular: true, discountPercent: 5, source: "Яндекс Карты", createdAt: day(-760), email: "kuznecova@example.com" },
   { id: "cl-3", code: "К-0003", name: "Волков Дмитрий", phone: "+7 916 000-00-03", source: "Авито", createdAt: day(-480) },
-  { id: "cl-4", code: "К-0004", name: "Лебедев Сергей", phone: "+7 916 000-00-04", createdAt: day(-210) },
-  { id: "cl-5", code: "К-0005", name: "Панфилова Елена", phone: "+7 916 000-00-05", createdAt: day(-20) },
+  { id: "cl-4", code: "К-0004", name: "Лебедев Сергей", phone: "+7 916 000-00-04", isRegular: true, createdAt: day(-410) },
+  { id: "cl-5", code: "К-0005", name: "Панфилова Елена", phone: "+7 916 000-00-05", source: "Яндекс Карты", createdAt: day(-330) },
+  { id: "cl-6", code: "К-0006", name: "Гончаров Павел", phone: "+7 916 000-00-06", source: "Сарафанное радио", createdAt: day(-300), notes: "Таксопарк, две машины" },
+  { id: "cl-7", code: "К-0007", name: "Егорова Ольга", phone: "+7 916 000-00-07", source: "Авито", createdAt: day(-260), birthday: "1991-11-19" },
+  { id: "cl-8", code: "К-0008", name: "Никитин Роман", phone: "+7 916 000-00-08", isRegular: true, discountPercent: 3, source: "Сарафанное радио", createdAt: day(-190) },
+  { id: "cl-9", code: "К-0009", name: "Соболева Ирина", phone: "+7 916 000-00-09", source: "Яндекс Карты", createdAt: day(-140) },
+  { id: "cl-10", code: "К-0010", name: "Тарасов Андрей", phone: "+7 916 000-00-10", source: "2ГИС", createdAt: day(-95) },
+  { id: "cl-11", code: "К-0011", name: "Филиппов Максим", phone: "+7 916 000-00-11", source: "Авито", createdAt: day(-58) },
+  { id: "cl-12", code: "К-0012", name: "Абрамова Юлия", phone: "+7 916 000-00-12", source: "Яндекс Карты", createdAt: day(-31) },
+  { id: "cl-13", code: "К-0013", name: "Зотов Кирилл", phone: "+7 916 000-00-13", source: "Сарафанное радио", createdAt: day(-12) },
+  { id: "cl-14", code: "К-0014", name: "Мельникова Дарья", phone: "+7 916 000-00-14", source: "2ГИС", createdAt: day(-5) },
+  { id: "cl-15", code: "К-0015", name: "Логинов Артём", phone: "+7 916 000-00-15", source: "Авито", createdAt: day(-2) },
 ];
 
 export const vehicles: Vehicle[] = [
   { id: "veh-1", code: "А-0001", clientId: "cl-1", make: "Toyota", model: "Camry", plate: "A123BC 797", mileage: 82000, year: 2019, color: "Чёрный", engine: "2.5 бензин", transmission: "АКПП", nextServiceMileage: 92000, nextServiceDate: day(74) },
   { id: "veh-2", code: "А-0002", clientId: "cl-2", make: "Kia", model: "Sportage", plate: "H456MK 799", mileage: 78460, vin: "XWEPH81ADMN123456", year: 2021, color: "Белый", engine: "2.0 дизель", transmission: "АКПП" },
   { id: "veh-3", code: "А-0003", clientId: "cl-3", make: "BMW", model: "X5", plate: "O789KX 777", mileage: 145000, year: 2016, color: "Синий", engine: "3.0 дизель", transmission: "АКПП" },
-  { id: "veh-4", code: "А-0004", clientId: "cl-4", make: "Hyundai", model: "Solaris", plate: "K222TT 750" },
-  { id: "veh-5", code: "А-0005", clientId: "cl-5", make: "Skoda", model: "Octavia", plate: "M333EE 197" },
+  { id: "veh-4", code: "А-0004", clientId: "cl-4", make: "Hyundai", model: "Solaris", plate: "K222TT 750", mileage: 121000, year: 2017, color: "Серебристый", engine: "1.6 бензин", transmission: "МКПП" },
+  { id: "veh-5", code: "А-0005", clientId: "cl-5", make: "Skoda", model: "Octavia", plate: "M333EE 197", mileage: 96500, year: 2018, color: "Синий", engine: "1.4 бензин", transmission: "АКПП" },
+  { id: "veh-6", code: "А-0006", clientId: "cl-6", make: "Volkswagen", model: "Polo", plate: "P555KH 750", mileage: 198000, year: 2016, color: "Белый", engine: "1.6 бензин", transmission: "МКПП" },
+  { id: "veh-7", code: "А-0007", clientId: "cl-6", make: "Volkswagen", model: "Polo", plate: "P556KH 750", mileage: 184000, year: 2016, color: "Белый", engine: "1.6 бензин", transmission: "МКПП" },
+  { id: "veh-8", code: "А-0008", clientId: "cl-7", make: "Renault", model: "Duster", plate: "T777OP 197", mileage: 64300, year: 2020, color: "Оранжевый", engine: "2.0 бензин", transmission: "МКПП" },
+  { id: "veh-9", code: "А-0009", clientId: "cl-8", make: "Mazda", model: "CX-5", plate: "У888ВС 777", mileage: 71200, year: 2019, color: "Красный", engine: "2.0 бензин", transmission: "АКПП" },
+  { id: "veh-10", code: "А-0010", clientId: "cl-9", make: "Nissan", model: "Qashqai", plate: "Е111МР 799", mileage: 110400, year: 2015, color: "Серый", engine: "2.0 бензин", transmission: "вариатор" },
+  { id: "veh-11", code: "А-0011", clientId: "cl-10", make: "Lada", model: "Vesta", plate: "К909АХ 750", mileage: 58900, year: 2021, color: "Синий", engine: "1.6 бензин", transmission: "МКПП" },
+  { id: "veh-12", code: "А-0012", clientId: "cl-11", make: "Ford", model: "Focus", plate: "О404ТТ 197", mileage: 143700, year: 2014, color: "Чёрный", engine: "1.6 бензин", transmission: "АКПП" },
+  { id: "veh-13", code: "А-0013", clientId: "cl-12", make: "Toyota", model: "RAV4", plate: "М606ХК 777", mileage: 49800, year: 2022, color: "Белый", engine: "2.0 бензин", transmission: "вариатор" },
+  { id: "veh-14", code: "А-0014", clientId: "cl-13", make: "Kia", model: "Rio", plate: "А202СН 799", mileage: 87300, year: 2018, color: "Серый", engine: "1.6 бензин", transmission: "АКПП" },
+  { id: "veh-15", code: "А-0015", clientId: "cl-14", make: "Hyundai", model: "Creta", plate: "Н313УК 750", mileage: 33100, year: 2023, color: "Тёмно-синий", engine: "1.6 бензин", transmission: "АКПП" },
+  { id: "veh-16", code: "А-0016", clientId: "cl-15", make: "Skoda", model: "Rapid", plate: "В515ЕТ 197", mileage: 102600, year: 2019, color: "Серебристый", engine: "1.6 бензин", transmission: "АКПП" },
 ];
 
 export const services: Service[] = [
@@ -103,23 +124,37 @@ export const services: Service[] = [
   { id: "sv-5", name: "Замена передних тормозных колодок", category: "Тормозная система", price: 2000 },
   { id: "sv-6", name: "Замена термостата", category: "Охлаждение", price: 1800 },
   { id: "sv-7", name: "Развал-схождение", category: "Ходовая", price: 2500 },
+  { id: "sv-8", name: "Замена тормозных дисков (пара)", category: "Тормозная система", price: 3000 },
+  { id: "sv-9", name: "Замена свечей зажигания", category: "Электрика", price: 450 },
+  { id: "sv-10", name: "Замена салонного фильтра", category: "ТО", price: 500 },
+  { id: "sv-11", name: "Замена антифриза", category: "Охлаждение", price: 1600 },
+  { id: "sv-12", name: "Замена тормозной жидкости", category: "Тормозная система", price: 1800 },
+  { id: "sv-13", name: "Замена передних амортизаторов", category: "Ходовая", price: 4500 },
+  { id: "sv-14", name: "Замена ремня ГРМ", category: "Двигатель", price: 9500 },
+  { id: "sv-15", name: "Замена сцепления", category: "Трансмиссия", price: 12000 },
+  { id: "sv-16", name: "Замена масла в АКПП", category: "Трансмиссия", price: 4200 },
+  { id: "sv-17", name: "Шиномонтаж (4 колеса)", category: "Шиномонтаж", price: 2400 },
+  { id: "sv-18", name: "Заправка кондиционера", category: "Климат", price: 3200 },
+  { id: "sv-19", name: "Замена ступичного подшипника", category: "Ходовая", price: 3800 },
+  { id: "sv-20", name: "Замена аккумулятора", category: "Электрика", price: 700 },
 ];
 
 export const stock: StockItem[] = [
-  { id: "st-1", code: "С-0001", name: "Тормозные колодки (передние)", sku: "GDB1956", brand: "TRW", category: "Тормозная система", qty: 2, minQty: 4, purchasePrice: 3250, cell: "A-03-02", unit: "компл." },
-  { id: "st-2", code: "С-0002", name: "Масляный фильтр (VAG)", sku: "26300-35505", brand: "MANN", category: "Фильтры", qty: 6, minQty: 3, purchasePrice: 980, cell: "A-01-02", unit: "шт." },
-  { id: "st-3", code: "С-0003", name: "Моторное масло 5W-30", sku: "Shell 5W-30", brand: "Shell", category: "Масла", qty: 18, minQty: 8, purchasePrice: 850, cell: "B-04-01", unit: "л" },
-  { id: "st-4", code: "С-0004", name: "Свечи зажигания (NGK)", sku: "BKR6E", brand: "NGK", category: "Электрика", qty: 16, minQty: 8, purchasePrice: 350, cell: "B-02-01", unit: "шт." },
-  { id: "st-5", code: "С-0005", name: "Антифриз G12+", sku: "G12+", brand: "Felix", category: "Жидкости", qty: 12, minQty: 6, purchasePrice: 650, cell: "B-04-02", unit: "л" },
-  { id: "st-6", code: "С-0006", name: "Воздушный фильтр", sku: "28113-D3100", brand: "MANN", category: "Фильтры", qty: 1, minQty: 3, purchasePrice: 1250, cell: "A-04-01", unit: "шт." },
-  { id: "st-7", code: "С-0007", name: "Тормозной диск передний", sku: "DF4271", brand: "TRW", category: "Тормозная система", qty: 4, minQty: 2, purchasePrice: 4900, cell: "A-02-02", unit: "шт." },
-];
-
-export const stockMovements: StockMovement[] = [
-  { id: "mv-1", date: at(0, "12:36"), itemId: "st-1", operation: "Приёмка", qty: 4, to: "A-03-02", employee: "Юра" },
-  { id: "mv-2", date: at(0, "11:02"), itemId: "st-2", operation: "Перемещение", qty: 2, from: "B-01-01", to: "A-01-02", employee: "Механик 1" },
-  { id: "mv-3", date: at(-1, "09:17"), itemId: "st-4", operation: "Приёмка", qty: 8, to: "B-02-01", employee: "Игорь" },
-  { id: "mv-4", date: at(-2, "16:21"), itemId: "st-7", operation: "Списание", qty: 1, from: "A-02-02", employee: "Механик 2" },
+  { id: "st-1", code: "С-0001", name: "Тормозные колодки (передние)", sku: "GDB1956", brand: "TRW", category: "Тормозная система", qty: 6, minQty: 4, purchasePrice: 3250, cell: "A-03-02", unit: "компл." },
+  { id: "st-2", code: "С-0002", name: "Масляный фильтр (VAG)", sku: "26300-35505", brand: "MANN", category: "Фильтры", qty: 14, minQty: 6, purchasePrice: 980, cell: "A-01-02", unit: "шт." },
+  { id: "st-3", code: "С-0003", name: "Моторное масло 5W-30", sku: "Shell 5W-30", brand: "Shell", category: "Масла", qty: 46, minQty: 20, purchasePrice: 850, cell: "B-04-01", unit: "л" },
+  { id: "st-4", code: "С-0004", name: "Свечи зажигания (NGK)", sku: "BKR6E", brand: "NGK", category: "Электрика", qty: 32, minQty: 12, purchasePrice: 350, cell: "B-02-01", unit: "шт." },
+  { id: "st-5", code: "С-0005", name: "Антифриз G12+", sku: "G12+", brand: "Felix", category: "Жидкости", qty: 24, minQty: 10, purchasePrice: 650, cell: "B-04-02", unit: "л" },
+  { id: "st-6", code: "С-0006", name: "Воздушный фильтр", sku: "28113-D3100", brand: "MANN", category: "Фильтры", qty: 2, minQty: 5, purchasePrice: 1250, cell: "A-04-01", unit: "шт." },
+  { id: "st-7", code: "С-0007", name: "Тормозной диск передний", sku: "DF4271", brand: "TRW", category: "Тормозная система", qty: 8, minQty: 4, purchasePrice: 4900, cell: "A-02-02", unit: "шт." },
+  { id: "st-8", code: "С-0008", name: "Салонный фильтр", sku: "CUK2939", brand: "MANN", category: "Фильтры", qty: 11, minQty: 5, purchasePrice: 760, cell: "A-04-02", unit: "шт." },
+  { id: "st-9", code: "С-0009", name: "Тормозная жидкость DOT-4", sku: "DOT4-1L", brand: "Bosch", category: "Жидкости", qty: 9, minQty: 4, purchasePrice: 520, cell: "B-05-01", unit: "л" },
+  { id: "st-10", code: "С-0010", name: "Амортизатор передний", sku: "334262", brand: "KYB", category: "Ходовая", qty: 4, minQty: 2, purchasePrice: 5400, cell: "C-01-01", unit: "шт." },
+  { id: "st-11", code: "С-0011", name: "Ремень ГРМ (комплект)", sku: "KTB331", brand: "Dayco", category: "Двигатель", qty: 1, minQty: 2, purchasePrice: 8700, cell: "C-02-01", unit: "компл." },
+  { id: "st-12", code: "С-0012", name: "Масло АКПП ATF", sku: "ATF-DIII", brand: "Idemitsu", category: "Масла", qty: 18, minQty: 8, purchasePrice: 940, cell: "B-04-03", unit: "л" },
+  { id: "st-13", code: "С-0013", name: "Аккумулятор 60Ач", sku: "6CT-60", brand: "Tyumen", category: "Электрика", qty: 3, minQty: 2, purchasePrice: 6300, cell: "C-03-01", unit: "шт." },
+  { id: "st-14", code: "С-0014", name: "Ступичный подшипник", sku: "VKBA6996", brand: "SKF", category: "Ходовая", qty: 5, minQty: 3, purchasePrice: 2450, cell: "C-01-02", unit: "шт." },
+  { id: "st-15", code: "С-0015", name: "Хладагент R134a", sku: "R134A-800", brand: "Errecom", category: "Климат", qty: 6, minQty: 3, purchasePrice: 2100, cell: "B-05-02", unit: "бал." },
 ];
 
 const activeOrders: Order[] = [
@@ -231,57 +266,140 @@ const activeOrders: Order[] = [
 
 
 /**
- * Закрытые заказы за последние недели генерируем: так аналитика, отчёты и график
- * всегда наполнены, а править руками полсотни записей не нужно.
+ * Закрытые заказы, расходы и движения склада за последние месяцы генерируем:
+ * так расписание, аналитика и отчёты наполнены на любом периоде, а править
+ * руками несколько сотен записей не нужно.
  */
-const CLOSED_TEMPLATES: { works: [string, number][]; parts: [string, string, number, number][] }[] = [
+const HISTORY_DAYS = 130;
+
+type Template = {
+  works: [string, number][];
+  parts: [string, string, number, number][];
+};
+
+const CLOSED_TEMPLATES: Template[] = [
   {
     works: [["Замена масла в ДВС", 1200], ["Замена масляного фильтра", 600], ["Замена воздушного фильтра", 400]],
-    parts: [["Моторное масло 5W-30", "Shell 5W-30", 5, 1100], ["Масляный фильтр (VAG)", "26300-35505", 1, 1400]],
+    parts: [["Моторное масло 5W-30", "Shell 5W-30", 5, 1150], ["Масляный фильтр (VAG)", "26300-35505", 1, 1400]],
   },
   {
-    works: [["Замена передних тормозных колодок", 2000], ["Развал-схождение", 2500]],
-    parts: [["Тормозные колодки (передние)", "GDB1956", 1, 4200]],
+    works: [["Замена передних тормозных колодок", 2000], ["Замена тормозных дисков (пара)", 3000], ["Развал-схождение", 2500]],
+    parts: [["Тормозные колодки (передние)", "GDB1956", 1, 4600], ["Тормозной диск передний", "DF4271", 2, 6900]],
   },
   {
-    works: [["Компьютерная диагностика", 1500], ["Замена термостата", 1800]],
-    parts: [["Антифриз G12+", "G12+", 5, 900]],
+    works: [["Компьютерная диагностика", 1500], ["Замена термостата", 1800], ["Замена антифриза", 1600]],
+    parts: [["Антифриз G12+", "G12+", 6, 950]],
   },
   {
-    works: [["Замена передних тормозных колодок", 2000]],
-    parts: [["Тормозной диск передний", "DF4271", 2, 6200], ["Тормозные колодки (передние)", "GDB1956", 1, 4200]],
+    works: [["Замена ремня ГРМ", 9500], ["Замена антифриза", 1600]],
+    parts: [["Ремень ГРМ (комплект)", "KTB331", 1, 12300], ["Антифриз G12+", "G12+", 5, 950]],
   },
   {
-    works: [["Компьютерная диагностика", 1500]],
+    works: [["Компьютерная диагностика", 1500], ["Замена свечей зажигания", 450]],
+    parts: [["Свечи зажигания (NGK)", "BKR6E", 4, 520]],
+  },
+  {
+    works: [["Замена масла в АКПП", 4200], ["Замена салонного фильтра", 500]],
+    parts: [["Масло АКПП ATF", "ATF-DIII", 7, 1350], ["Салонный фильтр", "CUK2939", 1, 1100]],
+  },
+  {
+    works: [["Замена передних амортизаторов", 4500], ["Развал-схождение", 2500]],
+    parts: [["Амортизатор передний", "334262", 2, 7600]],
+  },
+  {
+    works: [["Замена ступичного подшипника", 3800]],
+    parts: [["Ступичный подшипник", "VKBA6996", 1, 3500]],
+  },
+  {
+    works: [["Заправка кондиционера", 3200], ["Замена салонного фильтра", 500]],
+    parts: [["Хладагент R134a", "R134A-800", 1, 2950], ["Салонный фильтр", "CUK2939", 1, 1100]],
+  },
+  {
+    works: [["Шиномонтаж (4 колеса)", 2400]],
     parts: [],
   },
   {
-    works: [["Замена масла в ДВС", 1200], ["Замена воздушного фильтра", 400]],
-    parts: [["Свечи зажигания (NGK)", "BKR6E", 4, 620], ["Воздушный фильтр", "28113-D3100", 1, 1800]],
+    works: [["Замена тормозной жидкости", 1800], ["Компьютерная диагностика", 1500]],
+    parts: [["Тормозная жидкость DOT-4", "DOT4-1L", 1, 750]],
+  },
+  {
+    works: [["Замена аккумулятора", 700], ["Компьютерная диагностика", 1500]],
+    parts: [["Аккумулятор 60Ач", "6CT-60", 1, 8900]],
+  },
+  {
+    works: [["Замена сцепления", 12000]],
+    parts: [],
+  },
+  {
+    works: [["Замена масла в ДВС", 1200], ["Замена масляного фильтра", 600], ["Замена салонного фильтра", 500], ["Развал-схождение", 2500]],
+    parts: [
+      ["Моторное масло 5W-30", "Shell 5W-30", 5, 1150],
+      ["Масляный фильтр (VAG)", "26300-35505", 1, 1400],
+      ["Салонный фильтр", "CUK2939", 1, 1100],
+    ],
   },
 ];
 
-const CLOSED_PAIRS: [string, string][] = [
-  ["cl-1", "veh-1"], ["cl-2", "veh-2"], ["cl-3", "veh-3"], ["cl-4", "veh-4"], ["cl-5", "veh-5"],
+/**
+ * Клиент, его машина и день, с которого он у нас обслуживается. Пока клиент
+ * «не появился», заказов по нему нет — так в аналитике честно видно новых и
+ * повторных клиентов.
+ */
+const CLOSED_PAIRS: { clientId: string; vehicleId: string; since: number }[] = [
+  { clientId: "cl-1", vehicleId: "veh-1", since: 900 },
+  { clientId: "cl-2", vehicleId: "veh-2", since: 760 },
+  { clientId: "cl-3", vehicleId: "veh-3", since: 480 },
+  { clientId: "cl-4", vehicleId: "veh-4", since: 410 },
+  { clientId: "cl-5", vehicleId: "veh-5", since: 330 },
+  { clientId: "cl-6", vehicleId: "veh-6", since: 300 },
+  { clientId: "cl-6", vehicleId: "veh-7", since: 300 },
+  { clientId: "cl-7", vehicleId: "veh-8", since: 260 },
+  { clientId: "cl-8", vehicleId: "veh-9", since: 190 },
+  { clientId: "cl-9", vehicleId: "veh-10", since: 140 },
+  { clientId: "cl-10", vehicleId: "veh-11", since: 95 },
+  { clientId: "cl-11", vehicleId: "veh-12", since: 58 },
+  { clientId: "cl-12", vehicleId: "veh-13", since: 31 },
+  { clientId: "cl-13", vehicleId: "veh-14", since: 12 },
+  { clientId: "cl-14", vehicleId: "veh-15", since: 5 },
+  { clientId: "cl-15", vehicleId: "veh-16", since: 2 },
 ];
 
-function closedOrders(): Order[] {
-  const result: Order[] = [];
-  let number = 224;
-  // По 1–2 закрытых заказа на рабочий день за последний месяц.
-  for (let back = 30; back >= 2; back -= 1) {
+const MECHANICS = ["Механик 1", "Механик 2"];
+
+interface History {
+  closed: Order[];
+  expenses: Expense[];
+  movements: StockMovement[];
+}
+
+function buildHistory(): History {
+  const closed: Order[] = [];
+  const expenses: Expense[] = [];
+  const movements: StockMovement[] = [];
+
+  let step = 0;
+  /** Выручка с прошлой закупки — из неё считаем следующую, чтобы сервис работал в плюс. */
+  let revenueSincePurchase = 0;
+  let lastPurchaseDay = HISTORY_DAYS;
+
+  for (let back = HISTORY_DAYS; back >= 0; back -= 1) {
     const weekday = new Date(day(-back)).getDay();
-    if (weekday === 0) continue; // воскресенье — выходной
-    const perDay = back % 3 === 0 ? 2 : 1;
+    const workingDay = weekday !== 0;
+    // Сегодня пара машин уже уехала утром — подъёмники под ними не занимаем.
+    const perDay = !workingDay ? 0 : back === 0 ? 2 : 2 + (step % 3);
+
     for (let index = 0; index < perDay; index += 1) {
-      const template = CLOSED_TEMPLATES[(back + index) % CLOSED_TEMPLATES.length];
-      const [clientId, vehicleId] = CLOSED_PAIRS[(back + index * 2) % CLOSED_PAIRS.length];
+      const template = CLOSED_TEMPLATES[step % CLOSED_TEMPLATES.length];
+      const pool = CLOSED_PAIRS.filter((pair) => pair.since >= back);
+      const { clientId, vehicleId } = pool[step % pool.length];
+      const mechanic = MECHANICS[step % MECHANICS.length];
+
       const works = template.works.map(([name, price], i) => ({
         id: `w${i + 1}`,
         name,
         qty: 1,
         price,
-        executor: (back + i) % 2 === 0 ? "Механик 1" : "Механик 2",
+        executor: name === "Компьютерная диагностика" ? "Игорь" : mechanic,
       }));
       const parts = template.parts.map(([name, sku, qty, price], i) => ({
         id: `p${i + 1}`,
@@ -294,34 +412,160 @@ function closedOrders(): Order[] {
       const total =
         works.reduce((sum, work) => sum + work.price * work.qty, 0) +
         parts.reduce((sum, part) => sum + part.price * part.qty, 0);
-      const startHour = 9 + index * 4;
-      result.push({
-        id: `ord-${number}`,
-        number: `№АИ-${String(number).padStart(4, "0")}`,
+      // Раз в семь заказов — скидка постоянному клиенту.
+      const discount = step % 7 === 0 ? Math.round((total * 0.05) / 10) * 10 : 0;
+      const due = total - discount;
+      // Пара заказов в неделю остаётся с частичным долгом: так видно «Ожидаем оплату».
+      const paid = step % 11 === 0 ? Math.round(due / 2 / 100) * 100 : due;
+
+      const startHour = 9 + index * 3;
+      closed.push({
+        id: `ord-h${step}`,
+        number: "",
         clientId,
         vehicleId,
+        liftId: back === 0 ? undefined : (index % 5) + 1,
         status: "выдан",
         createdAt: at(-back, `${String(startHour).padStart(2, "0")}:00`),
         plannedAt: day(-back),
-        completedAt: at(-back, `${String(startHour + 3).padStart(2, "0")}:30`),
-        advisor: back % 2 === 0 ? "Игорь" : "Юра",
+        completedAt: at(-back, `${String(Math.min(19, startHour + 2)).padStart(2, "0")}:40`),
+        advisor: step % 2 === 0 ? "Игорь" : "Юра",
+        scheduledStart: back === 0 ? undefined : `${String(startHour).padStart(2, "0")}:00`,
+        scheduledEnd: back === 0 ? undefined : `${String(Math.min(20, startHour + 3)).padStart(2, "0")}:00`,
         works,
         parts,
-        paid: total,
+        discount: discount || undefined,
+        paid,
+        guaranteeMonths: 6,
       });
-      number += 1;
+
+      revenueSincePurchase += due;
+      step += 1;
+    }
+
+    // Закупка запчастей раз в пару дней — около четверти выручки за это время.
+    if (lastPurchaseDay - back >= 2) {
+      const amount = Math.max(6000, Math.round((revenueSincePurchase * 0.25) / 100) * 100);
+      expenses.push({
+        id: `ex-parts-${back}`,
+        date: day(-back),
+        category: "Закупка запчастей",
+        description: "Поставка запчастей и расходников",
+        amount,
+        counterparty: expenses.length % 2 === 0 ? "Exist.ru" : "Автодок",
+        status: "Оплачено",
+        comment: `Накладная №${20000 + back}`,
+      });
+      movements.push({
+        id: `mv-in-${back}`,
+        date: at(-back, "10:15"),
+        itemId: `st-${(back % 15) + 1}`,
+        operation: "Приёмка",
+        qty: 4 + (back % 6),
+        to: "A-01-01",
+        employee: back % 2 === 0 ? "Юра" : "Игорь",
+        amount: Math.round(amount / 4),
+      });
+      revenueSincePurchase = 0;
+      lastPurchaseDay = back;
+    }
+
+    // Постоянные расходы — пятого числа каждого месяца.
+    const date = new Date(day(-back));
+    if (date.getDate() === 3) {
+      const month = `${date.getFullYear()}-${date.getMonth()}`;
+      expenses.push(
+        { id: `ex-rent-${month}`, date: day(-back), category: "Аренда", description: "Аренда гаражей 563–564", amount: 60000, counterparty: "Аренда 42Г", status: "Оплачено" },
+        { id: `ex-util-${month}`, date: day(-back), category: "Коммунальные услуги", description: "Электричество и вода", amount: 9400, counterparty: "Мосэнергосбыт", status: "Оплачено" },
+        { id: `ex-ads-${month}`, date: day(-back), category: "Реклама", description: "Продвижение на Яндекс Картах и Авито", amount: 12000, counterparty: "Яндекс", status: "Оплачено" },
+        { id: `ex-tool-${month}`, date: day(-back), category: "Инструмент", description: "Расходный инструмент и химия", amount: 7600, counterparty: "Инструмент-Центр", status: "Оплачено" },
+      );
+    }
+
+    if (!workingDay) step += 1;
+  }
+
+  return { closed, expenses, movements };
+}
+
+
+/** Записи на ближайшую неделю — чтобы расписание было наполнено и вперёд. */
+const BOOKING_TEMPLATES: { works: [string, number][]; note: string }[] = [
+  { works: [["Замена масла в ДВС", 1200], ["Замена масляного фильтра", 600]], note: "ТО по пробегу" },
+  { works: [["Развал-схождение", 2500]], note: "Уводит вправо после ям" },
+  { works: [["Компьютерная диагностика", 1500]], note: "Горит Check Engine" },
+  { works: [["Замена передних тормозных колодок", 2000], ["Замена тормозных дисков (пара)", 3000]], note: "Скрип при торможении" },
+  { works: [["Заправка кондиционера", 3200]], note: "Плохо холодит" },
+  { works: [["Шиномонтаж (4 колеса)", 2400]], note: "Переобувка на зиму" },
+  { works: [["Замена масла в АКПП", 4200]], note: "Толчки при переключении" },
+  { works: [["Замена ступичного подшипника", 3800]], note: "Гул на скорости" },
+];
+
+const BOOKING_SLOTS: [string, string][] = [["09:00", "11:00"], ["11:30", "14:00"], ["14:30", "17:00"]];
+
+function bookings(): Order[] {
+  const result: Order[] = [];
+  let step = 0;
+  for (let ahead = 1; ahead <= 7; ahead += 1) {
+    const weekday = new Date(day(ahead)).getDay();
+    if (weekday === 0) continue;
+    const perDay = 2 + (ahead % 2);
+    for (let index = 0; index < perDay; index += 1) {
+      const template = BOOKING_TEMPLATES[step % BOOKING_TEMPLATES.length];
+      const pair = CLOSED_PAIRS[(step * 3 + 1) % CLOSED_PAIRS.length];
+      const [scheduledStart, scheduledEnd] = BOOKING_SLOTS[index % BOOKING_SLOTS.length];
+      result.push({
+        id: `ord-b${step}`,
+        number: "",
+        clientId: pair.clientId,
+        vehicleId: pair.vehicleId,
+        liftId: (index % 5) + 1,
+        status: "запись",
+        createdAt: at(0, `${String(10 + (step % 6)).padStart(2, "0")}:15`),
+        plannedAt: day(ahead),
+        advisor: step % 2 === 0 ? "Игорь" : "Юра",
+        scheduledStart,
+        scheduledEnd,
+        works: template.works.map(([name, price], i) => ({ id: `w${i + 1}`, name, qty: 1, price })),
+        parts: [],
+        paid: 0,
+        complaint: template.note,
+      });
+      step += 1;
     }
   }
   return result;
 }
 
-export const orders: Order[] = [...activeOrders, ...closedOrders()];
+const history = buildHistory();
+const planned = bookings();
 
-export const expenses: Expense[] = [
-  { id: "ex-1", code: "Р-0001", date: day(-2), category: "Закупка запчастей", description: "Поставка тормозных дисков и колодок", amount: 38400, counterparty: "Exist.ru", status: "Оплачено", comment: "Накладная №24567" },
-  { id: "ex-2", code: "Р-0002", date: day(-3), category: "Аренда", description: "Аренда гаража за месяц", amount: 60000, counterparty: "Аренда 42Г", status: "Оплачено" },
-  { id: "ex-3", code: "Р-0003", date: day(-11), category: "Закупка запчастей", description: "Масла, фильтры, техжидкости", amount: 29800, counterparty: "Автодок", status: "Оплачено", comment: "Накладная №22345" },
+/** Сквозная нумерация по дате создания: старые заказы получают меньшие номера. */
+function numbered(list: Order[], offset: number): Order[] {
+  return [...list]
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((order, index) => ({ ...order, number: `№АИ-${String(offset + index + 1).padStart(4, "0")}` }));
+}
+
+export const orders: Order[] = [
+  ...numbered(planned, history.closed.length + activeOrders.length),
+  ...numbered(activeOrders, history.closed.length),
+  ...numbered(history.closed, 0).reverse(),
 ];
+
+const recentMovements: StockMovement[] = [
+  { id: "mv-1", date: at(0, "12:36"), itemId: "st-1", operation: "Приёмка", qty: 4, to: "A-03-02", employee: "Юра", amount: 13000 },
+  { id: "mv-2", date: at(0, "11:02"), itemId: "st-2", operation: "Перемещение", qty: 2, from: "B-01-01", to: "A-01-02", employee: "Механик 1" },
+  { id: "mv-3", date: at(-1, "09:17"), itemId: "st-4", operation: "Приёмка", qty: 8, to: "B-02-01", employee: "Игорь", amount: 2800 },
+  { id: "mv-4", date: at(-2, "16:21"), itemId: "st-7", operation: "Списание", qty: 1, from: "A-02-02", employee: "Механик 2" },
+];
+
+export const stockMovements: StockMovement[] = [...recentMovements, ...history.movements]
+  .sort((a, b) => b.date.localeCompare(a.date));
+
+export const expenses: Expense[] = history.expenses
+  .sort((a, b) => b.date.localeCompare(a.date))
+  .map((expense, index) => ({ ...expense, code: `Р-${String(index + 1).padStart(4, "0")}` }));
 
 export const invoices: Invoice[] = [
   { id: "inv-1", number: "СЧ-001", clientId: "cl-2", orderId: "ord-268", amount: 19710, status: "Выставлен", issuedAt: day(0) },

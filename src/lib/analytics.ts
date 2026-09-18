@@ -91,8 +91,14 @@ function inRange(iso: string | undefined, range: Range) {
   return time >= range.from.getTime() && time <= range.to.getTime();
 }
 
+/** Заказы, попавшие в период: одна точка правды для метрик и зарплат. */
+export function ordersInRange(range: Range, orders: Order[]) {
+  return orders.filter((order) => order.status !== "запись" && inRange(orderDate(order), range));
+}
+
+/** День, к которому относится заказ: когда закрыт, иначе плановый день визита. */
 export function orderDate(order: Order) {
-  return order.completedAt ?? order.createdAt;
+  return order.completedAt ?? order.plannedAt ?? order.createdAt;
 }
 
 export interface Metrics {
@@ -117,7 +123,8 @@ export function computeMetrics(
   expenses: Expense[],
   salaries: number,
 ): Metrics {
-  const periodOrders = orders.filter((order) => inRange(orderDate(order), range));
+  // Записи на будущее — ещё не деньги, в выручку периода они не идут.
+  const periodOrders = orders.filter((order) => order.status !== "запись" && inRange(orderDate(order), range));
   const closed = periodOrders.filter((order) => order.status === "выдан");
 
   let worksRevenue = 0;
