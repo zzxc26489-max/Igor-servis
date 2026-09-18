@@ -86,6 +86,20 @@ export default function OrderDetail() {
   const [intakeMileage, setIntakeMileage] = useState("");
   const [mechanicComment, setMechanicComment] = useState(order?.mechanicComment ?? "");
 
+  const client = order ? clients.find((c) => c.id === order.clientId) : undefined;
+  const vehicle = order ? vehicles.find((v) => v.id === order.vehicleId) : undefined;
+  const lift = order ? lifts.find((l) => l.id === order.liftId) : undefined;
+
+  useEffect(() => {
+    if (!order) return;
+    setIntakeComplaint(order.complaint ?? "");
+    setIntakeDiagnosis(order.diagnosis ?? "");
+    setIntakeDefects(order.defects ?? "");
+    setIntakeGuarantee(order.guaranteeMonths ? String(order.guaranteeMonths) : "");
+    setIntakeMileage(vehicle?.mileage ? String(vehicle.mileage) : "");
+    setMechanicComment(order.mechanicComment ?? "");
+  }, [order, vehicle?.mileage]);
+
   if (!order) {
     return (
       <Page>
@@ -96,19 +110,6 @@ export default function OrderDetail() {
       </Page>
     );
   }
-
-  const client = clients.find((c) => c.id === order.clientId);
-  const vehicle = vehicles.find((v) => v.id === order.vehicleId);
-  const lift = lifts.find((l) => l.id === order.liftId);
-
-  useEffect(() => {
-    setIntakeComplaint(order.complaint ?? "");
-    setIntakeDiagnosis(order.diagnosis ?? "");
-    setIntakeDefects(order.defects ?? "");
-    setIntakeGuarantee(order.guaranteeMonths ? String(order.guaranteeMonths) : "");
-    setIntakeMileage(vehicle?.mileage ? String(vehicle.mileage) : "");
-    setMechanicComment(order.mechanicComment ?? "");
-  }, [order.id, order.complaint, order.diagnosis, order.defects, order.guaranteeMonths, order.mechanicComment, vehicle?.mileage]);
 
   const worksTotal = order.works.reduce((s, w) => s + w.price * w.qty, 0);
   const partsTotal = order.parts.reduce((s, p) => s + p.price * p.qty, 0);
