@@ -6,7 +6,8 @@ import { useConfirm } from "../components/Confirm";
 import { isValidMoney, moneyInput } from "../lib/formats";
 import { Button, Modal } from "../components/ui";
 import { formatDate, formatMoney } from "../lib/format";
-import type { PaymentMethod, StockItem } from "../types";
+import type { PartReference, PaymentMethod, StockItem } from "../types";
+import { isValidQuantity, parseQuantity } from "../lib/quantity";
 import { activeCashShift } from "../lib/cashShift";
 
 export const RACKS = ["A", "B", "C"];
@@ -26,18 +27,28 @@ function parseCell(cell?: string) {
   };
 }
 
-export default function StockReceive({ onClose, presetItemId }: { onClose: () => void; presetItemId?: string }) {
+const COMMON_UNITS = ["шт.", "компл.", "л", "мл", "кг", "г", "бал.", "упак.", "м"];
+
+export default function StockReceive({
+  onClose,
+  presetItemId,
+  presetReference,
+}: {
+  onClose: () => void;
+  presetItemId?: string;
+  presetReference?: PartReference;
+}) {
   const { stock, employees, cashShifts, receiveStock } = useAppStore();
   const confirm = useConfirm();
   const { showToast } = useToast();
 
   const preset = presetItemId ? stock.find((item) => item.id === presetItemId) : undefined;
-  const [sku, setSku] = useState(preset?.sku ?? "");
+  const [sku, setSku] = useState(preset?.sku ?? presetReference?.sku ?? "");
   const [matchedId, setMatchedId] = useState(preset?.id ?? "");
-  const [name, setName] = useState(preset?.name ?? "");
-  const [brand, setBrand] = useState(preset?.brand ?? "");
-  const [category, setCategory] = useState(preset?.category ?? "");
-  const [unit, setUnit] = useState(preset?.unit ?? "шт.");
+  const [name, setName] = useState(preset?.name ?? presetReference?.name ?? "");
+  const [brand, setBrand] = useState(preset?.brand ?? presetReference?.brand ?? "");
+  const [category, setCategory] = useState(preset?.category ?? presetReference?.category ?? "");
+  const [unit, setUnit] = useState(preset?.unit ?? presetReference?.unit ?? "шт.");
   const [minQty, setMinQty] = useState(preset ? String(preset.minQty) : "");
   const [qty, setQty] = useState("1");
   const [unitPrice, setUnitPrice] = useState(
@@ -51,6 +62,7 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
   const [rack, setRack] = useState(cellParts.rack);
   const [shelf, setShelf] = useState(cellParts.shelf);
   const [place, setPlace] = useState(cellParts.place);
+  const [withoutCell, setWithoutCell] = useState(!preset?.cell);
 
   const matched = useMemo(() => stock.find((item) => item.id === matchedId), [matchedId, stock]);
   const categories = useMemo(() => Array.from(new Set(stock.map((item) => item.category))), [stock]);
@@ -60,9 +72,10 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
     return map;
   }, [stock]);
 
-  const cell = buildCell(rack, shelf, place);
-  const cellOwner = occupied.get(cell);
-  const total = Math.round((Number(qty) || 0) * (Number(unitPrice) || 0));
+  const cell = withoutCell ? "" : buildCell(rack, shelf, place);
+  const cellOwner = cell ? occupied.get(cell) : undefined;
+  const numericQty = Number(qty.replace(",", "."));
+  const total = Math.round((numericQty || 0) * (Number(unitPrice) || 0));
 
   // Артикул — ключ позиции: по нему подтягиваем прошлую цену закупки и ячейку.
   function applySku(value: string) {
@@ -88,13 +101,13 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const receivedQty = Number(qty);
+    const receivedQty = Number(qty.replace(",", "."));
     const price = Number(unitPrice);
     if (!name.trim() || !sku.trim()) {
       showToast("Укажите артикул и название", "error");
       return;
     }
-    if (!receivedQty || receivedQty <= 0) {
+    if (!isValidQuantity(receivedQty)) {
       showToast("Количество должно быть больше нуля", "error");
       return;
     }
@@ -131,7 +144,7 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
         : "На складе появится новая позиция с указанной ячейкой и ценой закупки.",
       summary: [
         { label: "Запчасть", value: `${name.trim()} · ${sku.trim()}` },
-        { label: "Ячейка", value: cell },
+        { label: "Хранение", value: cell || "Без ячейки · быстрый доступ" },
         { label: "Принимаем", value: `${receivedQty} ${unit || "шт."}` },
         { label: "Цена закупки", value: formatMoney(price) },
         ...(matched
@@ -213,10 +226,12 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Field label="Количество *">
-            <input value={qty} onChange={(event) => setQty(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" />
+            <input value={qty} onChange={(event) => setQty(parseQuantity(event.target.value))} inputMode="decimal" placeholder="1 или 4,5" />
           </Field>
           <Field label="Единица">
-            <input value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="шт." />
+            <select value={unit} onChange={(event) => setUnit(event.target.value)}>
+              {Array.from(new Set([...COMMON_UNITS, unit])).map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
           </Field>
           <Field label="Цена закупки, ₽">
             <input value={unitPrice} onChange={(event) => setUnitPrice(moneyInput(event.target.value))} inputMode="numeric" placeholder="за единицу" />
@@ -236,10 +251,16 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
         <datalist id="stock-categories">{categories.map((item) => <option key={item} value={item} />)}</datalist>
 
         <div className="rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-            <IconMapPin size={16} className="text-[var(--accent)]" /> Куда положить
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <IconMapPin size={16} className="text-[var(--accent)]" /> Где хранится
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={withoutCell} onChange={(event) => setWithoutCell(event.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
+              Без ячейки / быстрый доступ
+            </label>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          {!withoutCell && <div className="grid grid-cols-3 gap-3">
             <Field label="Стеллаж">
               <select value={rack} onChange={(event) => setRack(event.target.value)}>
                 {RACKS.map((item) => <option key={item} value={item}>Стеллаж {item}</option>)}
@@ -255,13 +276,18 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
                 {PLACES.map((item) => <option key={item} value={item}>Место {Number(item)}</option>)}
               </select>
             </Field>
-          </div>
+          </div>}
           <p className="mt-2 text-sm">
-            Ячейка <b>{cell}</b>{" "}
-            {cellOwner && cellOwner.id !== matchedId ? (
-              <span style={{ color: "var(--danger)" }}>— занята: {cellOwner.name}</span>
+            {withoutCell ? (
+              <span className="muted">Позиция будет храниться без адресной ячейки — удобно для деталей под текущий ремонт и расходников.</span>
             ) : (
-              <span className="text-[var(--accent)]">— свободна</span>
+              <>Ячейка <b>{cell}</b>{" "}
+                {cellOwner && cellOwner.id !== matchedId ? (
+                  <span style={{ color: "var(--danger)" }}>— занята: {cellOwner.name}</span>
+                ) : (
+                  <span className="text-[var(--accent)]">— свободна</span>
+                )}
+              </>
             )}
           </p>
         </div>
