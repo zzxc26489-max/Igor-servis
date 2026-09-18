@@ -5,6 +5,7 @@ import type {
   Expense,
   Invoice,
   Lift,
+  Payment,
   Order,
   Service,
   StockItem,
@@ -661,6 +662,57 @@ export const orders: Order[] = [
   ...numbered(activeOrders, history.closed.length),
   ...numbered(history.closed, 0).reverse(),
 ];
+
+/**
+ * Демо-платежи специально содержат разные способы оплаты и сотрудников,
+ * чтобы блок «Сверка оплат» и история заказа были понятны сразу после запуска.
+ */
+export const payments: Payment[] = orders.flatMap((order, index) => {
+  const paid = Math.max(0, order.paid ?? 0);
+  if (paid <= 0) return [];
+
+  const at =
+    [...(order.timeline ?? [])].reverse().find((event) => event.status === "выдан")?.at
+    ?? order.completedAt
+    ?? order.createdAt;
+  const employee = order.advisor ?? (index % 2 === 0 ? "Игорь" : "Юра");
+  const methods = ["cash", "terminal", "transfer"] as const;
+
+  // Иногда клиент платит двумя способами — показываем реальный сценарий.
+  if (paid >= 2_000 && index % 5 === 0) {
+    const cash = Math.round((paid * 0.4) / 100) * 100;
+    return [
+      {
+        id: `seed-pay-${order.id}-cash`,
+        orderId: order.id,
+        at,
+        amount: cash,
+        kind: "payment" as const,
+        method: "cash" as const,
+        employee,
+      },
+      {
+        id: `seed-pay-${order.id}-card`,
+        orderId: order.id,
+        at,
+        amount: paid - cash,
+        kind: "payment" as const,
+        method: "terminal" as const,
+        employee,
+      },
+    ];
+  }
+
+  return [{
+    id: `seed-pay-${order.id}`,
+    orderId: order.id,
+    at,
+    amount: paid,
+    kind: "payment" as const,
+    method: methods[index % methods.length],
+    employee,
+  }];
+});
 
 const recentMovements: StockMovement[] = [
   { id: "mv-1", date: at(0, "12:36"), itemId: "st-1", operation: "Приёмка", qty: 4, to: "A-03-02", employee: "Юра", amount: 13000 },
