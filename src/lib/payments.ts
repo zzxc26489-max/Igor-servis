@@ -1,4 +1,4 @@
-import type { PaymentMethod } from "../types";
+import type { Order, Payment, PaymentMethod } from "../types";
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cash: "Наличные",
@@ -53,4 +53,23 @@ export function paymentMethodSummary(payments: PaymentLike[], from: Date, to: Da
     },
     { cash: 0, terminal: 0, transfer: 0, unknown: 0 } as Record<PaymentMethod | "unknown", number>,
   );
+}
+
+/** Достраивает журнал старых оплат из поля order.paid, не создавая дублей. */
+export function ensureLegacyPayments(existing: Payment[], orders: Order[]): Payment[] {
+  const payments = [...existing];
+  for (const order of orders) {
+    const recorded = recordedForOrder(payments, order.id);
+    const paid = Math.max(0, order.paid ?? 0);
+    if (paid <= recorded) continue;
+    payments.push({
+      id: `legacy-payment-${order.id}`,
+      orderId: order.id,
+      at: order.issuedAt ?? order.completedAt ?? (order.plannedAt ? `${order.plannedAt}T12:00:00` : order.createdAt),
+      amount: paid - recorded,
+      kind: "payment",
+      estimated: true,
+    });
+  }
+  return payments;
 }
