@@ -4,6 +4,7 @@ import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
+import { isValidMoney, moneyInput } from "../lib/formats";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { formatMoney, plural } from "../lib/format";
 
@@ -49,7 +50,7 @@ export default function Services() {
     const cleanName = name.trim();
     const cleanCategory = category.trim();
     const numericPrice = Number(price);
-    if (!cleanName || !cleanCategory || numericPrice <= 0) {
+    if (!cleanName || !cleanCategory || !isValidMoney(price)) {
       showToast("Заполните название, категорию и цену", "error");
       return;
     }
@@ -102,7 +103,7 @@ export default function Services() {
               <label className="text-sm"><span className="mb-1 block muted">Название</span><div className="field-control"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Например, замена ступичного подшипника" autoFocus required /></div></label>
               <label className="text-sm"><span className="mb-1 block muted">Категория</span><div className="field-control"><input value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Ходовая часть" list="service-categories" required /></div></label>
               <datalist id="service-categories">{Array.from(new Set(services.map((service) => service.category))).map((item) => <option value={item} key={item} />)}</datalist>
-              <label className="text-sm"><span className="mb-1 block muted">Цена, ₽</span><div className="field-control"><input value={price} onChange={(event) => setPrice(event.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="2500" required /></div></label>
+              <label className="text-sm"><span className="mb-1 block muted">Цена, ₽</span><div className="field-control"><input value={price} onChange={(event) => setPrice(moneyInput(event.target.value))} inputMode="numeric" placeholder="2500" required /></div></label>
               <div className="flex gap-2"><Button type="submit">{editingId ? "Сохранить" : "Добавить"}</Button><Button variant="secondary" onClick={resetForm}>Отмена</Button></div>
             </form>
           </Card>

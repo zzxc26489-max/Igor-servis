@@ -10,6 +10,7 @@ import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
 import RowMenu from "../components/RowMenu";
 import { reservedByItem } from "../lib/stock";
+import { isValidMoney, moneyInput } from "../lib/formats";
 import { Button, Card, Modal, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
 import type { OrderLinePart, OrderLineWork, OrderStatus } from "../types";
@@ -141,7 +142,14 @@ export default function OrderDetail() {
     if (workServiceId === CUSTOM_SERVICE) {
       name = workCustomName.trim();
       price = Number(workCustomPrice) || 0;
-      if (!name || price <= 0) return;
+      if (!name) {
+        showToast("Укажите название работы", "error");
+        return;
+      }
+      if (!isValidMoney(workCustomPrice)) {
+        showToast("Цена работы должна быть больше нуля и не более 10 млн ₽", "error");
+        return;
+      }
     } else {
       const service = services.find((s) => s.id === workServiceId);
       if (!service) return;
@@ -359,7 +367,7 @@ export default function OrderDetail() {
                       <input
                         autoFocus
                         value={discountInput}
-                        onChange={(e) => setDiscountInput(e.target.value.replace(/\D/g, ""))}
+                        onChange={(e) => setDiscountInput(moneyInput(e.target.value))}
                         onKeyDown={(e) => e.key === "Enter" && handleSaveDiscount()}
                         onBlur={handleSaveDiscount}
                         className="w-20 rounded border px-2 py-0.5 text-right text-sm"
@@ -409,7 +417,7 @@ export default function OrderDetail() {
                 <div className="mt-2 flex gap-2">
                   <input
                     value={targetTotal}
-                    onChange={(event) => setTargetTotal(event.target.value.replace(/\D/g, ""))}
+                    onChange={(event) => setTargetTotal(moneyInput(event.target.value))}
                     onKeyDown={(event) => event.key === "Enter" && applyTargetTotal()}
                     placeholder={String(due)}
                     inputMode="numeric"
@@ -629,13 +637,13 @@ export default function OrderDetail() {
                             <input placeholder="Название работы" value={workCustomName} onChange={(e) => setWorkCustomName(e.target.value)} />
                           </div>
                           <div className="field-control">
-                            <input placeholder="Цена, ₽" inputMode="numeric" value={workCustomPrice} onChange={(e) => setWorkCustomPrice(e.target.value.replace(/\D/g, ""))} />
+                            <input placeholder="Цена, ₽" inputMode="numeric" value={workCustomPrice} onChange={(e) => setWorkCustomPrice(moneyInput(e.target.value))} />
                           </div>
                         </div>
                       )}
                       <div className="mb-3 grid grid-cols-2 gap-2">
                         <div className="field-control">
-                          <input placeholder="Количество" inputMode="numeric" value={workQty} onChange={(e) => setWorkQty(e.target.value.replace(/\D/g, ""))} aria-label="Количество" />
+                          <input placeholder="Количество" inputMode="numeric" value={workQty} onChange={(e) => setWorkQty(e.target.value.replace(/\D/g, "").slice(0, 3))} aria-label="Количество" />
                         </div>
                         <div className="field-control">
                           <select value={workExecutor} onChange={(e) => setWorkExecutor(e.target.value)} aria-label="Исполнитель">
@@ -735,7 +743,7 @@ export default function OrderDetail() {
                             inputMode="numeric"
                             aria-label="Цена для клиента"
                             value={partPrice}
-                            onChange={(e) => setPartPrice(e.target.value.replace(/\D/g, ""))}
+                            onChange={(e) => setPartPrice(moneyInput(e.target.value))}
                           />
                         </div>
                       </div>
@@ -925,7 +933,7 @@ export default function OrderDetail() {
                 <input
                   autoFocus
                   value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) => setPaymentAmount(moneyInput(e.target.value))}
                   onKeyDown={(e) => e.key === "Enter" && handleAcceptPayment(paymentAmount ? Number(paymentAmount) : debt)}
                   placeholder={String(debt)}
                   inputMode="numeric"

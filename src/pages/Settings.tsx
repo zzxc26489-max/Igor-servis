@@ -3,6 +3,8 @@ import { IconAdjustments, IconBuildingStore, IconDatabase, IconDownload, IconInf
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
+import { PhoneField } from "../components/fields";
+import { formatPhone, isValidInn, isValidPhone } from "../lib/formats";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { APP_BUILD_DATE, APP_VERSION, DB_VERSION } from "../data/version";
 
@@ -12,13 +14,23 @@ export default function Settings() {
   const confirm = useConfirm();
   const [shortName, setShortName] = useState(company.shortName);
   const [address, setAddress] = useState(company.address);
-  const [phone, setPhone] = useState(company.phone);
+  const [phone, setPhone] = useState(formatPhone(company.phone));
+  const [touched, setTouched] = useState(false);
   const [workHours, setWorkHours] = useState(company.workHours);
   const [inn, setInn] = useState(company.inn);
   const [responsible, setResponsible] = useState(company.responsible);
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setTouched(true);
+    if (phone.replace(/\D/g, "") && !isValidPhone(phone)) {
+      showToast("Номер телефона неполный: нужен +7 и 10 цифр", "error");
+      return;
+    }
+    if (!isValidInn(inn)) {
+      showToast("ИНН должен быть из 10 или 12 цифр", "error");
+      return;
+    }
     updateCompany({
       shortName: shortName.trim(),
       address: address.trim(),
@@ -121,12 +133,7 @@ export default function Settings() {
                 </div>
               </label>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label className="block text-sm">
-                  <span className="mb-1 block muted">Телефон</span>
-                  <div className="field-control">
-                    <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 900 000-00-00" />
-                  </div>
-                </label>
+                <PhoneField label="Телефон" value={phone} onChange={setPhone} touched={touched} />
                 <label className="block text-sm">
                   <span className="mb-1 block muted">Часы работы</span>
                   <div className="field-control">
@@ -137,7 +144,10 @@ export default function Settings() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="block text-sm">
                   <span className="mb-1 block muted">ИНН</span>
-                  <div className="field-control"><input value={inn} onChange={(e) => setInn(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="Укажите при необходимости" /></div>
+                  <div className="field-control"><input value={inn} onChange={(e) => setInn(e.target.value.replace(/\D/g, "").slice(0, 12))} inputMode="numeric" placeholder="10 или 12 цифр" /></div>
+                  {touched && !isValidInn(inn) && (
+                    <span className="mt-1 block text-xs" style={{ color: "var(--danger)" }}>ИНН — 10 цифр у организации или 12 у ИП</span>
+                  )}
                 </label>
                 <label className="block text-sm">
                   <span className="mb-1 block muted">Ответственный в документах</span>

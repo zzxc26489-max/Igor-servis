@@ -8,6 +8,7 @@ import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
+import { isValidMoney, moneyInput } from "../lib/formats";
 import { Button, Card, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatMoney, plural } from "../lib/format";
 import { computePayroll } from "../lib/payroll";
@@ -112,7 +113,14 @@ export default function Finance() {
   async function handleAddExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const value = Number(amount);
-    if (!description.trim() || value <= 0) return;
+    if (!description.trim()) {
+      showToast("Опишите, за что расход", "error");
+      return;
+    }
+    if (!isValidMoney(amount)) {
+      showToast("Сумма расхода должна быть больше нуля и не более 10 млн ₽", "error");
+      return;
+    }
     const ok = await confirm({
       title: "Добавить расход",
       question: "Расход попадёт в финансы за сегодня и уменьшит прибыль периода.",
@@ -456,7 +464,7 @@ export default function Finance() {
                 <input placeholder="Описание" value={description} onChange={(event) => setDescription(event.target.value)} required />
               </div>
               <div className="field-control">
-                <input placeholder="Сумма, ₽" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} required />
+                <input placeholder="Сумма, ₽" inputMode="numeric" value={amount} onChange={(event) => setAmount(moneyInput(event.target.value))} required />
               </div>
               <div className="field-control">
                 <input placeholder="Поставщик" value={counterparty} onChange={(event) => setCounterparty(event.target.value)} />

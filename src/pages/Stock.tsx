@@ -528,7 +528,7 @@ function ReturnDialog({
               inputMode="numeric"
               aria-label="Количество к возврату"
               value={qty}
-              onChange={(event) => setQty(event.target.value.replace(/\D/g, ""))}
+              onChange={(event) => setQty(event.target.value.replace(/\D/g, "").slice(0, 6))}
             />
           </div>
         </label>

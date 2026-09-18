@@ -3,6 +3,7 @@ import { IconCheck, IconInfoCircle, IconMapPin, IconX } from "@tabler/icons-reac
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
+import { isValidMoney, moneyInput } from "../lib/formats";
 import { Button, Modal } from "../components/ui";
 import { formatDate, formatMoney } from "../lib/format";
 import type { StockItem } from "../types";
@@ -95,8 +96,12 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
       showToast("Количество должно быть больше нуля", "error");
       return;
     }
-    if (price < 0) {
-      showToast("Цена не может быть отрицательной", "error");
+    if (!isValidMoney(String(price), { allowZero: true })) {
+      showToast("Цена должна быть от 0 до 10 млн ₽", "error");
+      return;
+    }
+    if (receivedQty > 100_000) {
+      showToast("Количество слишком большое — проверьте ввод", "error");
       return;
     }
     if (cellOwner && cellOwner.id !== matchedId) {
@@ -198,13 +203,13 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Field label="Количество *">
-            <input value={qty} onChange={(event) => setQty(event.target.value.replace(/\D/g, ""))} inputMode="numeric" />
+            <input value={qty} onChange={(event) => setQty(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" />
           </Field>
           <Field label="Единица">
             <input value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="шт." />
           </Field>
           <Field label="Цена закупки, ₽">
-            <input value={unitPrice} onChange={(event) => setUnitPrice(event.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="за единицу" />
+            <input value={unitPrice} onChange={(event) => setUnitPrice(moneyInput(event.target.value))} inputMode="numeric" placeholder="за единицу" />
           </Field>
           <Field label="Мин. остаток">
             <input value={minQty} onChange={(event) => setMinQty(event.target.value.replace(/\D/g, ""))} inputMode="numeric" />

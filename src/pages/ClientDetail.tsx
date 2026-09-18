@@ -9,6 +9,12 @@ import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
+import { Field, PhoneField, PlateField } from "../components/fields";
+import {
+  FOREIGN_PLATE_HINT, RU_PLATE_HINT, VIN_HINT, formatPhone, isValidBirthday, isValidEmail,
+  isValidMileage, isValidPhone, isValidPlate, isValidVin, isValidYear, looksRussian,
+  normalizePlate, normalizeVin, type PlateKind,
+} from "../lib/formats";
 import { Button, Card, EmptyState, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney, plural } from "../lib/format";
 import { orderTotals } from "../lib/order";
@@ -80,6 +86,9 @@ export default function ClientDetail() {
     name: "", phone: "", phone2: "", email: "", birthday: "", source: "", discountPercent: "", notes: "",
   });
 
+  const [clientTouched, setClientTouched] = useState(false);
+  const [vehicleTouched, setVehicleTouched] = useState(false);
+  const [plateKind, setPlateKind] = useState<PlateKind>("ru");
   const [vehicleFormOpen, setVehicleFormOpen] = useState(false);
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
   const [vehicleForm, setVehicleForm] = useState({
@@ -124,10 +133,11 @@ export default function ClientDetail() {
 
   function startEditClient() {
     if (!client) return;
+    setClientTouched(false);
     setForm({
       name: client.name,
-      phone: client.phone,
-      phone2: client.phone2 ?? "",
+      phone: formatPhone(client.phone),
+      phone2: client.phone2 ? formatPhone(client.phone2) : "",
       email: client.email ?? "",
       birthday: client.birthday ?? "",
       source: client.source ?? "",
@@ -140,10 +150,27 @@ export default function ClientDetail() {
   function handleClientSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!client) return;
+    setClientTouched(true);
     const name = form.name.trim();
     const phone = form.phone.trim();
-    if (!name || digitsOnly(phone).length < 10) {
-      showToast("Укажите имя и телефон не менее 10 цифр", "error");
+    if (!name) {
+      showToast("Укажите имя клиента", "error");
+      return;
+    }
+    if (!isValidPhone(phone)) {
+      showToast("Номер телефона неполный: нужен +7 и 10 цифр", "error");
+      return;
+    }
+    if (form.phone2.trim() && !isValidPhone(form.phone2)) {
+      showToast("Дополнительный номер неполный", "error");
+      return;
+    }
+    if (!isValidEmail(form.email)) {
+      showToast("Проверьте email", "error");
+      return;
+    }
+    if (!isValidBirthday(form.birthday)) {
+      showToast("Дата рождения не может быть в будущем", "error");
       return;
     }
     const discount = Number(form.discountPercent);
@@ -168,6 +195,8 @@ export default function ClientDetail() {
   function resetVehicleForm() {
     setVehicleFormOpen(false);
     setEditingVehicleId(null);
+    setVehicleTouched(false);
+    setPlateKind("ru");
     setVehicleForm({
       make: "", model: "", plate: "", vin: "", year: "", mileage: "",
       color: "", engine: "", transmission: "", nextServiceDate: "", nextServiceMileage: "",
@@ -178,6 +207,9 @@ export default function ClientDetail() {
     const vehicle = vehicles.find((item) => item.id === id);
     if (!vehicle) return;
     setEditingVehicleId(id);
+    setVehicleTouched(false);
+    // Тип номера определяем по самому номеру: иностранный не пройдёт российскую проверку.
+    setPlateKind(looksRussian(vehicle.plate) ? "ru" : "foreign");
     setVehicleForm({
       make: vehicle.make,
       model: vehicle.model,
@@ -197,15 +229,41 @@ export default function ClientDetail() {
   function handleVehicleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!client) return;
+    setVehicleTouched(true);
     if (!vehicleForm.make.trim() || !vehicleForm.model.trim() || !vehicleForm.plate.trim()) {
       showToast("Заполните марку, модель и госномер", "error");
+      return;
+    }
+    if (!isValidPlate(vehicleForm.plate, plateKind)) {
+      showToast(plateKind === "ru" ? RU_PLATE_HINT : FOREIGN_PLATE_HINT, "error");
+      return;
+    }
+    if (vehicleForm.vin.trim() && !isValidVin(vehicleForm.vin)) {
+      showToast(`VIN указан неверно: ${VIN_HINT}`, "error");
+      return;
+    }
+    if (!isValidYear(vehicleForm.year)) {
+      showToast("Проверьте год выпуска", "error");
+      return;
+    }
+    if (!isValidMileage(vehicleForm.mileage) || !isValidMileage(vehicleForm.nextServiceMileage)) {
+      showToast("Пробег должен быть от 1 до 2 000 000 км", "error");
+      return;
+    }
+    const normalizedPlate = normalizePlate(vehicleForm.plate, plateKind);
+    const duplicate = vehicles.find(
+      (item) => item.id !== editingVehicleId
+        && normalizePlate(item.plate, looksRussian(item.plate) ? "ru" : "foreign") === normalizedPlate,
+    );
+    if (duplicate) {
+      showToast(`Автомобиль с номером ${duplicate.plate} уже заведён`, "error");
       return;
     }
     const patch = {
       make: vehicleForm.make.trim(),
       model: vehicleForm.model.trim(),
-      plate: vehicleForm.plate.trim().toUpperCase(),
-      vin: vehicleForm.vin.trim().toUpperCase() || undefined,
+      plate: normalizePlate(vehicleForm.plate, plateKind),
+      vin: normalizeVin(vehicleForm.vin) || undefined,
       year: vehicleForm.year ? Number(vehicleForm.year) : undefined,
       mileage: vehicleForm.mileage ? Number(vehicleForm.mileage) : undefined,
       color: vehicleForm.color.trim() || undefined,
@@ -305,10 +363,14 @@ export default function ClientDetail() {
               <form onSubmit={handleClientSubmit} className="space-y-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Имя *"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-                  <Field label="Телефон *"><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} inputMode="tel" /></Field>
-                  <Field label="Доп. телефон"><input value={form.phone2} onChange={(e) => setForm({ ...form, phone2: e.target.value })} inputMode="tel" placeholder="Жена, водитель и т.п." /></Field>
-                  <Field label="Email"><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} inputMode="email" /></Field>
-                  <Field label="День рождения"><input type="date" value={form.birthday} onChange={(e) => setForm({ ...form, birthday: e.target.value })} /></Field>
+                  <PhoneField label="Телефон *" value={form.phone} onChange={(value) => setForm({ ...form, phone: value })} required touched={clientTouched} />
+                  <PhoneField label="Доп. телефон" value={form.phone2} onChange={(value) => setForm({ ...form, phone2: value })} touched={clientTouched} hint="Жена, водитель и т.п." />
+                  <Field label="Email" error={clientTouched && !isValidEmail(form.email) ? "Проверьте адрес: нужен вид имя@домен.ru" : undefined}>
+                    <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} inputMode="email" autoComplete="email" placeholder="client@example.ru" />
+                  </Field>
+                  <Field label="День рождения" error={clientTouched && !isValidBirthday(form.birthday) ? "Дата не может быть в будущем" : undefined}>
+                    <input type="date" max={new Date().toISOString().slice(0, 10)} value={form.birthday} onChange={(e) => setForm({ ...form, birthday: e.target.value })} />
+                  </Field>
                   <Field label="Скидка, %"><input value={form.discountPercent} onChange={(e) => setForm({ ...form, discountPercent: e.target.value.replace(/\D/g, "").slice(0, 3) })} inputMode="numeric" placeholder="0" /></Field>
                   <Field label="Откуда пришёл">
                     <input list="client-sources" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="Авито, карты, сарафан" />
@@ -393,15 +455,34 @@ export default function ClientDetail() {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <Field label="Марка *"><input value={vehicleForm.make} onChange={(e) => setVehicleForm({ ...vehicleForm, make: e.target.value })} /></Field>
                   <Field label="Модель *"><input value={vehicleForm.model} onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })} /></Field>
-                  <Field label="Госномер *"><input value={vehicleForm.plate} onChange={(e) => setVehicleForm({ ...vehicleForm, plate: e.target.value })} placeholder="А123ВС 797" /></Field>
-                  <Field label="Год"><input value={vehicleForm.year} onChange={(e) => setVehicleForm({ ...vehicleForm, year: e.target.value.replace(/\D/g, "").slice(0, 4) })} inputMode="numeric" /></Field>
+                  <PlateField
+                    className="sm:col-span-2"
+                    value={vehicleForm.plate}
+                    kind={plateKind}
+                    onChange={(value) => setVehicleForm({ ...vehicleForm, plate: value })}
+                    onKindChange={setPlateKind}
+                    touched={vehicleTouched}
+                  />
+                  <Field label="Год" error={vehicleTouched && !isValidYear(vehicleForm.year) ? `С 1950 по ${new Date().getFullYear() + 1}` : undefined}>
+                    <input value={vehicleForm.year} onChange={(e) => setVehicleForm({ ...vehicleForm, year: e.target.value.replace(/\D/g, "").slice(0, 4) })} inputMode="numeric" placeholder="2019" />
+                  </Field>
                   <Field label="Цвет"><input value={vehicleForm.color} onChange={(e) => setVehicleForm({ ...vehicleForm, color: e.target.value })} /></Field>
-                  <Field label="Пробег, км"><input value={vehicleForm.mileage} onChange={(e) => setVehicleForm({ ...vehicleForm, mileage: e.target.value.replace(/\D/g, "") })} inputMode="numeric" /></Field>
+                  <Field label="Пробег, км" error={vehicleTouched && !isValidMileage(vehicleForm.mileage) ? "От 1 до 2 000 000 км" : undefined}>
+                    <input value={vehicleForm.mileage} onChange={(e) => setVehicleForm({ ...vehicleForm, mileage: e.target.value.replace(/\D/g, "").slice(0, 7) })} inputMode="numeric" placeholder="82000" />
+                  </Field>
                   <Field label="Двигатель"><input value={vehicleForm.engine} onChange={(e) => setVehicleForm({ ...vehicleForm, engine: e.target.value })} placeholder="2.0 бензин" /></Field>
                   <Field label="Коробка"><input value={vehicleForm.transmission} onChange={(e) => setVehicleForm({ ...vehicleForm, transmission: e.target.value })} placeholder="АКПП / МКПП" /></Field>
-                  <Field label="VIN"><input value={vehicleForm.vin} onChange={(e) => setVehicleForm({ ...vehicleForm, vin: e.target.value })} /></Field>
+                  <Field
+                    label="VIN"
+                    hint={VIN_HINT}
+                    error={vehicleTouched && vehicleForm.vin.trim() && !isValidVin(vehicleForm.vin) ? `Введено ${normalizeVin(vehicleForm.vin).length} из 17 знаков` : undefined}
+                  >
+                    <input value={vehicleForm.vin} onChange={(e) => setVehicleForm({ ...vehicleForm, vin: normalizeVin(e.target.value) })} className="uppercase" placeholder="XWEPH81ADMN123456" />
+                  </Field>
                   <Field label="Следующее ТО, дата"><input type="date" value={vehicleForm.nextServiceDate} onChange={(e) => setVehicleForm({ ...vehicleForm, nextServiceDate: e.target.value })} /></Field>
-                  <Field label="Следующее ТО, км"><input value={vehicleForm.nextServiceMileage} onChange={(e) => setVehicleForm({ ...vehicleForm, nextServiceMileage: e.target.value.replace(/\D/g, "") })} inputMode="numeric" /></Field>
+                  <Field label="Следующее ТО, км" error={vehicleTouched && !isValidMileage(vehicleForm.nextServiceMileage) ? "От 1 до 2 000 000 км" : undefined}>
+                    <input value={vehicleForm.nextServiceMileage} onChange={(e) => setVehicleForm({ ...vehicleForm, nextServiceMileage: e.target.value.replace(/\D/g, "").slice(0, 7) })} inputMode="numeric" />
+                  </Field>
                 </div>
                 <div className="mt-3 flex gap-2">
                   <Button type="submit" size="sm"><IconCheck size={16} /> {editingVehicleId ? "Сохранить" : "Добавить"}</Button>
@@ -553,11 +634,3 @@ function InfoRow({ icon, label, children }: { icon: ReactNode; label: string; ch
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="block text-sm">
-      <span className="mb-1 block muted">{label}</span>
-      <div className="field-control">{children}</div>
-    </label>
-  );
-}

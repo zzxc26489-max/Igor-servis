@@ -1,9 +1,14 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconAlertCircle, IconCalendarEvent, IconCar, IconUser } from "@tabler/icons-react";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
+import { Field, PhoneField, PlateField } from "../components/fields";
+import {
+  FOREIGN_PLATE_HINT, RU_PLATE_HINT, formatPhone, isValidMileage, isValidPhone,
+  isValidPlate, looksRussian, normalizePlate, type PlateKind,
+} from "../lib/formats";
 import { CODE_PREFIX, useAppStore } from "../store/AppStore";
 import { createId, nextCode } from "../lib/id";
 
@@ -18,15 +23,6 @@ function intervalsOverlap(aStart: string, aEnd: string, bStart: string, bEnd: st
   return toMinutes(aStart) < toMinutes(bEnd) && toMinutes(bStart) < toMinutes(aEnd);
 }
 
-function isValidPhone(value: string) {
-  return value.replace(/\D/g, "").length >= 10;
-}
-
-const PLATE_PATTERN = /^[a-zA-Zа-яА-Я]\d{3}[a-zA-Zа-яА-Я]{2}\s?\d{2,3}$/;
-
-function isValidPlate(value: string) {
-  return PLATE_PATTERN.test(value.trim());
-}
 
 export default function NewOrder() {
   const navigate = useNavigate();
@@ -42,10 +38,15 @@ export default function NewOrder() {
   const [existingClientId, setExistingClientId] = useState(presetClient?.id ?? "");
   const [existingVehicleId, setExistingVehicleId] = useState(presetVehicle?.id ?? "");
   const [clientName, setClientName] = useState(presetClient?.name ?? "");
-  const [phone, setPhone] = useState(presetClient?.phone ?? "");
+  const [phone, setPhone] = useState(formatPhone(presetClient?.phone ?? ""));
   const [make, setMake] = useState(presetVehicle?.make ?? "");
   const [model, setModel] = useState(presetVehicle?.model ?? "");
   const [plate, setPlate] = useState(presetVehicle?.plate ?? "");
+  // Российский формат по умолчанию; для машин на иностранных номерах — переключатель.
+  const [plateKind, setPlateKind] = useState<PlateKind>(
+    presetVehicle?.plate && !looksRussian(presetVehicle.plate) ? "foreign" : "ru",
+  );
+  const [touched, setTouched] = useState(false);
   const [mileage, setMileage] = useState(presetVehicle?.mileage ? String(presetVehicle.mileage) : "");
   // Подъёмник, дату и время можно передать ссылкой из расписания и с главной.
   const presetDate = searchParams.get("date");
@@ -82,16 +83,30 @@ export default function NewOrder() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setTouched(true);
     if (!clientName.trim() || !phone.trim() || !make.trim() || !model.trim() || !plate.trim()) {
       setError("Заполните клиента, телефон и данные автомобиля.");
       return;
     }
     if (!isValidPhone(phone)) {
-      setError("Проверьте номер телефона — укажите не менее 10 цифр.");
+      setError("Номер телефона неполный: нужен +7 и 10 цифр.");
       return;
     }
-    if (!isValidPlate(plate)) {
-      setError("Проверьте формат госномера, например А123ВС 797.");
+    if (!isValidPlate(plate, plateKind)) {
+      setError(plateKind === "ru" ? `Проверьте госномер. ${RU_PLATE_HINT}` : `Проверьте госномер. ${FOREIGN_PLATE_HINT}`);
+      return;
+    }
+    if (!isValidMileage(mileage)) {
+      setError("Пробег должен быть больше нуля и меньше 2 000 000 км.");
+      return;
+    }
+    // Один госномер — один автомобиль в базе, иначе история машины раздвоится.
+    const normalizedPlate = normalizePlate(plate, plateKind);
+    const duplicate = !existingVehicleId
+      && vehicles.find((item) => normalizePlate(item.plate, looksRussian(item.plate) ? "ru" : "foreign") === normalizedPlate);
+    if (duplicate) {
+      const owner = clients.find((item) => item.id === duplicate.clientId);
+      setError(`Автомобиль с номером ${duplicate.plate} уже есть в базе${owner ? ` — владелец ${owner.name}` : ""}. Выберите его из истории клиента.`);
       return;
     }
 
@@ -108,6 +123,12 @@ export default function NewOrder() {
     });
     if (hasOverlap) {
       setError("Этот подъёмник уже занят на выбранное время. Выберите другой или измените время.");
+      return;
+    }
+
+    const samePhone = !existingClientId && clients.find((item) => item.phone.replace(/\D/g, "") === phone.replace(/\D/g, ""));
+    if (samePhone) {
+      setError(`Клиент с таким телефоном уже есть: ${samePhone.name}. Выберите его в списке выше.`);
       return;
     }
 
@@ -151,7 +172,7 @@ export default function NewOrder() {
         clientId,
         make: make.trim(),
         model: model.trim(),
-        plate: plate.trim().toUpperCase(),
+        plate: normalizePlate(plate, plateKind),
         mileage: mileage ? Number(mileage) : undefined,
       }],
       orders: [...previous.orders, {
@@ -201,7 +222,7 @@ export default function NewOrder() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Имя клиента *"><input value={clientName} onChange={(event) => setClientName(event.target.value)} required /></Field>
-              <Field label="Телефон *"><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" placeholder="+7 900 000-00-00" required /></Field>
+              <PhoneField label="Телефон *" value={phone} onChange={setPhone} required touched={touched} />
             </div>
           </Card>
 
@@ -224,8 +245,20 @@ export default function NewOrder() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Марка *"><input value={make} onChange={(event) => setMake(event.target.value)} required /></Field>
               <Field label="Модель *"><input value={model} onChange={(event) => setModel(event.target.value)} required /></Field>
-              <Field label="Госномер *"><input value={plate} onChange={(event) => setPlate(event.target.value)} placeholder="А123ВС 797" required /></Field>
-              <Field label="Пробег"><input value={mileage} onChange={(event) => setMileage(event.target.value.replace(/\D/g, ""))} inputMode="numeric" /></Field>
+              <PlateField
+                className="sm:col-span-2"
+                value={plate}
+                kind={plateKind}
+                onChange={setPlate}
+                onKindChange={setPlateKind}
+                touched={touched}
+              />
+              <Field
+                label="Пробег, км"
+                error={touched && !isValidMileage(mileage) ? "От 1 до 2 000 000 км" : undefined}
+              >
+                <input value={mileage} onChange={(event) => setMileage(event.target.value.replace(/\D/g, "").slice(0, 7))} inputMode="numeric" placeholder="82000" />
+              </Field>
             </div>
           </Card>
 
@@ -261,8 +294,4 @@ export default function NewOrder() {
       </Page>
     </>
   );
-}
-
-function Field({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
-  return <label className={`block text-sm ${className}`}><span className="mb-1 block muted">{label}</span><div className="field-control">{children}</div></label>;
 }

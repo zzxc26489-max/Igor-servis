@@ -19,6 +19,7 @@ import { company as companySeed } from "../data/company";
 import { createId, nextCode } from "../lib/id";
 import { orderTotals } from "../lib/order";
 import { reservedByItem } from "../lib/stock";
+import { formatPhone, formatPlate, looksRussian } from "../lib/formats";
 
 const STORAGE_KEY = "igor-servis-db-v1";
 
@@ -83,8 +84,17 @@ function withCodes<T extends { code?: string }>(items: T[], prefix: string): T[]
 function migrate(db: DB): DB {
   return {
     ...db,
-    clients: withCodes(db.clients, CODE_PREFIX.client),
-    vehicles: withCodes(db.vehicles, CODE_PREFIX.vehicle),
+    company: { ...db.company, phone: formatPhone(db.company.phone) || db.company.phone },
+    // Телефоны и номера приводим к единому виду: старые записи хранились как придётся.
+    clients: withCodes(db.clients, CODE_PREFIX.client).map((client) => ({
+      ...client,
+      phone: formatPhone(client.phone) || client.phone,
+      phone2: client.phone2 ? formatPhone(client.phone2) || client.phone2 : undefined,
+    })),
+    vehicles: withCodes(db.vehicles, CODE_PREFIX.vehicle).map((vehicle) => ({
+      ...vehicle,
+      plate: looksRussian(vehicle.plate) ? formatPlate(vehicle.plate) : vehicle.plate.trim().toUpperCase(),
+    })),
     stock: withCodes(db.stock, CODE_PREFIX.stock),
     expenses: withCodes(db.expenses, CODE_PREFIX.expense),
   };
@@ -535,7 +545,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             ],
           };
         }),
-      resetToSeed: () => rawSetDB(seedDB()),
+      resetToSeed: () => rawSetDB(migrate(seedDB())),
       exportDB: () => JSON.stringify(db, null, 2),
       importDB: (json) => {
         try {

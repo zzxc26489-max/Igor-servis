@@ -6,6 +6,7 @@ import { useConfirm } from "../components/Confirm";
 import { useToast } from "../components/Toast";
 import { formatDate, formatMoney, plural } from "../lib/format";
 import { computePayroll, payrollBalance } from "../lib/payroll";
+import { moneyInput } from "../lib/formats";
 import type { Employee } from "../types";
 
 function payLabel(employee: Employee) {
@@ -156,7 +157,7 @@ function PayDialog({
               inputMode="numeric"
               aria-label="Сумма выплаты"
               value={amount}
-              onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))}
+              onChange={(event) => setAmount(moneyInput(event.target.value))}
               onKeyDown={(event) => event.key === "Enter" && onSubmit(value)}
             />
           </div>

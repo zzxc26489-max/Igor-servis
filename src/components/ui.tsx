@@ -44,14 +44,25 @@ export function TopBar({
 
   const results = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("ru-RU");
+    // Телефон ищем по цифрам: маска и пробелы не должны мешать поиску.
+    const digits = query.replace(/\D/g, "");
     if (term.length < 2) return [];
     const matches = [
       ...clients
-        .filter((client) => `${client.code ?? ""} ${client.name} ${client.phone}`.toLocaleLowerCase("ru-RU").includes(term))
+        .filter((client) => {
+          const haystack = `${client.code ?? ""} ${client.name} ${client.phone} ${client.phone2 ?? ""}`;
+          if (haystack.toLocaleLowerCase("ru-RU").includes(term)) return true;
+          return digits.length >= 3 && `${client.phone}${client.phone2 ?? ""}`.replace(/\D/g, "").includes(digits);
+        })
         .slice(0, 3)
         .map((client) => ({ label: client.name, detail: client.phone, to: `/clients/${client.id}` })),
       ...vehicles
-        .filter((vehicle) => `${vehicle.plate} ${vehicle.make} ${vehicle.model}`.toLocaleLowerCase("ru-RU").includes(term))
+        .filter((vehicle) => {
+          const haystack = `${vehicle.plate} ${vehicle.make} ${vehicle.model} ${vehicle.vin ?? ""}`;
+          // Номер ищем и без пробела: «А123ВС797» находит «А123ВС 797».
+          return haystack.toLocaleLowerCase("ru-RU").includes(term)
+            || haystack.replace(/[\s-]/g, "").toLocaleLowerCase("ru-RU").includes(term.replace(/[\s-]/g, ""));
+        })
         .slice(0, 3)
         .map((vehicle) => {
           const order = orders.find((item) => item.vehicleId === vehicle.id);
