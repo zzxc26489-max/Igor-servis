@@ -7,6 +7,7 @@ import { isValidMoney, moneyInput } from "../lib/formats";
 import { Button, Modal } from "../components/ui";
 import { formatDate, formatMoney } from "../lib/format";
 import type { PaymentMethod, StockItem } from "../types";
+import { activeCashShift } from "../lib/cashShift";
 
 export const RACKS = ["A", "B", "C"];
 export const SHELVES = ["01", "02", "03", "04"];
@@ -26,7 +27,7 @@ function parseCell(cell?: string) {
 }
 
 export default function StockReceive({ onClose, presetItemId }: { onClose: () => void; presetItemId?: string }) {
-  const { stock, employees, receiveStock } = useAppStore();
+  const { stock, employees, cashShifts, receiveStock } = useAppStore();
   const confirm = useConfirm();
   const { showToast } = useToast();
 
@@ -111,6 +112,10 @@ export default function StockReceive({ onClose, presetItemId }: { onClose: () =>
     }
     if (createExpense && total > 0 && !expenseMethod) {
       showToast("Выберите, как оплачена поставка", "error");
+      return;
+    }
+    if (createExpense && expenseMethod === "cash" && !activeCashShift(cashShifts)) {
+      showToast("Для оплаты поставки наличными сначала откройте кассовую смену", "error");
       return;
     }
 
