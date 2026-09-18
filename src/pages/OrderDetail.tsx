@@ -19,7 +19,10 @@ import { paymentMethodLabel } from "../lib/payments";
 import { actualMinutes, deviationPercent, formatDuration, isEstimatedTiming, normMinutes } from "../lib/worktime";
 import { Button, Card, Modal, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
-import type { OrderLinePart, OrderLineWork, OrderStatus, PaymentMethod } from "../types";
+import { CONSUMABLE_PRESETS } from "../data/consumables";
+import { formatQuantity, isValidQuantity } from "../lib/quantity";
+import { nowISO } from "../lib/date";
+import type { OrderConsumable, OrderLinePart, OrderLineWork, OrderStatus, PaymentMethod } from "../types";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
 const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "Документы"] as const;
@@ -73,6 +76,8 @@ export default function OrderDetail() {
   const [addingWork, setAddingWork] = useState(false);
   const [addingPart, setAddingPart] = useState(false);
   const [partError, setPartError] = useState("");
+  const [consumablesOpen, setConsumablesOpen] = useState(false);
+  const [selectedConsumables, setSelectedConsumables] = useState<Record<string, boolean>>({});
 
   const [editingDiscount, setEditingDiscount] = useState(false);
   const [discountInput, setDiscountInput] = useState("0");
@@ -211,7 +216,7 @@ export default function OrderDetail() {
       showToast("Выданный заказ нельзя изменять. Сначала верните автомобиль в работу.", "error");
       return;
     }
-    if (!Number.isInteger(qty) || qty <= 0 || price <= 0 || price > 10_000_000) {
+    if (!isValidQuantity(qty) || price <= 0 || price > 10_000_000) {
       setPartError("Проверьте количество и цену запчасти");
       return;
     }
@@ -227,10 +232,10 @@ export default function OrderDetail() {
       summary: [
         { label: "Запчасть", value: `${stockItem.name} · ${stockItem.sku}` },
         { label: "Ячейка", value: stockItem.cell || "—" },
-        { label: "Количество", value: `${qty} ${stockItem.unit}` },
+        { label: "Количество", value: `${formatQuantity(qty)} ${stockItem.unit}` },
         { label: "Закупка", value: formatMoney(stockItem.purchasePrice * qty) },
         { label: "Цена клиенту", value: formatMoney(price * qty) },
-        { label: "Свободно после резерва", value: `${free - qty} ${stockItem.unit}` },
+        { label: "Свободно после резерва", value: `${formatQuantity(free - qty)} ${stockItem.unit}` },
         {
           label: "Наценка до скидки",
           value: `${formatMoney(profit.rub)}${profit.percent !== null ? ` · ${profit.percent}%` : ""}`,
@@ -418,6 +423,11 @@ export default function OrderDetail() {
 
   async function handleChangeStatus(next: OrderStatus) {
     if (!order || next === order.status) return;
+    if (next === "готово" && order.status !== "готово" && order.status !== "выдан") {
+      setSelectedConsumables({});
+      setConsumablesOpen(true);
+      return;
+    }
     const issuing = next === "выдан";
     const reverting = order.status === "выдан" && next !== "выдан";
     const reopening = canReopen && (next === "в работе" || next === "диагностика");
@@ -451,8 +461,51 @@ export default function OrderDetail() {
       confirmLabel: issuing ? "Выдать" : "Изменить статус",
     });
     if (!ok) return;
-    setOrderStatus(order.id, next);
+    const statusError = setOrderStatus(order.id, next);
+    if (statusError) {
+      showToast(statusError, "error");
+      return;
+    }
     showToast(`Статус изменён: «${next}»`);
+  }
+
+  function finishWithConsumables() {
+    if (!order) return;
+    const chosen = CONSUMABLE_PRESETS.filter((item) => selectedConsumables[item.key]);
+    const total = chosen.reduce((sum, item) => sum + item.amount, 0);
+    if (total > 0 && order.works.length === 0) {
+      showToast("Чтобы включить внутренние расходники в сумму, в заказе должна быть хотя бы одна работа", "error");
+      return;
+    }
+
+    const works = order.works.map((work, index) => {
+      if (index !== 0 || total <= 0) return work;
+      return { ...work, price: work.price + total / Math.max(1, work.qty) };
+    });
+    const consumables: OrderConsumable[] = chosen.map((item) => ({
+      id: createId("cons"),
+      key: item.key,
+      label: item.label,
+      amount: item.amount,
+      appliedAt: nowISO(),
+    }));
+
+    if (total > 0) {
+      updateOrder(order.id, {
+        works,
+        consumables: [...(order.consumables ?? []), ...consumables],
+      });
+    }
+
+    const statusError = setOrderStatus(order.id, "готово");
+    if (statusError) {
+      showToast(statusError, "error");
+      return;
+    }
+    setConsumablesOpen(false);
+    showToast(total > 0
+      ? `Работы завершены · внутренние расходники учтены на ${formatMoney(total)}`
+      : "Работы завершены");
   }
 
   const carTitle = vehicle ? `${vehicle.make} ${vehicle.model}` : order.number;
@@ -1047,7 +1100,51 @@ export default function OrderDetail() {
 
       {addingWork && <AddWork onClose={() => setAddingWork(false)} onSubmit={handleAddWork} />}
       {addingPart && (
-        <AddPart onClose={() => setAddingPart(false)} onSubmit={handleAddPart} error={partError} />
+        <AddPart onClose={() => setAddingPart(false)} onSubmit={handleAddPart} error={partError} vehicle={vehicle} />
+      )}
+
+      {consumablesOpen && (
+        <Modal
+          title="Расходники при работе"
+          subtitle="Отметьте то, что реально использовали. Клиенту отдельной строкой это не показывается."
+          onClose={() => setConsumablesOpen(false)}
+        >
+          <div className="space-y-3 p-4">
+            <p className="muted text-sm">
+              Сумма выбранных расходников распределится внутри стоимости работ. В акте останутся обычные работы без строк «медная смазка», «жидкий ключ» и т. п.
+            </p>
+            <div className="space-y-2">
+              {CONSUMABLE_PRESETS.map((item) => (
+                <label
+                  key={item.key}
+                  className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border p-3"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selectedConsumables[item.key])}
+                      onChange={(event) => setSelectedConsumables((prev) => ({ ...prev, [item.key]: event.target.checked }))}
+                      className="h-4 w-4 accent-[var(--accent)]"
+                    />
+                    <span className="text-sm font-medium">{item.label}</span>
+                  </span>
+                  <b className="text-sm tabular-nums">+{formatMoney(item.amount)}</b>
+                </label>
+              ))}
+            </div>
+            <div className="flex items-center justify-between rounded-lg p-3 text-sm" style={{ background: "var(--bg)" }}>
+              <span className="muted">Внутренне добавится к работам</span>
+              <b>
+                {formatMoney(CONSUMABLE_PRESETS.filter((item) => selectedConsumables[item.key]).reduce((sum, item) => sum + item.amount, 0))}
+              </b>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setConsumablesOpen(false)}>Отмена</Button>
+              <Button onClick={finishWithConsumables}>Завершить работы</Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {refundOpen && (
