@@ -31,7 +31,7 @@ const PERIODS: { value: PeriodKey; label: string }[] = [
 ];
 
 export default function Finance() {
-  const { orders, expenses, employees: rawEmployees, clients, addExpense, confirmRefund } = useAppStore();
+  const { orders, expenses, payments, employees: rawEmployees, clients, addExpense, confirmRefund } = useAppStore();
   const { showToast } = useToast();
   const confirm = useConfirm();
   const navigate = useNavigate();
@@ -45,21 +45,19 @@ export default function Finance() {
 
   // Зарплату считаем по заказам периода, иначе за «день» прилетает начисление за всё время.
   const periodOrders = useMemo(() => ordersInRange(range, orders), [orders, range]);
-  const employees = useMemo(() => computePayroll(rawEmployees, periodOrders), [periodOrders, rawEmployees]);
+  const payrollOrders = useMemo(() => periodOrders.filter((order) => order.status === "выдан"), [periodOrders]);
+  const employees = useMemo(() => computePayroll(rawEmployees, payrollOrders), [payrollOrders, rawEmployees]);
   const totalSalaries = employees.reduce((sum, employee) => sum + employee.accrued, 0);
-  const metrics = useMemo(() => computeMetrics(range, orders, expenses, totalSalaries), [expenses, orders, range, totalSalaries]);
+  const metrics = useMemo(() => computeMetrics(range, orders, expenses, totalSalaries, payments), [expenses, orders, payments, range, totalSalaries]);
   const previous = useMemo(() => {
     const prev = previousRange(range);
     if (!prev) return null;
-    const prevSalaries = computePayroll(rawEmployees, ordersInRange(prev, orders))
+    const prevSalaries = computePayroll(rawEmployees, ordersInRange(prev, orders).filter((order) => order.status === "выдан"))
       .reduce((sum, employee) => sum + employee.accrued, 0);
-    return computeMetrics(prev, orders, expenses, prevSalaries);
-  }, [expenses, orders, range, rawEmployees]);
+    return computeMetrics(prev, orders, expenses, prevSalaries, payments);
+  }, [expenses, orders, payments, range, rawEmployees]);
 
-  const chart = useMemo(() => buildChart(range, metrics.orders, expenses.filter((expense) => {
-    const time = new Date(expense.date).getTime();
-    return time >= range.from.getTime() && time <= range.to.getTime();
-  })), [expenses, metrics.orders, range]);
+  const chart = useMemo(() => buildChart(range, payments, expenses), [expenses, payments, range]);
 
   const pending = useMemo(() => pendingPayments(orders, clients), [clients, orders]);
   // Возвраты, по которым деньги ещё не пришли: в расчёт не идут, пока не подтвердят.
@@ -86,7 +84,7 @@ export default function Finance() {
     confirmRefund(expenseId);
     showToast(`Возврат подтверждён: ${formatMoney(expense.amount)}`);
   }
-  const operations = useMemo(() => buildOperations(range, orders, expenses), [expenses, orders, range]);
+  const operations = useMemo(() => buildOperations(range, orders, expenses, payments), [expenses, orders, payments, range]);
   const periodExpenses = useMemo(
     () => expenses
       .filter((expense) => {
@@ -220,7 +218,7 @@ export default function Finance() {
         </div>
 
         <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <Metric icon={<IconCreditCardPay size={18} />} label="Выручка" value={formatMoney(metrics.revenue)} current={metrics.revenue} previous={previous?.revenue} hint={`${metrics.orders.length} ${plural(metrics.orders.length, "заказ", "заказа", "заказов")}`} />
+          <Metric icon={<IconCreditCardPay size={18} />} label="Выручка" value={formatMoney(metrics.revenue)} current={metrics.revenue} previous={previous?.revenue} hint={`${metrics.closed.length} ${plural(metrics.closed.length, "выданный заказ", "выданных заказа", "выданных заказов")} · получено ${formatMoney(metrics.received)}`} />
           <Metric icon={<IconBriefcase size={18} />} tone="warning" label="Расходы" value={formatMoney(metrics.expenses)} current={metrics.expenses} previous={previous?.expenses} lowerIsBetter hint="Закупки и прочее" />
           <Metric icon={<IconCoin size={18} />} tone="violet" label="Зарплаты" value={formatMoney(metrics.salaries)} hint="Начислено мастерам" />
           <Metric icon={<IconChartBar size={18} />} label="Прибыль" value={formatMoney(metrics.profit)} current={metrics.profit} previous={previous?.profit} hint="После расходов и зарплат" />
@@ -233,10 +231,10 @@ export default function Finance() {
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="section-kicker">Динамика</p>
-                <h2 className="panel-title mt-1">Выручка и расходы</h2>
+                <h2 className="panel-title mt-1">Поступления и расходы</h2>
               </div>
               <div className="flex gap-3 text-xs">
-                <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#1f9d63]" /> Выручка</span>
+                <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#1f9d63]" /> Поступления</span>
                 <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#e39230]" /> Расходы</span>
               </div>
             </div>
