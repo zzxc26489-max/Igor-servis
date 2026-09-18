@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from "react";
-import { IconAdjustments, IconBuildingStore, IconDatabase, IconDownload, IconInfoCircle, IconUpload } from "@tabler/icons-react";
+import { IconAdjustments, IconBuildingStore, IconCloud, IconDatabase, IconDownload, IconInfoCircle, IconRefresh, IconUpload } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
@@ -13,7 +13,10 @@ import { todayISO } from "../lib/date";
 import { isValidTime, timeToMinutes } from "../lib/workday";
 
 export default function Settings() {
-  const { company, settings, updateCompany, updateSettings, resetToSeed, exportDB, importDB, orders, clients, stock, expenses } = useAppStore();
+  const {
+    company, settings, updateCompany, updateSettings, resetToSeed, exportDB, importDB,
+    orders, clients, stock, expenses, cloud, uploadLocalToCloud, refreshFromCloud, backupCloud,
+  } = useAppStore();
   const { showToast } = useToast();
   const confirm = useConfirm();
   const [shortName, setShortName] = useState(company.shortName);
@@ -93,6 +96,34 @@ export default function Settings() {
     } else {
       showToast("Файл не похож на резервную копию CRM", "error");
     }
+  }
+
+  async function handleUploadCloud() {
+    const ok = await confirm({
+      title: "Перенести базу на сервер",
+      question: "Текущие данные этого браузера станут общей базой сервиса для всех пользователей.",
+      summary: [
+        { label: "Заказ-наряды", value: orders.length },
+        { label: "Клиенты", value: clients.length },
+        { label: "Позиции склада", value: stock.length },
+        { label: "Расходы", value: expenses.length },
+      ],
+      note: "Делайте это только на устройстве, где сейчас находится актуальная рабочая база.",
+      confirmLabel: "Перенести на сервер",
+    });
+    if (!ok) return;
+    const error = await uploadLocalToCloud();
+    showToast(error ?? "Общая база создана и синхронизация включена", error ? "error" : undefined);
+  }
+
+  async function handleCloudBackup() {
+    const error = await backupCloud();
+    showToast(error ?? "Серверная резервная копия создана", error ? "error" : undefined);
+  }
+
+  async function handleRefreshCloud() {
+    const error = await refreshFromCloud();
+    showToast(error ?? "Загружена свежая версия общей базы", error ? "error" : undefined);
   }
 
   async function handleReset() {
@@ -222,28 +253,72 @@ export default function Settings() {
 
           <Card>
             <div className="mb-4 flex items-center gap-3">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#fbe9e9] text-[var(--danger)]">
-                <IconDatabase size={22} />
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#edf4ff] text-[#3978c9]">
+                {cloud.configured ? <IconCloud size={22} /> : <IconDatabase size={22} />}
               </div>
-              <div>
-                <h2 className="panel-title">Данные и резервные копии</h2>
-                <p className="muted text-sm">CRM сейчас хранит данные локально в этом браузере</p>
+              <div className="min-w-0">
+                <h2 className="panel-title">Общая база и резервные копии</h2>
+                <p className="muted text-sm">
+                  {!cloud.configured && "Локальный режим — данные только в этом браузере"}
+                  {cloud.configured && cloud.status === "loading" && "Подключаем общую базу…"}
+                  {cloud.configured && cloud.status === "needs_upload" && "Сервер подключён, но общая база ещё пустая"}
+                  {cloud.configured && cloud.status === "saving" && "Сохраняем изменения на сервер…"}
+                  {cloud.configured && cloud.status === "ready" && `${cloud.workshopName || "Общая база"} · синхронизация включена`}
+                  {cloud.configured && cloud.status === "error" && "Есть проблема с синхронизацией"}
+                </p>
               </div>
             </div>
-            <p className="mb-4 text-sm muted">
-              Все заказ-наряды, клиенты, склад и финансы сохраняются только на этом устройстве. Делайте резервную
-              копию и открывайте её на другом компьютере или телефоне, пока CRM не переехала на общий сервер.
-            </p>
+
+            {cloud.configured && (
+              <div className="mb-4 rounded-xl border p-3 text-sm" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
+                <div className="flex justify-between gap-3"><span className="muted">Пользователь</span><b>{cloud.displayName || "—"}</b></div>
+                <div className="mt-1 flex justify-between gap-3"><span className="muted">Ревизия базы</span><span>{cloud.revision ?? 0}</span></div>
+                {cloud.lastSyncedAt && (
+                  <div className="mt-1 flex justify-between gap-3"><span className="muted">Последняя синхронизация</span><span>{new Date(cloud.lastSyncedAt).toLocaleString("ru-RU")}</span></div>
+                )}
+                {cloud.error && <p className="mt-2 text-sm" style={{ color: "var(--danger)" }}>{cloud.error}</p>}
+              </div>
+            )}
+
+            {!cloud.configured && (
+              <p className="mb-4 text-sm muted">
+                Сейчас каждый телефон и компьютер хранит свою копию. После подключения Supabase здесь появятся общая база,
+                вход пользователей и автоматическое сохранение на сервер.
+              </p>
+            )}
+
+            {cloud.status === "needs_upload" && (
+              <div className="mb-4 rounded-xl border p-3" style={{ borderColor: "var(--warning)", background: "#fff9ed" }}>
+                <b className="block text-sm">Нужен первый перенос</b>
+                <p className="muted mt-1 text-xs">Откройте устройство с актуальными данными и перенесите именно эту базу на сервер.</p>
+                <Button className="mt-3" onClick={() => void handleUploadCloud()}>
+                  <IconUpload size={18} /> Перенести текущую базу на сервер
+                </Button>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-2">
               <Button onClick={handleBackup}>
-                <IconDownload size={18} /> Скачать копию
+                <IconDownload size={18} /> Скачать JSON-копию
               </Button>
               <Button variant="secondary" onClick={() => fileRef.current?.click()}>
-                <IconUpload size={18} /> Загрузить копию
+                <IconUpload size={18} /> Восстановить из файла
               </Button>
-              <Button variant="secondary" onClick={handleReset}>
-                Сбросить к демонстрационным
-              </Button>
+              {cloud.configured && cloud.status !== "needs_upload" && (
+                <>
+                  <Button variant="secondary" onClick={() => void handleRefreshCloud()}>
+                    <IconRefresh size={18} /> Обновить с сервера
+                  </Button>
+                  <Button variant="secondary" onClick={() => void handleCloudBackup()}>
+                    <IconCloud size={18} /> Серверная копия
+                  </Button>
+                </>
+              )}
+              {!cloud.configured && (
+                <Button variant="secondary" onClick={handleReset}>
+                  Сбросить к демонстрационным
+                </Button>
+              )}
             </div>
             <input
               ref={fileRef}
