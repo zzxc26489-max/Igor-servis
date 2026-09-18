@@ -50,17 +50,17 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
 ];
 
-const MOBILE_NAV_ITEMS = [
+const MOBILE_NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Сегодня", icon: IconHome2, end: true },
   { to: "/orders", label: "Заказы", icon: IconClipboardList },
   { to: "/stock", label: "Склад", icon: IconCube },
 ];
 
-const MECHANIC_MOBILE_NAV = [
+const MECHANIC_MOBILE_NAV: NavItem[] = [
   { to: "/my-work", label: "Мои работы", icon: IconGauge, end: true },
 ];
 
-const ACCOUNTANT_MOBILE_NAV = [
+const ACCOUNTANT_MOBILE_NAV: NavItem[] = [
   { to: "/finance", label: "Финансы", icon: IconCoin, end: true },
   { to: "/reports", label: "Отчёты", icon: IconChartBar },
   { to: "/employees", label: "Сотрудники", icon: IconUsersGroup },
@@ -105,7 +105,7 @@ function SidebarContent({
           <div key={group.label}>
             <div className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[.12em] opacity-38">{group.label}</div>
             <div className="flex flex-col gap-1">
-              {group.items.filter((item) => !role || canOpenPath(role, item.to)).map((item) => {
+              {group.items.filter((item) => (item.to !== "/my-work" || role === "mechanic") && (!role || canOpenPath(role, item.to))).map((item) => {
                 const badge = item.badge ? badges[item.badge] : 0;
                 return (
                   <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass} style={navLinkStyle} onClick={onNavigate}>
