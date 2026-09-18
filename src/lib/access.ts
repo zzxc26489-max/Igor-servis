@@ -33,3 +33,8 @@ export function canManageSettings(role: CloudRole) {
 export function canSeeFinance(role: CloudRole) {
   return role === "owner" || role === "partner";
 }
+
+
+export function canManageStock(role: CloudRole) {
+  return role === "owner" || role === "partner" || role === "parts";
+}
