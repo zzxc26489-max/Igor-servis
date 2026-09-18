@@ -46,6 +46,7 @@ export default function Finance() {
   const [period, setPeriod] = useState<PeriodKey>("month");
   const [offset, setOffset] = useState(0);
   const [pickedDay, setPickedDay] = useState<number | null>(null);
+  const [refundMethods, setRefundMethods] = useState<Record<string, PaymentMethod | "">>({});
   const operatorName = cloud.displayName || rawEmployees[0]?.name || "Игорь";
   const [openingCash, setOpeningCash] = useState("0");
   const [countedCash, setCountedCash] = useState("");
@@ -91,6 +92,11 @@ export default function Finance() {
   async function handleConfirmRefund(expenseId: string) {
     const expense = expenses.find((item) => item.id === expenseId);
     if (!expense) return;
+    const method = refundMethods[expenseId];
+    if (!method) {
+      showToast("Выберите, как поставщик вернул деньги", "error");
+      return;
+    }
     const ok = await confirm({
       title: "Подтвердить возврат денег",
       question: "Подтвердите, что деньги от поставщика пришли. Сумма уменьшит расходы периода и появится в ленте операций.",
@@ -98,12 +104,14 @@ export default function Finance() {
         { label: "Возврат", value: expense.description },
         { label: "Поставщик", value: expense.counterparty },
         { label: "Оформлен", value: formatDate(expense.date) },
+        { label: "Получили", value: paymentMethodLabel(method) },
         { label: "Сумма к возврату", value: `+${formatMoney(expense.amount)}`, total: true, tone: "accent" },
       ],
       confirmLabel: "Деньги пришли",
     });
     if (!ok) return;
-    confirmRefund(expenseId);
+    confirmRefund(expenseId, method);
+    setRefundMethods((prev) => ({ ...prev, [expenseId]: "" }));
     showToast(`Возврат подтверждён: ${formatMoney(expense.amount)}`);
   }
   const operations = useMemo(() => buildOperations(range, orders, expenses, payments), [expenses, orders, payments, range]);
@@ -412,6 +420,18 @@ export default function Finance() {
                         <b className="shrink-0 text-sm tabular-nums">{formatMoney(expense.amount)}</b>
                       </div>
                       {expense.comment && <p className="muted mt-1 text-xs">{expense.comment}</p>}
+                      <div className="field-control mt-2">
+                        <select
+                          value={refundMethods[expense.id] ?? ""}
+                          onChange={(event) => setRefundMethods((prev) => ({ ...prev, [expense.id]: event.target.value as PaymentMethod | "" }))}
+                          aria-label="Как поставщик вернул деньги"
+                        >
+                          <option value="">Как вернули деньги</option>
+                          <option value="cash">Наличные</option>
+                          <option value="terminal">Терминал / карта</option>
+                          <option value="transfer">Перевод / СБП</option>
+                        </select>
+                      </div>
                       <Button size="sm" className="mt-2 w-full justify-center" onClick={() => handleConfirmRefund(expense.id)}>
                         Подтвердить возврат денег
                       </Button>
