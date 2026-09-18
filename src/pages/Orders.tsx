@@ -93,8 +93,8 @@ export default function Orders() {
           <Metric icon={<IconCoin size={18} />} label="Долг клиентов" value={formatMoney(totalDebt)} hint="По неоплаченным заказам" tone="danger" />
         </div>
 
-        <Card className="p-0 overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b" style={{ borderColor: "var(--border)" }}>
+        <Card className="overflow-hidden p-0 max-sm:-mx-3 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4 max-sm:px-3 max-sm:py-3" style={{ borderColor: "var(--border)" }}>
             <h2 className="panel-title">Список заказ-нарядов</h2>
             <select
               value={statusFilter}
@@ -109,7 +109,7 @@ export default function Orders() {
               ))}
             </select>
           </div>
-          <div className="space-y-2 p-3 lg:hidden">
+          <div className="space-y-2 p-3 max-sm:p-2 lg:hidden">
             {page.map((o) => {
               const client = clients.find((c) => c.id === o.clientId);
               const vehicle = vehicles.find((v) => v.id === o.vehicleId);

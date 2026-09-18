@@ -11,6 +11,7 @@ import { formatMoney } from "../lib/format";
 import { APP_BUILD_DATE, APP_VERSION, DB_VERSION } from "../data/version";
 import { todayISO } from "../lib/date";
 import { isValidTime, timeToMinutes } from "../lib/workday";
+import defaultLogo from "../assets/logo.jpg";
 
 export default function Settings() {
   const {
@@ -23,6 +24,8 @@ export default function Settings() {
   const [shortName, setShortName] = useState(company.shortName);
   const [address, setAddress] = useState(company.address);
   const [phone, setPhone] = useState(formatPhone(company.phone));
+  const [phone2, setPhone2] = useState(company.phone2 ? formatPhone(company.phone2) : "");
+  const [logoDataUrl, setLogoDataUrl] = useState(company.logoDataUrl ?? "");
   const [touched, setTouched] = useState(false);
   const [openTime, setOpenTime] = useState(company.openTime);
   const [closeTime, setCloseTime] = useState(company.closeTime);
@@ -84,7 +87,11 @@ export default function Settings() {
     e.preventDefault();
     setTouched(true);
     if (phone.replace(/\D/g, "") && !isValidPhone(phone)) {
-      showToast("Номер телефона неполный: нужен +7 и 10 цифр", "error");
+      showToast("Первый номер телефона неполный: нужен +7 и 10 цифр", "error");
+      return;
+    }
+    if (phone2.replace(/\D/g, "") && !isValidPhone(phone2)) {
+      showToast("Второй номер телефона неполный: нужен +7 и 10 цифр", "error");
       return;
     }
     if (!isValidTime(openTime) || !isValidTime(closeTime) || timeToMinutes(closeTime) - timeToMinutes(openTime) < 60) {
@@ -99,6 +106,8 @@ export default function Settings() {
       shortName: shortName.trim(),
       address: address.trim(),
       phone: phone.trim(),
+      phone2: phone2.trim() || undefined,
+      logoDataUrl: logoDataUrl || undefined,
       openTime,
       closeTime,
       inn: inn.trim(),
@@ -108,6 +117,53 @@ export default function Settings() {
   }
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const logoFileRef = useRef<HTMLInputElement>(null);
+
+  async function handleLogoFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      showToast("Выберите изображение PNG, JPG или WEBP", "error");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      showToast("Файл логотипа слишком большой. Максимум 8 МБ", "error");
+      return;
+    }
+
+    const source = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(new Error("read"));
+      reader.readAsDataURL(file);
+    }).catch(() => "");
+
+    if (!source) {
+      showToast("Не удалось прочитать логотип", "error");
+      return;
+    }
+
+    const image = await new Promise<HTMLImageElement | null>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = source;
+    });
+    if (!image) {
+      showToast("Не удалось открыть изображение", "error");
+      return;
+    }
+
+    const maxSide = 420;
+    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const compressed = canvas.toDataURL("image/webp", 0.86);
+    setLogoDataUrl(compressed);
+    showToast("Логотип подготовлен. Нажмите «Сохранить»");
+  }
 
   function handleBackup() {
     const blob = new Blob([exportDB()], { type: "application/json" });
@@ -239,7 +295,10 @@ export default function Settings() {
                 </div>
               </label>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <PhoneField label="Телефон" value={phone} onChange={setPhone} touched={touched} />
+                <PhoneField label="Телефон 1" value={phone} onChange={setPhone} touched={touched} />
+                <PhoneField label="Телефон 2" value={phone2} onChange={setPhone2} touched={touched} hint="Например, второй номер совладельца" />
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="block text-sm">
                   <span className="mb-1 block muted">Часы работы</span>
                   <div className="flex items-center gap-2">
@@ -252,6 +311,39 @@ export default function Settings() {
                     </div>
                   </div>
                   <span className="mt-1 block text-xs muted">По этим часам строится расписание, свободные окна и загрузка подъёмников</span>
+                </div>
+
+                <div className="block text-sm">
+                  <span className="mb-1 block muted">Логотип в документах</span>
+                  <div className="flex items-center gap-3 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
+                    <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-[var(--bg)]">
+                      <img src={logoDataUrl || defaultLogo} alt="Логотип сервиса" className="h-full w-full object-contain" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs muted">Печатается в заказ-наряде и акте. По умолчанию используется текущий логотип CRM; можно загрузить свой PNG/JPG/WEBP.</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button type="button" size="sm" variant="secondary" onClick={() => logoFileRef.current?.click()}>
+                          Выбрать файл
+                        </Button>
+                        {logoDataUrl && (
+                          <Button type="button" size="sm" variant="secondary" onClick={() => setLogoDataUrl("")}>
+                            Вернуть стандартный
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <input
+                    ref={logoFileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void handleLogoFile(file);
+                      event.target.value = "";
+                    }}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

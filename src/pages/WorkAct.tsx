@@ -5,6 +5,7 @@ import { useAppStore } from "../store/AppStore";
 import { Button, Page, TopBar } from "../components/ui";
 import { formatDateTime, formatMoney } from "../lib/format";
 import { amountInWords } from "../lib/numberToWords";
+import defaultLogo from "../assets/logo.jpg";
 
 const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
 function formatActDate(iso: string) {
@@ -48,11 +49,20 @@ export default function WorkAct() {
       <Page>
         <article className="work-act mx-auto max-w-[900px] rounded-xl border bg-white p-5 shadow-sm sm:p-8 print:max-w-none print:border-0 print:p-0 print:shadow-none" style={{ borderColor: "var(--border)" }}>
           <header className="flex flex-col justify-between gap-5 border-b pb-5 sm:flex-row" style={{ borderColor: "var(--border)" }}>
-            <div>
-              <h2 className="text-xl font-bold">{company.name}</h2>
-              <p className="mt-1 text-sm">{company.address}</p>
-              {company.phone && <p className="text-sm">Тел.: {company.phone}</p>}
-              {company.inn && <p className="text-sm">ИНН: {company.inn}</p>}
+            <div className="flex items-start gap-4">
+              <img
+                src={company.logoDataUrl || defaultLogo}
+                alt=""
+                className="document-logo h-16 w-16 shrink-0 rounded-xl object-contain"
+              />
+              <div>
+                <h2 className="text-xl font-bold">{company.name}</h2>
+                <p className="mt-1 text-sm">{company.address}</p>
+                {(company.phone || company.phone2) && (
+                  <p className="text-sm">Тел.: {[company.phone, company.phone2].filter(Boolean).join(" · ")}</p>
+                )}
+                {company.inn && <p className="text-sm">ИНН: {company.inn}</p>}
+              </div>
             </div>
             <div className="sm:text-right">
               <h1 className="text-2xl font-bold">Акт выполненных работ</h1>

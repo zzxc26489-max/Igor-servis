@@ -144,7 +144,7 @@ export function TopBar({
         </div>
       </header>
 
-      <div className="flex flex-wrap items-start justify-between gap-3 px-4 pt-4 sm:px-5 lg:px-5 print:hidden">
+      <div className="flex flex-wrap items-start justify-between gap-3 px-3 pt-3 sm:px-5 sm:pt-4 lg:px-5 print:hidden">
         <div className="min-w-0">
           {breadcrumbs && breadcrumbs.length > 0 && (
             <nav className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }} aria-label="Хлебные крошки">
@@ -187,7 +187,7 @@ function NewRecordButton() {
 }
 
 export function Page({ children }: { children: ReactNode }) {
-  return <main className="min-w-0 flex-1 overflow-auto overflow-x-hidden p-4 pb-24 sm:p-5 sm:pb-6 lg:px-5 lg:py-5 print:flex-none print:overflow-visible print:p-0">{children}</main>;
+  return <main className="min-w-0 flex-1 overflow-auto overflow-x-hidden px-3 py-3 pb-24 sm:p-5 sm:pb-6 lg:px-5 lg:py-5 print:flex-none print:overflow-visible print:p-0">{children}</main>;
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {

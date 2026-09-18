@@ -14,6 +14,7 @@ export default function Services() {
   const { showToast } = useToast();
   const confirm = useConfirm();
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -21,11 +22,18 @@ export default function Services() {
   const [price, setPrice] = useState("");
   const [norm, setNorm] = useState("");
 
+  const allCategories = useMemo(
+    () => Array.from(new Set(services.map((service) => service.category))).sort((a, b) => a.localeCompare(b, "ru")),
+    [services],
+  );
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("ru-RU");
-    if (!term) return services;
-    return services.filter((service) => `${service.name} ${service.category}`.toLocaleLowerCase("ru-RU").includes(term));
-  }, [query, services]);
+    return services.filter((service) => {
+      if (categoryFilter !== "all" && service.category !== categoryFilter) return false;
+      if (!term) return true;
+      return `${service.name} ${service.category}`.toLocaleLowerCase("ru-RU").includes(term);
+    });
+  }, [categoryFilter, query, services]);
   const categories = Array.from(new Set(filtered.map((service) => service.category)));
 
   function resetForm() {
@@ -95,9 +103,46 @@ export default function Services() {
         actions={<Button onClick={() => { resetForm(); setShowForm(true); }}><span className="inline-flex items-center gap-2"><IconPlus size={18} /> Добавить услугу</span></Button>}
       />
       <Page>
-        <div className="relative mb-4 max-w-xl">
-          <IconSearch className="pointer-events-none absolute left-3 top-2.5" size={18} color="var(--text-muted)" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full rounded-lg border bg-white py-2 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]" style={{ borderColor: "var(--border)" }} placeholder="Поиск по названию или категории" />
+        <div className="mb-4 space-y-3">
+          <div className="relative max-w-xl">
+            <IconSearch className="pointer-events-none absolute left-3 top-2.5" size={18} color="var(--text-muted)" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full rounded-lg border bg-white py-2 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)]" style={{ borderColor: "var(--border)" }} placeholder="Поиск по названию услуги" />
+          </div>
+          <div className="-mx-3 overflow-x-auto px-3">
+            <div className="flex min-w-max gap-2 pb-1">
+              <button
+                type="button"
+                onClick={() => setCategoryFilter("all")}
+                className="rounded-lg border px-3 py-2 text-sm font-medium"
+                style={{
+                  borderColor: categoryFilter === "all" ? "var(--accent)" : "var(--border)",
+                  background: categoryFilter === "all" ? "var(--accent)" : "white",
+                  color: categoryFilter === "all" ? "white" : "var(--text)",
+                }}
+              >
+                Все · {services.length}
+              </button>
+              {allCategories.map((item) => {
+                const count = services.filter((service) => service.category === item).length;
+                const active = categoryFilter === item;
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setCategoryFilter(item)}
+                    className="rounded-lg border px-3 py-2 text-sm font-medium"
+                    style={{
+                      borderColor: active ? "var(--accent)" : "var(--border)",
+                      background: active ? "var(--accent)" : "white",
+                      color: active ? "white" : "var(--text)",
+                    }}
+                  >
+                    {item} · {count}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {showForm && (
@@ -121,14 +166,14 @@ export default function Services() {
             {categories.map((currentCategory) => {
               const categoryServices = filtered.filter((service) => service.category === currentCategory);
               return (
-              <Card key={currentCategory} className="p-0 overflow-hidden">
+              <Card key={currentCategory} className="overflow-hidden p-0 max-sm:-mx-3 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
                 <div className="flex items-center gap-3 border-b p-4" style={{ borderColor: "var(--border)" }}>
                   <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#e9f5ed] text-[var(--accent)]"><IconTool size={18} /></div>
                   <div><h2 className="panel-title">{currentCategory}</h2><p className="muted text-xs">{categoryServices.length} {plural(categoryServices.length, "услуга", "услуги", "услуг")}</p></div>
                 </div>
                 <ul className="divide-y" style={{ borderColor: "var(--border)" }}>
                   {categoryServices.map((service) => (
-                    <li key={service.id} className="flex items-center gap-3 px-4 py-3 text-sm">
+                    <li key={service.id} className="flex items-center gap-2 px-4 py-3 text-sm max-sm:px-3">
                       <span className="min-w-0 flex-1">
                         {service.name}
                         {service.normMinutes ? <span className="muted block text-xs">Норматив {formatDuration(service.normMinutes)}</span> : null}

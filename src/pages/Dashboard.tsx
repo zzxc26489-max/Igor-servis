@@ -65,7 +65,7 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-          <Card className="overflow-hidden p-0">
+          <Card className="overflow-hidden p-0 max-sm:-mx-3 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
             <div className="flex flex-wrap items-center justify-between gap-3 p-4">
               <h2 className="panel-title">Подъёмники</h2>
               <div className="flex items-center gap-1">
@@ -87,7 +87,7 @@ export default function Dashboard() {
             </div>
 
             {/* На телефоне показываем сразу, какая машина на каком подъёмнике. */}
-            <div className="space-y-2 p-3 pt-0 lg:hidden">
+            <div className="space-y-2 p-2 pt-0 lg:hidden">
               {liftStates.map(({ lift, state }) => {
                 if (state.orders.length === 0) {
                   return (
@@ -159,7 +159,7 @@ export default function Dashboard() {
 
           </Card>
 
-          <Card className="overflow-hidden p-0">
+          <Card className="overflow-hidden p-0 max-sm:-mx-3 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
             <div className="flex items-center justify-between gap-3 p-4">
               <h2 className="panel-title">Требуют внимания</h2>
               <span className="rounded-md px-2 py-0.5 text-xs font-semibold" style={{ background: "var(--bg)", color: "var(--text-muted)" }}>
@@ -208,7 +208,7 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        <Card className="mt-4 overflow-hidden p-0">
+        <Card className="mt-4 overflow-hidden p-0 max-sm:-mx-3 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
           <div className="flex items-center justify-between gap-3 p-4">
             <h2 className="panel-title">Ближайшие визиты</h2>
             <Link to="/orders" className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[var(--accent)]">
@@ -216,7 +216,7 @@ export default function Dashboard() {
             </Link>
           </div>
 
-          <div className="space-y-2 p-3 pt-0 lg:hidden">
+          <div className="space-y-2 p-2 pt-0 lg:hidden">
             {visits.map((order) => {
               const client = clients.find((item) => item.id === order.clientId);
               const vehicle = vehicles.find((item) => item.id === order.vehicleId);

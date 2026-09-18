@@ -150,6 +150,10 @@ function migrate(db: DB): DB {
       // Старая маска-заглушка «+7 (___) ___-__-__» не проходила проверку и
       // не давала сохранить настройки — такой номер считаем незаполненным.
       phone: isValidPhone(db.company.phone) ? formatPhone(db.company.phone) : "",
+      phone2: db.company.phone2 && isValidPhone(db.company.phone2) ? formatPhone(db.company.phone2) : undefined,
+      logoDataUrl: typeof db.company.logoDataUrl === "string" && db.company.logoDataUrl.startsWith("data:image/")
+        ? db.company.logoDataUrl
+        : undefined,
       openTime: hours.start,
       closeTime: hours.end,
     },
