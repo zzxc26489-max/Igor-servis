@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import {
-  IconCalendarEvent, IconChartBar, IconClipboardList, IconCoin,
-  IconCube, IconHome2, IconSettings, IconShoppingCart,
+  IconCalendarEvent, IconChartBar, IconChevronDown, IconClipboardList, IconCoin,
+  IconCube, IconDotsCircleHorizontal, IconHome2, IconSettings, IconShoppingCart,
   IconTool, IconUsers, IconUsersGroup, IconX,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
@@ -9,27 +9,35 @@ import { useMobileMenu } from "./MobileMenu";
 import logo from "../assets/logo.jpg";
 import { APP_VERSION } from "../data/version";
 
-const NAV_GROUPS = [
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof IconHome2;
+  end?: boolean;
+  badge?: "orders" | "purchases";
+};
+
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Работа",
     items: [
-      { to: "/", label: "Главная", icon: IconHome2, end: true },
+      { to: "/", label: "Сегодня", icon: IconHome2, end: true },
       { to: "/schedule", label: "Расписание", icon: IconCalendarEvent },
-      { to: "/orders", label: "Заказ-наряды", icon: IconClipboardList },
+      { to: "/orders", label: "Заказ-наряды", icon: IconClipboardList, badge: "orders" },
     ],
   },
   {
-    label: "Склад",
+    label: "Запчасти",
     items: [
       { to: "/stock", label: "Склад", icon: IconCube },
-      { to: "/purchases", label: "Закупки", icon: IconShoppingCart },
-      { to: "/services", label: "Услуги", icon: IconTool },
+      { to: "/purchases", label: "Закупки", icon: IconShoppingCart, badge: "purchases" },
     ],
   },
   {
-    label: "Бизнес",
+    label: "Управление",
     items: [
       { to: "/clients", label: "Клиенты", icon: IconUsers },
+      { to: "/services", label: "Услуги", icon: IconTool },
       { to: "/employees", label: "Сотрудники", icon: IconUsersGroup },
       { to: "/finance", label: "Финансы", icon: IconCoin },
       { to: "/reports", label: "Отчёты", icon: IconChartBar },
@@ -38,58 +46,75 @@ const NAV_GROUPS = [
 ];
 
 const MOBILE_NAV_ITEMS = [
-  NAV_GROUPS[0].items[0],
-  NAV_GROUPS[0].items[1],
-  NAV_GROUPS[0].items[2],
-  NAV_GROUPS[1].items[0],
-  NAV_GROUPS[2].items[2],
+  { to: "/", label: "Сегодня", icon: IconHome2, end: true },
+  { to: "/orders", label: "Заказы", icon: IconClipboardList },
+  { to: "/stock", label: "Склад", icon: IconCube },
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
-    isActive ? "font-semibold text-white shadow-[0_6px_18px_rgba(0,0,0,.12)]" : "text-[var(--sidebar-text)] hover:bg-white/8 hover:text-white"
+  `relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+    isActive ? "font-semibold text-white" : "text-[var(--sidebar-text)] hover:bg-white/8 hover:text-white"
   }`;
 
 const navLinkStyle = ({ isActive }: { isActive: boolean }) => (isActive ? { background: "var(--accent)" } : undefined);
 
-function SidebarContent({ company, onNavigate }: { company: { shortName: string; address: string; workHours: string }; onNavigate?: () => void }) {
+function SidebarContent({
+  badges,
+  onNavigate,
+}: {
+  badges: { orders: number; purchases: number };
+  onNavigate?: () => void;
+}) {
   return (
     <>
-      <div className="flex items-center gap-3 border-b px-4 py-5" style={{ borderColor: "var(--sidebar-border)" }}>
-        <img src={logo} alt={company.shortName} className="h-11 w-11 rounded-xl bg-white object-cover ring-1 ring-white/10" />
-        <div>
-          <div className="text-[15px] font-bold leading-tight text-white">{company.shortName}</div>
-          <div className="mt-1 text-[11px] opacity-55">Надёжно. По-честному.</div>
+      <div className="flex items-center gap-3 px-4 py-5">
+        <img src={logo} alt="" className="h-11 w-11 shrink-0 rounded-xl bg-white object-cover ring-1 ring-white/10" />
+        <div className="min-w-0">
+          <div className="truncate text-[15px] font-bold uppercase leading-tight tracking-[0.01em] text-white">
+            The Service
+          </div>
+          <div className="mt-0.5 text-[11px] opacity-55">&amp; UMC <span className="opacity-60">/ CRM</span></div>
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-5 overflow-y-auto p-3">
+      <nav className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 pb-3">
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
-            <div className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[.12em] opacity-38">
-              {group.label}
-            </div>
+            <div className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[.12em] opacity-38">{group.label}</div>
             <div className="flex flex-col gap-1">
-              {group.items.map((item) => (
-                <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass} style={navLinkStyle} onClick={onNavigate}>
-                  <item.icon size={20} stroke={1.8} />
-                  <span>{item.label}</span>
-                </NavLink>
-              ))}
+              {group.items.map((item) => {
+                const badge = item.badge ? badges[item.badge] : 0;
+                return (
+                  <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass} style={navLinkStyle} onClick={onNavigate}>
+                    <item.icon size={20} stroke={1.8} />
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    {badge > 0 && (
+                      <span className="shrink-0 rounded-md bg-white/12 px-1.5 py-0.5 text-[11px] font-semibold text-white/80">
+                        {badge}
+                      </span>
+                    )}
+                  </NavLink>
+                );
+              })}
             </div>
           </div>
         ))}
       </nav>
 
-      <div className="border-t p-3" style={{ borderColor: "var(--sidebar-border)", background: "var(--sidebar-bg-alt)" }}>
+      <div className="px-3 pb-3">
         <NavLink to="/settings" className={navLinkClass} style={navLinkStyle} onClick={onNavigate}>
           <IconSettings size={20} stroke={1.8} />
           <span>Настройки</span>
         </NavLink>
-        <div className="mt-2 px-3 text-[11px] opacity-50">
-          <div>{company.address}</div>
-          <div className="mt-1">{company.workHours}</div>
-          <div className="mt-3">Версия {APP_VERSION}</div>
+      </div>
+      <div className="border-t px-4 py-4" style={{ borderColor: "var(--sidebar-border)" }}>
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10 text-sm font-bold text-white">И</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-white">Игорь</span>
+            <span className="block truncate text-[11px] opacity-55">Рабочее место · v{APP_VERSION}</span>
+          </span>
+          <IconChevronDown size={16} className="shrink-0 opacity-50" />
         </div>
       </div>
     </>
@@ -97,27 +122,28 @@ function SidebarContent({ company, onNavigate }: { company: { shortName: string;
 }
 
 export default function Layout() {
-  const { company } = useAppStore();
+  const { orders, stock } = useAppStore();
   const { open, setOpen } = useMobileMenu();
+
+  const badges = {
+    orders: orders.filter((order) => order.status !== "выдан").length,
+    purchases: stock.filter((item) => item.qty <= item.minQty).length,
+  };
 
   return (
     <div className="app-shell flex min-h-screen print:min-h-0">
       <aside
-        className="hidden w-[228px] shrink-0 flex-col lg:flex print:hidden"
+        className="hidden w-[300px] shrink-0 flex-col lg:flex print:hidden"
         style={{ background: "var(--sidebar-bg)", color: "var(--sidebar-text)" }}
       >
-        <SidebarContent company={company} />
+        <SidebarContent badges={badges} />
       </aside>
 
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden print:hidden">
-          <button
-            className="absolute inset-0 bg-black/40"
-            aria-label="Закрыть меню"
-            onClick={() => setOpen(false)}
-          />
+          <button className="absolute inset-0 bg-black/40" aria-label="Закрыть меню" onClick={() => setOpen(false)} />
           <div
-            className="relative flex h-full w-72 max-w-[80vw] flex-col shadow-xl"
+            className="relative flex h-full w-72 max-w-[82vw] flex-col shadow-xl"
             style={{ background: "var(--sidebar-bg)", color: "var(--sidebar-text)" }}
           >
             <button
@@ -127,7 +153,7 @@ export default function Layout() {
             >
               <IconX size={20} />
             </button>
-            <SidebarContent company={company} onNavigate={() => setOpen(false)} />
+            <SidebarContent badges={badges} onNavigate={() => setOpen(false)} />
           </div>
         </div>
       )}
@@ -137,7 +163,7 @@ export default function Layout() {
       </div>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t bg-white/95 px-1 shadow-[0_-4px_18px_rgba(23,34,30,.06)] backdrop-blur lg:hidden print:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t bg-white/95 px-1 backdrop-blur lg:hidden print:hidden"
         style={{ borderColor: "var(--border)" }}
         aria-label="Основная навигация"
       >
@@ -147,16 +173,30 @@ export default function Layout() {
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `flex min-w-0 flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+              `relative flex min-w-0 flex-1 flex-col items-center gap-1 px-2 py-1.5 text-[11px] focus-visible:outline-none ${
                 isActive ? "font-semibold" : ""
               }`
             }
             style={({ isActive }) => ({ color: isActive ? "var(--accent)" : "var(--text-muted)" })}
           >
-            <item.icon size={20} stroke={1.8} aria-hidden="true" />
-            <span className="max-w-16 truncate">{item.label}</span>
+            {({ isActive }) => (
+              <>
+                {isActive && <span className="absolute -top-px h-0.5 w-10 rounded-full bg-[var(--accent)]" />}
+                <item.icon size={22} stroke={1.8} aria-hidden="true" />
+                <span className="max-w-full truncate">{item.label}</span>
+              </>
+            )}
           </NavLink>
         ))}
+        <button
+          onClick={() => setOpen(true)}
+          className="flex min-w-0 flex-1 flex-col items-center gap-1 px-2 py-1.5 text-[11px]"
+          style={{ color: "var(--text-muted)" }}
+          aria-label="Открыть меню"
+        >
+          <IconDotsCircleHorizontal size={22} stroke={1.8} aria-hidden="true" />
+          <span>Ещё</span>
+        </button>
       </nav>
     </div>
   );

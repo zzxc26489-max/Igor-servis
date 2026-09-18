@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { IconChevronDown, IconChevronUp, IconClipboardList, IconClockHour4, IconAlertTriangle, IconCoin } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
-import { Card, EmptyState, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
+import { Button, Card, EmptyState, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDateTime, formatMoney } from "../lib/format";
 import { orderTotals } from "../lib/order";
 import type { Order, OrderStatus } from "../types";
@@ -17,6 +17,8 @@ const STATUS_FILTERS: { value: OrderStatus | "all"; label: string }[] = [
   { value: "выдан", label: "Выдан" },
 ];
 
+const PAGE_SIZE = 25;
+
 type SortKey = "date" | "client" | "amount" | "debt";
 
 export default function Orders() {
@@ -25,6 +27,7 @@ export default function Orders() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
   const active = orders.filter((o) => o.status !== "выдан");
   const waitingParts = orders.filter((o) => o.status === "ожидает запчасти");
@@ -55,6 +58,9 @@ export default function Orders() {
     });
     return sorted;
   }, [orders, statusFilter, sortKey, sortDir, clients]);
+
+  // Длинный список режем на страницы: за год заказов набираются сотни.
+  const page = shown.slice(0, limit);
 
   function SortHeader({ label, sortKeyName, align }: { label: string; sortKeyName: SortKey; align?: "right" }) {
     const isActive = sortKey === sortKeyName;
@@ -92,7 +98,7 @@ export default function Orders() {
             <h2 className="panel-title">Список заказ-нарядов</h2>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as OrderStatus | "all")}
+              onChange={(e) => { setStatusFilter(e.target.value as OrderStatus | "all"); setLimit(PAGE_SIZE); }}
               className="rounded-lg border bg-white px-3 py-2 text-sm"
               style={{ borderColor: "var(--border)" }}
             >
@@ -104,7 +110,7 @@ export default function Orders() {
             </select>
           </div>
           <div className="space-y-2 p-3 lg:hidden">
-            {shown.map((o) => {
+            {page.map((o) => {
               const client = clients.find((c) => c.id === o.clientId);
               const vehicle = vehicles.find((v) => v.id === o.vehicleId);
               const { due, debt } = orderTotals(o);
@@ -144,7 +150,7 @@ export default function Orders() {
                 </tr>
               </thead>
               <tbody>
-                {shown.map((o) => {
+                {page.map((o) => {
                   const client = clients.find((c) => c.id === o.clientId);
                   const vehicle = vehicles.find((v) => v.id === o.vehicleId);
                   const { due, debt } = orderTotals(o);
@@ -180,6 +186,14 @@ export default function Orders() {
               </tbody>
             </table>
           </div>
+
+          {shown.length > page.length && (
+            <div className="border-t p-3 text-center" style={{ borderColor: "var(--border)" }}>
+              <Button variant="secondary" onClick={() => setLimit((value) => value + PAGE_SIZE)}>
+                Показать ещё {Math.min(PAGE_SIZE, shown.length - page.length)} из {shown.length}
+              </Button>
+            </div>
+          )}
         </Card>
       </Page>
     </>

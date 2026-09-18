@@ -254,3 +254,53 @@ export function topDebtors(orders: Order[], clients: Client[], limit = 5) {
 export function stockValue(stock: StockItem[]) {
   return stock.reduce((sum, item) => sum + item.qty * item.purchasePrice, 0);
 }
+
+/** Заказы с непогашенным долгом — «ожидаем оплату». */
+export function pendingPayments(orders: Order[], clients: Client[], limit = 6) {
+  return orders
+    .map((order) => ({
+      order,
+      client: clients.find((client) => client.id === order.clientId),
+      debt: Math.max(0, orderTotals(order).debt),
+    }))
+    .filter((entry) => entry.debt > 0)
+    .sort((a, b) => b.debt - a.debt)
+    .slice(0, limit);
+}
+
+export interface Operation {
+  id: string;
+  date: string;
+  title: string;
+  category: string;
+  orderId?: string;
+  orderNumber?: string;
+  amount: number;
+}
+
+/** Единая лента операций: поступления по заказам и расходы. */
+export function buildOperations(range: Range, orders: Order[], expenses: Expense[]): Operation[] {
+  const income: Operation[] = orders
+    .filter((order) => (order.paid ?? 0) > 0 && inRange(orderDate(order), range))
+    .map((order) => ({
+      id: `in-${order.id}`,
+      date: orderDate(order) ?? order.createdAt,
+      title: "Оплата по заказ-наряду",
+      category: "Поступление",
+      orderId: order.id,
+      orderNumber: order.number,
+      amount: order.paid ?? 0,
+    }));
+
+  const outcome: Operation[] = expenses
+    .filter((expense) => inRange(expense.date, range))
+    .map((expense) => ({
+      id: `out-${expense.id}`,
+      date: expense.date,
+      title: expense.description,
+      category: expense.category,
+      amount: -expense.amount,
+    }));
+
+  return [...income, ...outcome].sort((a, b) => b.date.localeCompare(a.date));
+}

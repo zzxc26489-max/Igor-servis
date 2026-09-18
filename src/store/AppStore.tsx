@@ -138,6 +138,10 @@ interface AppStoreValue extends DB {
   updateService: (id: string, patch: Partial<Service>) => void;
   deleteService: (id: string) => void;
   resetToSeed: () => void;
+  /** Резервная копия: весь справочник одним JSON. */
+  exportDB: () => string;
+  /** Восстановление из резервной копии; возвращает false, если файл не подошёл. */
+  importDB: (json: string) => boolean;
 }
 
 const AppStoreContext = createContext<AppStoreValue | null>(null);
@@ -282,6 +286,22 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         })),
       deleteService: (id) => setDB((prev) => ({ ...prev, services: prev.services.filter((service) => service.id !== id) })),
       resetToSeed: () => setDB(seedDB()),
+      exportDB: () => JSON.stringify(db, null, 2),
+      importDB: (json) => {
+        try {
+          const parsed = JSON.parse(json) as Partial<DB>;
+          if (!Array.isArray(parsed.orders) || !Array.isArray(parsed.clients)) return false;
+          setDB(migrate({
+            ...seedDB(),
+            ...parsed,
+            company: { ...companySeed, ...parsed.company },
+            settings: { ...defaultSettings, ...parsed.settings },
+          }));
+          return true;
+        } catch {
+          return false;
+        }
+      },
     }),
     [db],
   );

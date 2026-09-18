@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   IconBox, IconBriefcase, IconChartBar, IconChevronLeft,
   IconChevronRight, IconCoin, IconCreditCardPay, IconPlus, IconUsers,
@@ -11,11 +11,14 @@ import { Button, Card, ListCard, Metric, Page, StatusBadge, TopBar } from "../co
 import { formatDate, formatMoney, plural } from "../lib/format";
 import { computePayroll } from "../lib/payroll";
 import {
-  buildChart, byVehicleMake, clientsBreakdown, computeMetrics, getRange,
-  previousRange, stockValue, topDebtors, topServices, type PeriodKey,
+  buildChart, buildOperations, byVehicleMake, clientsBreakdown, computeMetrics, getRange,
+  pendingPayments, previousRange, stockValue, topServices, type PeriodKey,
 } from "../lib/analytics";
 
 const EXPENSE_CATEGORIES = ["Закупка запчастей", "Аренда", "Доставка", "Коммунальные услуги", "Инструмент", "Реклама", "Прочее"];
+const TABS = ["Обзор", "Операции", "Зарплаты"] as const;
+type Tab = (typeof TABS)[number];
+
 const PERIODS: { value: PeriodKey; label: string }[] = [
   { value: "today", label: "День" },
   { value: "week", label: "Неделя" },
@@ -27,7 +30,9 @@ const PERIODS: { value: PeriodKey; label: string }[] = [
 export default function Finance() {
   const { orders, expenses, employees: rawEmployees, clients, vehicles, stock, addExpense } = useAppStore();
   const { showToast } = useToast();
+  const navigate = useNavigate();
 
+  const [tab, setTab] = useState<Tab>("Обзор");
   const [period, setPeriod] = useState<PeriodKey>("month");
   const [offset, setOffset] = useState(0);
 
@@ -49,7 +54,8 @@ export default function Finance() {
   const services = useMemo(() => topServices(metrics.orders), [metrics.orders]);
   const makes = useMemo(() => byVehicleMake(metrics.orders, vehicles), [metrics.orders, vehicles]);
   const clientStats = useMemo(() => clientsBreakdown(range, metrics.orders, orders), [metrics.orders, orders, range]);
-  const debtors = useMemo(() => topDebtors(orders, clients), [clients, orders]);
+  const pending = useMemo(() => pendingPayments(orders, clients), [clients, orders]);
+  const operations = useMemo(() => buildOperations(range, orders, expenses), [expenses, orders, range]);
   const periodExpenses = useMemo(
     () => expenses
       .filter((expense) => {
@@ -102,11 +108,37 @@ export default function Finance() {
   }
 
   const maxChartValue = Math.max(1, ...chart.map((point) => Math.max(point.revenue, point.expenses)));
+  const axisMax = niceMax(maxChartValue);
+  const axisTicks = [axisMax, (axisMax / 4) * 3, axisMax / 2, axisMax / 4, 0];
 
   return (
     <>
-      <TopBar title="Финансы" subtitle="Деньги за выбранный период" hideNewRecordOnMobile />
+      <TopBar
+        title="Финансы"
+        subtitle={`${range.title} · ${range.label}`}
+        actions={
+          <Button onClick={() => { setTab("Операции"); setAddingExpense(true); }}>
+            <IconPlus size={18} /> Добавить расход
+          </Button>
+        }
+      />
       <Page>
+        <div className="mb-3 flex gap-1 overflow-x-auto rounded-xl border bg-white p-1" style={{ borderColor: "var(--border)" }}>
+          {TABS.map((item) => (
+            <button
+              key={item}
+              onClick={() => setTab(item)}
+              className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition"
+              style={{
+                background: tab === item ? "var(--accent-soft)" : "transparent",
+                color: tab === item ? "var(--accent-strong)" : "var(--text-muted)",
+              }}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+
         <Card className="mb-3">
           <div className="flex flex-wrap gap-1.5">
             {PERIODS.map((item) => (
@@ -147,6 +179,8 @@ export default function Finance() {
           <Metric icon={<IconChartBar size={18} />} label="Прибыль" value={formatMoney(metrics.profit)} current={metrics.profit} previous={previous?.profit} hint="После расходов и зарплат" />
         </div>
 
+        {tab === "Обзор" && (
+        <>
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.4fr_1fr]">
           <Card>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -162,19 +196,41 @@ export default function Finance() {
             {chart.length === 0 || maxChartValue <= 1 ? (
               <p className="muted py-8 text-center text-sm">За этот период движения денег не было.</p>
             ) : (
-              <div className="flex h-44 items-end gap-0.5 border-b pb-0" style={{ borderColor: "var(--border)" }}>
-                {chart.map((point, index) => (
-                  <div key={index} className="flex h-full flex-1 items-end gap-px" title={`${point.label}: выручка ${formatMoney(point.revenue)}, расходы ${formatMoney(point.expenses)}`}>
-                    <div className="flex-1 rounded-t-sm bg-[#1f9d63]" style={{ height: `${(point.revenue / maxChartValue) * 100}%` }} />
-                    <div className="flex-1 rounded-t-sm bg-[#e39230]" style={{ height: `${(point.expenses / maxChartValue) * 100}%` }} />
+              <div className="flex gap-2">
+                {/* Ось значений: без неё по высоте столбиков ничего не понять. */}
+                <div className="flex h-44 w-12 shrink-0 flex-col justify-between text-right text-[10px] muted">
+                  {axisTicks.map((tick) => (
+                    <span key={tick} className="leading-none">{formatAxis(tick)}</span>
+                  ))}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="relative h-44">
+                    <div className="absolute inset-0 flex flex-col justify-between">
+                      {axisTicks.map((tick) => (
+                        <div key={tick} className="h-px w-full" style={{ background: "#eef0ee" }} />
+                      ))}
+                    </div>
+                    <div className="relative flex h-full items-end gap-0.5 border-b" style={{ borderColor: "var(--border)" }}>
+                      {chart.map((point, index) => (
+                        <div
+                          key={index}
+                          className="flex h-full flex-1 items-end gap-px"
+                          title={`${point.label}: выручка ${formatMoney(point.revenue)}, расходы ${formatMoney(point.expenses)}`}
+                        >
+                          <div className="flex-1 rounded-t-sm bg-[#1f9d63]" style={{ height: `${(point.revenue / axisMax) * 100}%` }} />
+                          <div className="flex-1 rounded-t-sm bg-[#e39230]" style={{ height: `${(point.expenses / axisMax) * 100}%` }} />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-            {chart.length > 0 && (
-              <div className="mt-1 flex justify-between text-[10px] muted">
-                <span>{chart[0]?.label}</span>
-                <span>{chart[chart.length - 1]?.label}</span>
+                  <div className="mt-1 flex gap-0.5 text-[10px] muted">
+                    {chart.map((point, index) => (
+                      <span key={index} className="min-w-0 flex-1 text-center">
+                        {chart.length <= 14 || index % Math.ceil(chart.length / 10) === 0 ? point.label : ""}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -217,16 +273,24 @@ export default function Finance() {
             </Card>
 
             <Card>
-              <h2 className="panel-title mb-3 flex items-center gap-2"><IconUsers size={18} /> Должники</h2>
-              {debtors.length === 0 ? (
-                <p className="muted text-sm">Долгов нет.</p>
+              <h2 className="panel-title mb-3 flex items-center gap-2"><IconUsers size={18} /> Ожидаем оплату</h2>
+              {pending.length === 0 ? (
+                <p className="muted text-sm">Все заказы оплачены.</p>
               ) : (
-                <div className="space-y-2 text-sm">
-                  {debtors.map((debtor) => (
-                    <div key={debtor.name} className="flex items-center justify-between gap-2">
-                      <span className="truncate">{debtor.name}</span>
-                      <b style={{ color: "var(--danger)" }}>{formatMoney(debtor.debt)}</b>
-                    </div>
+                <div className="space-y-2">
+                  {pending.map((entry) => (
+                    <Link
+                      key={entry.order.id}
+                      to={`/orders/${entry.order.id}`}
+                      className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-sm transition hover:border-[var(--accent)]"
+                      style={{ borderColor: "var(--border)" }}
+                    >
+                      <span className="min-w-0">
+                        <b className="block truncate">{entry.client?.name ?? "Клиент"}</b>
+                        <span className="muted text-xs">{entry.order.number}</span>
+                      </span>
+                      <b className="shrink-0 tabular-nums" style={{ color: "var(--danger)" }}>{formatMoney(entry.debt)}</b>
+                    </Link>
                   ))}
                 </div>
               )}
@@ -282,6 +346,72 @@ export default function Finance() {
             )}
           </Card>
         </div>
+
+        </>
+        )}
+
+        {tab === "Операции" && (
+        <>
+        <Card className="mb-3 overflow-hidden p-0">
+          <div className="border-b p-4" style={{ borderColor: "var(--border)" }}>
+            <h2 className="panel-title">Последние операции</h2>
+            <p className="muted mt-1 text-xs">Поступления от клиентов и расходы за выбранный период</p>
+          </div>
+
+          <div className="space-y-2 p-3 lg:hidden">
+            {operations.map((operation) => (
+              <ListCard
+                key={operation.id}
+                onClick={operation.orderId ? () => navigate(`/orders/${operation.orderId}`) : undefined}
+                title={operation.title}
+                amount={
+                  <span style={{ color: operation.amount >= 0 ? "var(--accent)" : "var(--danger)" }}>
+                    {operation.amount >= 0 ? "+" : "−"}{formatMoney(Math.abs(operation.amount))}
+                  </span>
+                }
+                lines={[operation.category, operation.orderNumber ?? null]}
+                meta={formatDate(operation.date)}
+              />
+            ))}
+            {operations.length === 0 && <p className="muted p-3 text-sm">За этот период операций нет.</p>}
+          </div>
+
+          <div className="hidden lg:block">
+            <table className="app-table">
+              <thead>
+                <tr>
+                  <th className="w-28">Дата</th>
+                  <th>Операция</th>
+                  <th className="w-44">Категория</th>
+                  <th className="w-40">Связь с заказом</th>
+                  <th className="w-32 text-right">Сумма</th>
+                </tr>
+              </thead>
+              <tbody>
+                {operations.map((operation) => (
+                  <tr key={operation.id}>
+                    <td className="muted whitespace-nowrap">{formatDate(operation.date)}</td>
+                    <td>{operation.title}</td>
+                    <td className="muted">{operation.category}</td>
+                    <td>
+                      {operation.orderId ? (
+                        <Link to={`/orders/${operation.orderId}`} className="font-medium text-[var(--accent)]">{operation.orderNumber}</Link>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td className="text-right font-semibold tabular-nums" style={{ color: operation.amount >= 0 ? "var(--accent)" : "var(--danger)" }}>
+                      {operation.amount >= 0 ? "+" : "−"}{formatMoney(Math.abs(operation.amount))}
+                    </td>
+                  </tr>
+                ))}
+                {operations.length === 0 && (
+                  <tr><td colSpan={5} className="muted text-center">За этот период операций нет.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
 
         <Card className="mt-3 overflow-hidden p-0">
           <div className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -358,7 +488,11 @@ export default function Finance() {
           </div>
         </Card>
 
-        <Card className="mt-3 overflow-hidden p-0">
+        </>
+        )}
+
+        {tab === "Зарплаты" && (
+        <Card className="overflow-hidden p-0">
           <div className="flex items-center justify-between border-b p-4" style={{ borderColor: "var(--border)" }}>
             <div>
               <p className="section-kicker">Команда</p>
@@ -388,6 +522,7 @@ export default function Finance() {
             Итого к выплате: {formatMoney(totalSalaries)}
           </div>
         </Card>
+        )}
       </Page>
     </>
   );
@@ -411,4 +546,22 @@ function Tile({ label, value }: { label: string; value: string }) {
       <p className="mt-0.5 text-lg font-semibold">{value}</p>
     </div>
   );
+}
+
+/** Округляем верх шкалы до «красивого» числа, чтобы подписи оси читались. */
+function niceMax(value: number) {
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const steps = [1, 2, 2.5, 5, 10];
+  for (const step of steps) {
+    const candidate = step * magnitude;
+    if (candidate >= value) return candidate;
+  }
+  return 10 * magnitude;
+}
+
+function formatAxis(value: number) {
+  if (value === 0) return "0";
+  if (value >= 1_000_000) return `${(value / 1_000_000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} млн`;
+  if (value >= 1000) return `${(value / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 0 })} тыс.`;
+  return value.toLocaleString("ru-RU");
 }

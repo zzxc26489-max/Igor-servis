@@ -1,12 +1,12 @@
-import { useState, type FormEvent } from "react";
-import { IconAdjustments, IconBuildingStore, IconDatabase, IconInfoCircle } from "@tabler/icons-react";
+import { useRef, useState, type FormEvent } from "react";
+import { IconAdjustments, IconBuildingStore, IconDatabase, IconDownload, IconInfoCircle, IconUpload } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
 import { Button, Card, Page, TopBar } from "../components/ui";
 import { APP_BUILD_DATE, APP_VERSION, DB_VERSION } from "../data/version";
 
 export default function Settings() {
-  const { company, settings, updateCompany, updateSettings, resetToSeed } = useAppStore();
+  const { company, settings, updateCompany, updateSettings, resetToSeed, exportDB, importDB } = useAppStore();
   const { showToast } = useToast();
   const [shortName, setShortName] = useState(company.shortName);
   const [address, setAddress] = useState(company.address);
@@ -26,6 +26,29 @@ export default function Settings() {
       responsible: responsible.trim(),
     });
     showToast("Данные компании сохранены");
+  }
+
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleBackup() {
+    const blob = new Blob([exportDB()], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `igor-servis-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast("Резервная копия сохранена");
+  }
+
+  async function handleRestore(file: File) {
+    const text = await file.text();
+    if (!window.confirm("Заменить текущие данные содержимым резервной копии?")) return;
+    if (importDB(text)) {
+      showToast("Данные восстановлены из копии");
+    } else {
+      showToast("Файл не похож на резервную копию CRM", "error");
+    }
   }
 
   function handleReset() {
@@ -119,17 +142,37 @@ export default function Settings() {
                 <IconDatabase size={22} />
               </div>
               <div>
-                <h2 className="panel-title">Демонстрационные данные</h2>
+                <h2 className="panel-title">Данные и резервные копии</h2>
                 <p className="muted text-sm">CRM сейчас хранит данные локально в этом браузере</p>
               </div>
             </div>
             <p className="mb-4 text-sm muted">
-              Все заказ-наряды, клиенты, склад и финансы сохраняются только на этом устройстве. При переносе CRM
-              на сервер данные станут общими для всех сотрудников.
+              Все заказ-наряды, клиенты, склад и финансы сохраняются только на этом устройстве. Делайте резервную
+              копию и открывайте её на другом компьютере или телефоне, пока CRM не переехала на общий сервер.
             </p>
-            <Button variant="secondary" onClick={handleReset}>
-              Сбросить к демонстрационным данным
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={handleBackup}>
+                <IconDownload size={18} /> Скачать копию
+              </Button>
+              <Button variant="secondary" onClick={() => fileRef.current?.click()}>
+                <IconUpload size={18} /> Загрузить копию
+              </Button>
+              <Button variant="secondary" onClick={handleReset}>
+                Сбросить к демонстрационным
+              </Button>
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              aria-label="Файл резервной копии"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleRestore(file);
+                event.target.value = "";
+              }}
+            />
           </Card>
 
           <Card>

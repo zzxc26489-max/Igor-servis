@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { IconBell, IconCalendarEvent, IconChevronDown, IconMenu2, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
+import { IconMenu2, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useMobileMenu } from "./MobileMenu";
 
@@ -8,27 +8,32 @@ export function TopBar({
   title,
   subtitle,
   actions,
-  hideNewRecordOnMobile = false,
+  breadcrumbs,
+  titleChip,
 }: {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
+  /** Хлебные крошки над заголовком: путь до текущей карточки. */
+  breadcrumbs?: { label: string; to?: string }[];
+  /** Плашка рядом с заголовком, например госномер. */
+  titleChip?: ReactNode;
+  /** Оставлено для совместимости вызовов: на узком экране действия и так переносятся. */
   hideNewRecordOnMobile?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
-  const location = useLocation();
-  const { clients, vehicles, orders, company } = useAppStore();
+  const { clients, vehicles, orders } = useAppStore();
   const { setOpen } = useMobileMenu();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
         inputRef.current?.focus();
       }
-      if (e.key === "Escape" && document.activeElement === inputRef.current) {
+      if (event.key === "Escape" && document.activeElement === inputRef.current) {
         setQuery("");
         inputRef.current?.blur();
       }
@@ -40,16 +45,22 @@ export function TopBar({
   const results = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("ru-RU");
     if (term.length < 2) return [];
-
     const matches = [
       ...clients
-        .filter((client) => `${client.name} ${client.phone}`.toLocaleLowerCase("ru-RU").includes(term))
+        .filter((client) => `${client.code ?? ""} ${client.name} ${client.phone}`.toLocaleLowerCase("ru-RU").includes(term))
         .slice(0, 3)
-        .map((client) => ({ label: client.name, detail: client.phone, to: `/clients?q=${encodeURIComponent(term)}` })),
+        .map((client) => ({ label: client.name, detail: client.phone, to: `/clients/${client.id}` })),
       ...vehicles
-        .filter((vehicle) => `${vehicle.make} ${vehicle.model} ${vehicle.plate} ${vehicle.vin ?? ""}`.toLocaleLowerCase("ru-RU").includes(term))
+        .filter((vehicle) => `${vehicle.plate} ${vehicle.make} ${vehicle.model}`.toLocaleLowerCase("ru-RU").includes(term))
         .slice(0, 3)
-        .map((vehicle) => ({ label: `${vehicle.make} ${vehicle.model}`, detail: vehicle.plate, to: `/clients?q=${encodeURIComponent(term)}` })),
+        .map((vehicle) => {
+          const order = orders.find((item) => item.vehicleId === vehicle.id);
+          return {
+            label: `${vehicle.make} ${vehicle.model} · ${vehicle.plate}`,
+            detail: "Автомобиль",
+            to: order ? `/orders/${order.id}` : `/clients/${vehicle.clientId}`,
+          };
+        }),
       ...orders
         .filter((order) => order.number.toLocaleLowerCase("ru-RU").includes(term))
         .slice(0, 3)
@@ -58,85 +69,101 @@ export function TopBar({
     return matches.slice(0, 6);
   }, [clients, orders, query, vehicles]);
 
+  const today = new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date());
+
   return (
-    <header className="sticky top-0 z-30 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-3 overflow-visible border-b bg-white/95 px-3 py-3 backdrop-blur sm:px-6 lg:grid-cols-[minmax(230px,360px)_minmax(260px,1fr)_auto] lg:gap-x-4 print:hidden" style={{ borderColor: "var(--border)" }}>
-      <div className="flex min-w-0 items-center gap-2">
+    <>
+      <header
+        className="sticky top-0 z-30 flex min-w-0 items-center gap-3 border-b bg-white/95 px-3 py-2.5 backdrop-blur sm:px-6 print:hidden"
+        style={{ borderColor: "var(--border)" }}
+      >
         <button
           onClick={() => setOpen(true)}
           aria-label="Открыть меню"
-          className="rounded-lg p-2 -ml-2 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] lg:hidden"
+          className="-ml-1 rounded-lg p-2 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] lg:hidden"
         >
           <IconMenu2 size={22} />
         </button>
+
+        <div className="relative min-w-0 flex-1">
+          <IconSearch className="pointer-events-none absolute left-3 top-2.5" size={18} color="var(--text-muted)" aria-hidden="true" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Клиент, госномер, телефон или заказ"
+            className="w-full rounded-lg bg-transparent py-2 pl-10 pr-12 text-sm outline-none placeholder:text-[var(--text-muted)] focus:bg-[#f5f7f5]"
+            aria-label="Поиск по CRM"
+          />
+          <kbd
+            className="pointer-events-none absolute right-2.5 top-1.5 hidden rounded border px-1.5 py-0.5 text-[10px] font-medium sm:block"
+            style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+          >
+            Ctrl K
+          </kbd>
+          {query.trim().length >= 2 && (
+            <div className="absolute z-40 mt-1 w-full overflow-hidden rounded-lg border bg-white shadow-lg" style={{ borderColor: "var(--border)" }}>
+              {results.length > 0 ? results.map((result, index) => (
+                <button
+                  key={`${result.to}-${index}`}
+                  onClick={() => { setQuery(""); navigate(result.to); }}
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-none"
+                >
+                  <span className="truncate">{result.label}</span>
+                  <span className="ml-3 shrink-0 text-xs" style={{ color: "var(--text-muted)" }}>{result.detail}</span>
+                </button>
+              )) : (
+                <div className="px-3 py-3 text-sm" style={{ color: "var(--text-muted)" }}>Ничего не найдено</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="hidden shrink-0 items-center gap-4 text-xs md:flex" style={{ color: "var(--text-muted)" }}>
+          <span className="font-semibold uppercase tracking-[.08em]">Демо-данные</span>
+          <span>{today}</span>
+        </div>
+      </header>
+
+      <div className="flex flex-wrap items-start justify-between gap-3 px-4 pt-5 sm:px-5 lg:px-6 print:hidden">
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-bold tracking-[-0.025em] sm:text-[22px]" title={title} style={{ color: "var(--text)" }}>
-            {title}
-          </h1>
-          {subtitle && <p className="mt-0.5 truncate text-xs sm:text-sm" title={subtitle} style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
+          {breadcrumbs && breadcrumbs.length > 0 && (
+            <nav className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }} aria-label="Хлебные крошки">
+              {breadcrumbs.map((crumb, index) => (
+                <span key={`${crumb.label}-${index}`} className="flex items-center gap-1.5">
+                  {index > 0 && <span aria-hidden="true">/</span>}
+                  {crumb.to ? (
+                    <Link to={crumb.to} className="hover:text-[var(--accent)]">{crumb.label}</Link>
+                  ) : (
+                    <span>{crumb.label}</span>
+                  )}
+                </span>
+              ))}
+            </nav>
+          )}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em] sm:text-[34px]" style={{ color: "var(--text)" }}>
+              {title}
+            </h1>
+            {titleChip}
+          </div>
+          {subtitle && <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {actions ?? <NewRecordButton />}
         </div>
       </div>
+    </>
+  );
+}
 
-      <div className="relative col-span-2 row-start-2 w-full lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:max-w-md lg:justify-self-center">
-        <input
-          ref={inputRef}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Поиск: клиент, авто, номер заказа"
-          className="w-full rounded-lg border bg-[#f5f7f5] px-3 py-2 pl-10 pr-12 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--accent)_12%,transparent)]"
-          style={{ borderColor: "var(--border)", boxShadow: "none" }}
-          aria-label="Поиск по CRM"
-        />
-        <IconSearch className="pointer-events-none absolute left-3 top-2.5" size={18} color="var(--text-muted)" aria-hidden="true" />
-        <kbd
-          className="pointer-events-none absolute right-2.5 top-1.5 hidden rounded border px-1.5 py-0.5 text-[10px] font-medium sm:block"
-          style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-        >
-          ⌘K
-        </kbd>
-        {query.trim().length >= 2 && (
-          <div className="absolute z-40 mt-1 w-full overflow-hidden rounded-lg border bg-white shadow-lg" style={{ borderColor: "var(--border)" }}>
-            {results.length > 0 ? results.map((result, index) => (
-              <button
-                key={`${result.to}-${index}`}
-                onClick={() => { setQuery(""); navigate(result.to); }}
-                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 focus-visible:outline-none focus-visible:bg-gray-50"
-              >
-                <span>{result.label}</span>
-                <span className="ml-3 text-xs" style={{ color: "var(--text-muted)" }}>{result.detail}</span>
-              </button>
-            )) : (
-              <div className="px-3 py-3 text-sm" style={{ color: "var(--text-muted)" }}>Ничего не найдено</div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="col-start-2 row-start-1 flex min-w-0 items-center justify-end gap-1.5 sm:gap-2 lg:col-start-3">
-        <div className="hidden items-center gap-2 text-sm text-[var(--text-muted)] xl:flex"><IconCalendarEvent size={18} /> Сегодня</div>
-        <button aria-label="Уведомления" className="relative hidden h-9 w-9 shrink-0 place-items-center rounded-lg hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:grid">
-          <IconBell size={19} />
-          <span className="absolute right-2 top-1.5 h-2 w-2 rounded-full border-2 border-white bg-[var(--danger)]" />
-        </button>
-        <Link
-          to="/orders/new"
-          aria-label="Новая запись"
-          className={actions || location.pathname === "/orders/new" ? "hidden" : hideNewRecordOnMobile ? "hidden sm:block" : "shrink-0"}
-        >
-          <Button size="sm"><IconPlus size={17} /><span className="hidden sm:inline">Новая запись</span></Button>
-        </Link>
-        {actions}
-        {!actions && (
-          <div className="hidden shrink-0 items-center gap-2 border-l border-[var(--border)] pl-3 min-[1440px]:flex">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--sidebar-bg)] text-sm font-bold text-white">{company.shortName.charAt(0)}</span>
-            <span className="w-[130px] shrink-0 leading-tight">
-              <span className="block truncate text-sm font-semibold" title={company.shortName}>{company.shortName}</span>
-              <span className="block truncate text-xs text-[var(--text-muted)]">Рабочее место</span>
-            </span>
-            <IconChevronDown size={16} className="shrink-0 text-[var(--text-muted)]" />
-          </div>
-        )}
-      </div>
-    </header>
+function NewRecordButton() {
+  const location = useLocation();
+  if (location.pathname === "/orders/new") return null;
+  return (
+    <Link to="/orders/new">
+      <Button><IconPlus size={18} /> Новая запись</Button>
+    </Link>
   );
 }
 
