@@ -18,6 +18,7 @@ import {
 import { Button, Card, EmptyState, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney, plural } from "../lib/format";
 import { orderTotals } from "../lib/order";
+import { vehicleOrders, vehicleServiceStats } from "../lib/serviceBook";
 import type { Vehicle } from "../types";
 import { todayISO } from "../lib/date";
 
@@ -92,6 +93,7 @@ export default function ClientDetail() {
   const [plateKind, setPlateKind] = useState<PlateKind>("ru");
   const [vehicleFormOpen, setVehicleFormOpen] = useState(false);
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
+  const [serviceBookVehicleId, setServiceBookVehicleId] = useState<string | null>(null);
   const [vehicleForm, setVehicleForm] = useState({
     make: "", model: "", plate: "", vin: "", year: "", mileage: "",
     color: "", engine: "", transmission: "", nextServiceDate: "", nextServiceMileage: "",
@@ -531,6 +533,15 @@ export default function ClientDetail() {
                           <Link to={`/orders/new?clientId=${client.id}&vehicleId=${vehicle.id}`} aria-label={`Записать ${vehicle.make} ${vehicle.model}`} title="Записать на ремонт">
                             <Button size="icon" variant="secondary"><IconPlus size={16} /></Button>
                           </Link>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            onClick={() => setServiceBookVehicleId((current) => current === vehicle.id ? null : vehicle.id)}
+                            aria-label={`Сервисная книжка ${vehicle.make} ${vehicle.model}`}
+                            title="Сервисная книжка"
+                          >
+                            <IconClipboardList size={16} />
+                          </Button>
                           <Button size="icon" variant="secondary" onClick={() => startEditVehicle(vehicle.id)} aria-label={`Изменить ${vehicle.make} ${vehicle.model}`} title="Изменить">
                             <IconEdit size={16} />
                           </Button>
@@ -539,6 +550,51 @@ export default function ClientDetail() {
                           </Button>
                         </div>
                       </div>
+                      {serviceBookVehicleId === vehicle.id && (() => {
+                        const history = vehicleOrders(orders, vehicle.id);
+                        const serviceStats = vehicleServiceStats(orders, vehicle.id);
+                        return (
+                          <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--border)" }}>
+                            <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                              <div className="rounded-lg bg-[var(--bg)] p-2 text-xs"><span className="muted block">Визитов</span><b>{serviceStats.issuedOrders}</b></div>
+                              <div className="rounded-lg bg-[var(--bg)] p-2 text-xs"><span className="muted block">Работ</span><b>{serviceStats.works}</b></div>
+                              <div className="rounded-lg bg-[var(--bg)] p-2 text-xs"><span className="muted block">Запчастей</span><b>{serviceStats.parts}</b></div>
+                              <div className="rounded-lg bg-[var(--bg)] p-2 text-xs"><span className="muted block">За всё время</span><b>{formatMoney(serviceStats.spent)}</b></div>
+                            </div>
+                            <h3 className="mb-2 text-sm font-semibold">Сервисная книжка автомобиля</h3>
+                            <div className="space-y-2">
+                              {history.map((historyOrder) => {
+                                const { due } = orderTotals(historyOrder);
+                                return (
+                                  <button
+                                    type="button"
+                                    key={historyOrder.id}
+                                    onClick={() => navigate(`/orders/${historyOrder.id}`)}
+                                    className="w-full rounded-lg border p-3 text-left transition hover:bg-[var(--bg)]"
+                                    style={{ borderColor: "var(--border)" }}
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-semibold">{historyOrder.number}</span>
+                                      <span className="text-sm font-semibold">{formatMoney(due)}</span>
+                                    </div>
+                                    <div className="muted mt-1 text-xs">
+                                      {formatDateTime(historyOrder.issuedAt ?? historyOrder.completedAt ?? historyOrder.createdAt)}
+                                      {" · "}
+                                      {historyOrder.works.map((work) => work.name).join(", ") || "работы не указаны"}
+                                    </div>
+                                    {historyOrder.parts.length > 0 && (
+                                      <div className="muted mt-1 text-xs">
+                                        Запчасти: {historyOrder.parts.map((part) => `${part.name} × ${part.qty}`).join(", ")}
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                              {history.length === 0 && <p className="muted text-xs">По этой машине заказ-нарядов ещё нет.</p>}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}

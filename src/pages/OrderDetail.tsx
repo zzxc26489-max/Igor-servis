@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   IconArrowBackUp, IconArrowLeft, IconCalendarTime, IconCar, IconCheck, IconClipboardText,
-  IconFileDescription, IconNotes, IconPrinter, IconStopwatch, IconTool, IconTrash, IconUser,
+  IconBrandWhatsapp, IconFileDescription, IconMessage, IconNotes, IconPrinter, IconStopwatch, IconTool, IconTrash, IconUser,
 } from "@tabler/icons-react";
 import { formatWorkHours } from "../lib/workday";
 import { useAppStore } from "../store/AppStore";
@@ -16,6 +16,7 @@ import { reservedByItem } from "../lib/stock";
 import { moneyInput } from "../lib/formats";
 import { margin } from "../lib/price";
 import { paymentMethodLabel } from "../lib/payments";
+import { readyMessage, smsMessageHref, whatsappMessageHref } from "../lib/customerMessages";
 import { actualMinutes, deviationPercent, formatDuration, isEstimatedTiming, normMinutes } from "../lib/worktime";
 import { Button, Card, Modal, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
@@ -509,6 +510,15 @@ export default function OrderDetail() {
   }
 
   const carTitle = vehicle ? `${vehicle.make} ${vehicle.model}` : order.number;
+  const readyText = readyMessage({
+    clientName: client?.name,
+    vehicle: carTitle,
+    orderNumber: order.number,
+    serviceName: company.shortName || company.name,
+    phone: company.phone,
+  });
+  const whatsappReadyHref = client?.phone ? whatsappMessageHref(client.phone, readyText) : "";
+  const smsReadyHref = client?.phone ? smsMessageHref(client.phone, readyText) : "";
 
   /**
    * Деньги по заказу: итог, скидка, подгонка суммы и договорённость.
@@ -640,6 +650,20 @@ export default function OrderDetail() {
               <Button className="max-sm:flex-1" variant="secondary" onClick={() => handleChangeStatus("в работе")}>
                 <IconArrowBackUp size={18} /> Вернуть в работу
               </Button>
+            )}
+            {order.status === "готово" && client?.phone && (
+              <>
+                <a href={whatsappReadyHref} target="_blank" rel="noreferrer" className="max-sm:flex-1">
+                  <Button className="max-sm:w-full" variant="secondary">
+                    <IconBrandWhatsapp size={18} /> <span className="hidden sm:inline">WhatsApp</span>
+                  </Button>
+                </a>
+                <a href={smsReadyHref} className="max-sm:flex-1">
+                  <Button className="max-sm:w-full" variant="secondary">
+                    <IconMessage size={18} /> <span className="hidden sm:inline">SMS</span>
+                  </Button>
+                </a>
+              </>
             )}
             {nextStatusLabel && (
               <Button className="max-sm:flex-1" onClick={() => nextStatus && handleChangeStatus(nextStatus)}>
