@@ -102,6 +102,8 @@ export interface OrderLinePart {
   price: number;
   /** Закупочная цена на момент добавления в заказ. */
   purchasePrice?: number;
+  /** true — цену восстановили из текущего склада, а не знаем точно на дату продажи. */
+  purchasePriceEstimated?: boolean;
   availability: "in_stock" | "reserved" | "ordered";
 }
 
@@ -115,6 +117,10 @@ export interface Order {
   createdAt: string;
   completedAt?: string;
   plannedAt?: string;
+  /** Момент фактической выдачи автомобиля. */
+  issuedAt?: string;
+  /** true — дата выдачи восстановлена для старого заказа. */
+  issuedAtEstimated?: boolean;
   advisor?: string;
   works: OrderLineWork[];
   parts: OrderLinePart[];
@@ -126,6 +132,11 @@ export interface Order {
   complaint?: string;
   /** История статусов: когда машина встала на подъёмник и когда сошла. */
   timeline?: StatusEvent[];
+  /** Рабочие часы, действовавшие для этого заказа. */
+  workDayStart?: string;
+  workDayEnd?: string;
+  /** true — часы восстановлены для старого заказа. */
+  workDayEstimated?: boolean;
   diagnosis?: string;
   defects?: string;
   guaranteeMonths?: number;
@@ -194,6 +205,16 @@ export interface Expense {
 }
 
 export type ExpenseStatus = "Оплачено" | "Ожидает" | "Ждём возврат" | "Возвращено";
+
+export interface Payment {
+  id: string;
+  orderId: string;
+  /** Реальный момент приёма денег. */
+  at: string;
+  amount: number;
+  /** Старые оплаты без истории получают приблизительную дату при миграции. */
+  estimated?: boolean;
+}
 
 export interface Invoice {
   id: string;
