@@ -200,6 +200,10 @@ export interface Expense {
    * supplier_refund — возврат денег от поставщика, уменьшает расходы периода.
    */
   source?: "stock_purchase" | "payroll" | "supplier_refund";
+  /** Как реально ушли деньги. Для кассы считаем только явно указанные наличные. */
+  paymentMethod?: PaymentMethod;
+  /** Кассовая смена, в которой произошло движение денег. */
+  shiftId?: string;
   itemId?: string;
   employeeId?: string;
   /** Для возврата поставщику: пока деньги не пришли, в расчёт не идёт. */
@@ -224,8 +228,21 @@ export interface Payment {
   method?: PaymentMethod;
   /** Кто принял оплату или оформил возврат. */
   employee?: string;
+  /** Кассовая смена, открытая в момент платежа. */
+  shiftId?: string;
   /** Старые оплаты без истории получают приблизительную дату при миграции. */
   estimated?: boolean;
+}
+
+export interface CashShift {
+  id: string;
+  openedAt: string;
+  openedBy: string;
+  openingCash: number;
+  closedAt?: string;
+  closedBy?: string;
+  countedCash?: number;
+  comment?: string;
 }
 
 export interface Invoice {
