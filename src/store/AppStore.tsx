@@ -12,6 +12,7 @@ import type {
   PaymentMethod,
   Order,
   OrderStatus,
+  WorkLineStatus,
   Service,
   StockItem,
   StockMovement,
@@ -43,6 +44,7 @@ import { useAuth } from "../auth/AuthContext";
 import { LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
 import { isValidQuantity, normalizeQuantity } from "../lib/quantity";
 import { activeCashShift, cashShiftSummary } from "../lib/cashShift";
+import { transitionWorkSessions } from "../lib/workSessions";
 
 const STORAGE_KEY = LOCAL_DB_KEY;
 
@@ -259,6 +261,8 @@ interface AppStoreValue extends DB {
   deleteService: (id: string) => void;
   /** Смена статуса заказа: при выдаче списывает запчасти, при откате возвращает. */
   setOrderStatus: (id: string, status: OrderStatus) => string | null;
+  /** Старт/пауза/завершение конкретной работы механика. */
+  setWorkLineStatus: (orderId: string, workId: string, status: WorkLineStatus) => string | null;
   /** Добавить запчасть со склада в заказ (резерв, без списания остатка). */
   reservePart: (orderId: string, itemId: string, qty: number, price: number) => string | null;
   /** Убрать запчасть из заказа и снять резерв. Выданный заказ менять нельзя. */
@@ -748,6 +752,46 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           services: prev.services.map((service) => (service.id === id ? { ...service, ...patch } : service)),
         })),
       deleteService: (id) => setDB((prev) => ({ ...prev, services: prev.services.filter((service) => service.id !== id) })),
+      setWorkLineStatus: (orderId, workId, status) => {
+        let error: string | null = null;
+        setDB((prev) => {
+          const order = prev.orders.find((item) => item.id === orderId);
+          if (!order) {
+            error = "Заказ-наряд не найден";
+            return prev;
+          }
+          if (order.status === "выдан") {
+            error = "Выданный заказ менять нельзя";
+            return prev;
+          }
+          const work = order.works.find((item) => item.id === workId);
+          if (!work) {
+            error = "Работа не найдена";
+            return prev;
+          }
+          if (cloud.role === "mechanic" && work.executor !== cloud.displayName) {
+            error = "Эта работа назначена другому механику";
+            return prev;
+          }
+
+          const transition = transitionWorkSessions(work, status, nowISO());
+          const works = order.works.map((item) =>
+            item.id === workId ? { ...item, ...transition } : item,
+          );
+          const nextOrderStatus =
+            status === "in_progress" && (order.status === "запись" || order.status === "диагностика")
+              ? "в работе"
+              : order.status;
+
+          return {
+            ...prev,
+            orders: prev.orders.map((item) =>
+              item.id === orderId ? { ...item, works, status: nextOrderStatus } : item,
+            ),
+          };
+        });
+        return error;
+      },
       setOrderStatus: (id, status) => {
         let error: string | null = null;
         setDB((prev) => {
