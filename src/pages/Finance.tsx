@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   IconArrowBackUp, IconBriefcase, IconChartBar, IconChevronLeft,
-  IconChevronRight, IconCoin, IconCreditCardPay, IconPlus, IconUsers,
+  IconChevronRight, IconCoin, IconCreditCardPay, IconCash, IconPlus, IconUsers,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
@@ -12,7 +12,9 @@ import { isValidMoney, moneyInput } from "../lib/formats";
 import { Button, Card, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatMoney, plural } from "../lib/format";
 import { computePayroll } from "../lib/payroll";
-import { paymentMethodSummary } from "../lib/payments";
+import { paymentMethodLabel, paymentMethodSummary } from "../lib/payments";
+import { activeCashShift, cashShiftDifference, cashShiftSummary } from "../lib/cashShift";
+import type { PaymentMethod } from "../types";
 import { todayISO } from "../lib/date";
 import {
   buildChart, buildOperations, computeMetrics, getRange,
@@ -20,7 +22,7 @@ import {
 } from "../lib/analytics";
 
 const EXPENSE_CATEGORIES = ["Закупка запчастей", "Аренда", "Доставка", "Коммунальные услуги", "Инструмент", "Реклама", "Прочее"];
-const TABS = ["Обзор", "Операции", "Зарплаты"] as const;
+const TABS = ["Обзор", "Операции", "Касса", "Зарплаты"] as const;
 type Tab = (typeof TABS)[number];
 
 const PERIODS: { value: PeriodKey; label: string }[] = [
@@ -32,7 +34,10 @@ const PERIODS: { value: PeriodKey; label: string }[] = [
 ];
 
 export default function Finance() {
-  const { orders, expenses, payments, employees: rawEmployees, clients, addExpense, confirmRefund } = useAppStore();
+  const {
+    orders, expenses, payments, cashShifts, employees: rawEmployees, clients, cloud,
+    addExpense, confirmRefund, openCashShift, closeCashShift,
+  } = useAppStore();
   const { showToast } = useToast();
   const confirm = useConfirm();
   const navigate = useNavigate();
@@ -41,6 +46,10 @@ export default function Finance() {
   const [period, setPeriod] = useState<PeriodKey>("month");
   const [offset, setOffset] = useState(0);
   const [pickedDay, setPickedDay] = useState<number | null>(null);
+  const operatorName = cloud.displayName || rawEmployees[0]?.name || "Игорь";
+  const [openingCash, setOpeningCash] = useState("0");
+  const [countedCash, setCountedCash] = useState("");
+  const [shiftComment, setShiftComment] = useState("");
 
   const range = useMemo(() => getRange(period, offset), [period, offset]);
 
@@ -61,6 +70,15 @@ export default function Finance() {
   const methodSummary = useMemo(
     () => paymentMethodSummary(payments, range.from, range.to),
     [payments, range],
+  );
+  const currentShift = useMemo(() => activeCashShift(cashShifts), [cashShifts]);
+  const currentShiftSummary = useMemo(
+    () => currentShift ? cashShiftSummary(currentShift, payments, expenses) : null,
+    [currentShift, expenses, payments],
+  );
+  const shiftHistory = useMemo(
+    () => [...cashShifts].sort((a, b) => b.openedAt.localeCompare(a.openedAt)),
+    [cashShifts],
   );
 
   const pending = useMemo(() => pendingPayments(orders, clients), [clients, orders]);
@@ -104,6 +122,7 @@ export default function Finance() {
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [counterparty, setCounterparty] = useState("");
+  const [expenseMethod, setExpenseMethod] = useState<PaymentMethod | "">("");
 
   function resetExpenseForm() {
     setAddingExpense(false);
@@ -111,6 +130,7 @@ export default function Finance() {
     setDescription("");
     setAmount("");
     setCounterparty("");
+    setExpenseMethod("");
   }
 
   async function handleAddExpense(event: FormEvent<HTMLFormElement>) {
@@ -124,6 +144,10 @@ export default function Finance() {
       showToast("Сумма расхода должна быть больше нуля и не более 10 млн ₽", "error");
       return;
     }
+    if (!expenseMethod) {
+      showToast("Выберите способ оплаты расхода", "error");
+      return;
+    }
     const ok = await confirm({
       title: "Добавить расход",
       question: "Расход попадёт в финансы за сегодня и уменьшит прибыль периода.",
@@ -131,6 +155,7 @@ export default function Finance() {
         { label: "Категория", value: category },
         { label: "Описание", value: description.trim() },
         { label: "Поставщик", value: counterparty.trim() || "—" },
+        { label: "Оплачено", value: paymentMethodLabel(expenseMethod) },
         { label: "Сумма", value: `−${formatMoney(value)}`, total: true, tone: "danger" },
       ],
       confirmLabel: "Добавить расход",
@@ -144,9 +169,43 @@ export default function Finance() {
       amount: value,
       counterparty: counterparty.trim() || "—",
       status: "Оплачено",
+      paymentMethod: expenseMethod,
     });
     showToast(`Расход добавлен: ${formatMoney(value)}`);
     resetExpenseForm();
+  }
+
+  function handleOpenShift() {
+    const amount = Number(openingCash) || 0;
+    const error = openCashShift(amount, operatorName);
+    if (error) {
+      showToast(error, "error");
+      return;
+    }
+    setOpeningCash("0");
+    showToast("Кассовая смена открыта");
+  }
+
+  function handleCloseShift() {
+    if (!currentShift || !currentShiftSummary) return;
+    const counted = Number(countedCash);
+    if (!Number.isFinite(counted) || counted < 0) {
+      showToast("Укажите фактический остаток наличных", "error");
+      return;
+    }
+    const difference = counted - currentShiftSummary.expectedCash;
+    if (difference !== 0 && !shiftComment.trim()) {
+      showToast("При расхождении обязательно напишите причину", "error");
+      return;
+    }
+    const error = closeCashShift(currentShift.id, counted, operatorName, shiftComment);
+    if (error) {
+      showToast(error, "error");
+      return;
+    }
+    setCountedCash("");
+    setShiftComment("");
+    showToast(difference === 0 ? "Смена закрыта без расхождений" : `Смена закрыта · расхождение ${formatMoney(difference)}`);
   }
 
   function changePeriod(next: PeriodKey) {
@@ -504,6 +563,17 @@ export default function Finance() {
                   <input placeholder="Exist.ru" value={counterparty} onChange={(event) => setCounterparty(event.target.value)} aria-label="Кому платим" />
                 </div>
               </label>
+              <label className="block text-sm">
+                <span className="muted mb-1 block">Как оплатили</span>
+                <div className="field-control">
+                  <select value={expenseMethod} onChange={(event) => setExpenseMethod(event.target.value as PaymentMethod | "")}>
+                    <option value="">Выберите способ</option>
+                    <option value="cash">Наличные</option>
+                    <option value="terminal">Терминал / карта</option>
+                    <option value="transfer">Перевод / СБП</option>
+                  </select>
+                </div>
+              </label>
               <div className="flex gap-2 sm:col-span-2 lg:col-span-5 lg:justify-end">
                 <Button variant="secondary" onClick={resetExpenseForm}>Отмена</Button>
                 <Button type="submit">Добавить</Button>
@@ -551,6 +621,129 @@ export default function Finance() {
         </Card>
 
         </>
+        )}
+
+        {tab === "Касса" && (
+          <div className="space-y-3">
+            {!currentShift ? (
+              <Card>
+                <div className="flex items-start gap-3">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+                    <IconCash size={22} />
+                  </span>
+                  <div>
+                    <h2 className="panel-title">Открыть кассовую смену</h2>
+                    <p className="muted mt-1 text-sm">Укажите наличные в кассе на начало работы. Терминал и переводы считаются отдельно и на остаток ящика не влияют.</p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-[220px_1fr_auto] sm:items-end">
+                  <label className="block text-sm">
+                    <span className="muted mb-1 block">Наличные на начало, ₽</span>
+                    <div className="field-control">
+                      <input inputMode="numeric" value={openingCash} onChange={(e) => setOpeningCash(moneyInput(e.target.value))} placeholder="0" />
+                    </div>
+                  </label>
+                  <div className="rounded-lg p-3 text-sm" style={{ background: "var(--bg)" }}>
+                    <span className="muted">Открывает</span>
+                    <b className="ml-2">{operatorName}</b>
+                  </div>
+                  <Button onClick={handleOpenShift}>Открыть смену</Button>
+                </div>
+              </Card>
+            ) : (
+              <>
+                <Card>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="section-kicker">Смена открыта</p>
+                      <h2 className="panel-title mt-1">Касса с {new Date(currentShift.openedAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</h2>
+                      <p className="muted mt-1 text-xs">Открыл: {currentShift.openedBy}</p>
+                    </div>
+                    <b className="text-xl tabular-nums">{formatMoney(currentShiftSummary?.expectedCash ?? currentShift.openingCash)}</b>
+                  </div>
+                  {currentShiftSummary && (
+                    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <Row label="Начало" value={currentShift.openingCash} />
+                      <Row label="Наличными от клиентов" value={currentShiftSummary.cashPayments} tone="accent" />
+                      <Row label="Возвраты клиентам" value={-currentShiftSummary.cashRefunds} tone={currentShiftSummary.cashRefunds ? "danger" : undefined} />
+                      <Row label="Расходы наличными" value={-currentShiftSummary.cashExpenses} tone={currentShiftSummary.cashExpenses ? "danger" : undefined} />
+                      {currentShiftSummary.cashSupplierRefunds > 0 && <Row label="Возврат поставщика" value={currentShiftSummary.cashSupplierRefunds} tone="accent" />}
+                      <Row label="Терминал" value={currentShiftSummary.terminal} signed />
+                      <Row label="Перевод / СБП" value={currentShiftSummary.transfer} signed />
+                      <Row label="Ожидаемо в кассе" value={currentShiftSummary.expectedCash} tone="accent" />
+                    </div>
+                  )}
+                </Card>
+
+                <Card>
+                  <h2 className="panel-title">Закрыть смену</h2>
+                  <p className="muted mt-1 text-sm">Пересчитайте только наличные в кассе. Терминал и СБП сверяются отдельно по банку.</p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label className="block text-sm">
+                      <span className="muted mb-1 block">Фактически наличных, ₽</span>
+                      <div className="field-control">
+                        <input inputMode="numeric" value={countedCash} onChange={(e) => setCountedCash(moneyInput(e.target.value))} placeholder={String(currentShiftSummary?.expectedCash ?? 0)} />
+                      </div>
+                    </label>
+                    <label className="block text-sm">
+                      <span className="muted mb-1 block">Комментарий {countedCash && Number(countedCash) !== (currentShiftSummary?.expectedCash ?? 0) ? "к расхождению" : ""}</span>
+                      <div className="field-control">
+                        <input value={shiftComment} onChange={(e) => setShiftComment(e.target.value)} placeholder="Например: 500 ₽ оставили на мелочь / недостача" />
+                      </div>
+                    </label>
+                  </div>
+                  {countedCash && currentShiftSummary && (
+                    <div className="mt-3 rounded-lg p-3 text-sm" style={{ background: "var(--bg)" }}>
+                      <div className="flex justify-between"><span className="muted">Ожидаемо</span><b>{formatMoney(currentShiftSummary.expectedCash)}</b></div>
+                      <div className="mt-1 flex justify-between">
+                        <span className="muted">Расхождение</span>
+                        <b style={{ color: Number(countedCash) === currentShiftSummary.expectedCash ? "var(--accent)" : "var(--danger)" }}>
+                          {formatMoney(Number(countedCash) - currentShiftSummary.expectedCash)}
+                        </b>
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-4 flex justify-end">
+                    <Button onClick={handleCloseShift}>Закрыть смену</Button>
+                  </div>
+                </Card>
+              </>
+            )}
+
+            <Card className="overflow-hidden p-0">
+              <div className="border-b p-4" style={{ borderColor: "var(--border)" }}>
+                <h2 className="panel-title">История смен</h2>
+              </div>
+              <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                {shiftHistory.slice(0, 20).map((shift) => {
+                  const summary = cashShiftSummary(shift, payments, expenses);
+                  const difference = cashShiftDifference(shift, summary);
+                  return (
+                    <div key={shift.id} className="p-4 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                          <b>{formatDate(shift.openedAt)}</b>
+                          <span className="muted ml-2">{shift.openedBy}{shift.closedBy ? ` → ${shift.closedBy}` : ""}</span>
+                        </span>
+                        <b className="tabular-nums">{shift.closedAt ? formatMoney(shift.countedCash ?? 0) : "Открыта"}</b>
+                      </div>
+                      <div className="muted mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                        <span>Начало {formatMoney(shift.openingCash)}</span>
+                        <span>Ожидаемо {formatMoney(summary.expectedCash)}</span>
+                        {difference !== null && (
+                          <span style={{ color: difference === 0 ? "var(--accent)" : "var(--danger)" }}>
+                            Расхождение {formatMoney(difference)}
+                          </span>
+                        )}
+                      </div>
+                      {shift.comment && <p className="mt-1 text-xs">{shift.comment}</p>}
+                    </div>
+                  );
+                })}
+                {shiftHistory.length === 0 && <p className="muted p-4 text-sm">Кассовых смен ещё не было.</p>}
+              </div>
+            </Card>
+          </div>
         )}
 
         {tab === "Зарплаты" && (
