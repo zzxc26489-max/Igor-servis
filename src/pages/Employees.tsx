@@ -9,6 +9,7 @@ import { computePayroll, payrollBalance } from "../lib/payroll";
 import { moneyInput } from "../lib/formats";
 import type { Employee, PaymentMethod } from "../types";
 import { paymentMethodLabel } from "../lib/payments";
+import { activeCashShift } from "../lib/cashShift";
 
 function payLabel(employee: Employee) {
   if (employee.payType === "percent") return `${employee.payValue}% от работ`;
@@ -17,7 +18,7 @@ function payLabel(employee: Employee) {
 }
 
 export default function Employees() {
-  const { employees: rawEmployees, orders, payEmployee } = useAppStore();
+  const { employees: rawEmployees, orders, cashShifts, payEmployee } = useAppStore();
   const confirm = useConfirm();
   const { showToast } = useToast();
   const [payFor, setPayFor] = useState<string | null>(null);
@@ -28,6 +29,10 @@ export default function Employees() {
   const target = employees.find((employee) => employee.id === payFor) ?? null;
 
   async function handlePay(employee: Employee, amount: number, method: PaymentMethod) {
+    if (method === "cash" && !activeCashShift(cashShifts)) {
+      showToast("Для выплаты наличными сначала откройте кассовую смену в Финансах → Касса", "error");
+      return;
+    }
     if (amount <= 0) {
       showToast("Сумма выплаты должна быть больше нуля", "error");
       return;
