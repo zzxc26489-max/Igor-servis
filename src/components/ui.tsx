@@ -86,13 +86,13 @@ export function TopBar({
   return (
     <>
       <header
-        className="sticky top-0 z-30 flex min-w-0 items-center gap-2.5 border-b bg-white/95 px-3 py-2 backdrop-blur sm:gap-3 sm:px-5 print:hidden"
+        className="sticky top-0 z-30 flex min-w-0 items-center gap-2 border-b bg-white/95 px-2.5 py-1.5 backdrop-blur sm:gap-3 sm:px-5 sm:py-2 print:hidden"
         style={{ borderColor: "var(--border)" }}
       >
         <button
           onClick={() => setOpen(true)}
           aria-label="Открыть меню"
-          className="-ml-1 grid h-11 w-11 shrink-0 place-items-center rounded-lg hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] lg:hidden"
+          className="-ml-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl hover:bg-gray-100 active:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] lg:hidden"
         >
           <IconMenu2 size={22} />
         </button>
@@ -100,17 +100,17 @@ export function TopBar({
         <img
           src={company.logoDataUrl || defaultLogo}
           alt=""
-          className="h-8 w-8 shrink-0 rounded-lg object-contain ring-1 ring-black/5 lg:hidden"
+          className="h-7 w-7 shrink-0 rounded-lg object-contain ring-1 ring-black/5 lg:hidden"
         />
 
         <div className="relative min-w-0 flex-1">
-          <IconSearch className="pointer-events-none absolute left-3 top-2.5" size={18} color="var(--text-muted)" aria-hidden="true" />
+          <IconSearch className="pointer-events-none absolute left-3 top-2.5" size={17} color="var(--text-muted)" aria-hidden="true" />
           <input
             ref={inputRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Клиент, госномер, телефон или заказ"
-            className="min-h-11 w-full rounded-lg bg-transparent py-2 pl-10 pr-3 text-sm outline-none placeholder:text-[var(--text-muted)] focus:bg-[#f5f7f5] sm:min-h-10 sm:pr-12"
+            className="min-h-10 w-full rounded-xl bg-[#f4f6f5] py-2 pl-9 pr-3 text-[13px] outline-none ring-1 ring-transparent placeholder:text-[var(--text-muted)] focus:bg-white focus:ring-[var(--border)] sm:min-h-10 sm:pl-10 sm:pr-12 sm:text-sm"
             aria-label="Поиск по CRM"
           />
           <kbd
@@ -151,7 +151,7 @@ export function TopBar({
         </div>
       </header>
 
-      <div className="flex flex-wrap items-start justify-between gap-3 px-3 pt-3 sm:px-5 sm:pt-4 print:hidden">
+      <div className="flex flex-wrap items-start justify-between gap-2 px-3 pt-2.5 sm:gap-3 sm:px-5 sm:pt-4 print:hidden">
         <div className="min-w-0">
           {breadcrumbs && breadcrumbs.length > 0 && (
             <nav className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }} aria-label="Хлебные крошки">
@@ -168,14 +168,14 @@ export function TopBar({
             </nav>
           )}
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-[26px] font-bold leading-tight tracking-[-0.03em] sm:text-[30px]" style={{ color: "var(--text)" }}>
+            <h1 className="text-[22px] font-bold leading-[1.15] tracking-[-0.025em] sm:text-[30px]" style={{ color: "var(--text)" }}>
               {title}
             </h1>
             {titleChip}
           </div>
-          {subtitle && <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
+          {subtitle && <p className="mt-0.5 text-[12px] sm:mt-1 sm:text-sm" style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
         </div>
-        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 max-sm:w-full sm:shrink-0">
+        <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 sm:shrink-0 sm:gap-2">
           {actions ?? <NewRecordButton />}
         </div>
       </div>
@@ -194,13 +194,13 @@ function NewRecordButton() {
 }
 
 export function Page({ children }: { children: ReactNode }) {
-  return <main className="min-w-0 flex-1 overflow-auto overflow-x-hidden px-3 py-3 pb-5 sm:p-5 sm:pb-6 print:flex-none print:overflow-visible print:p-0">{children}</main>;
+  return <main className="min-w-0 flex-1 overflow-auto overflow-x-hidden px-2.5 py-2.5 pb-4 sm:p-5 sm:pb-6 print:flex-none print:overflow-visible print:p-0">{children}</main>;
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`rounded-xl border bg-white p-3 shadow-[0_2px_8px_rgba(23,34,30,0.045)] sm:p-4 ${className}`}
+      className={`rounded-[14px] border bg-white p-2.5 shadow-[0_2px_7px_rgba(23,34,30,0.04)] sm:rounded-xl sm:p-4 ${className}`}
       style={{ borderColor: "var(--border)" }}
     >
       {children}
@@ -251,7 +251,7 @@ export function Metric({
   const body = (
     <>
       <div className="flex items-center gap-2.5">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: palette.bg, color: palette.color }}>
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] sm:h-9 sm:w-9 sm:rounded-xl" style={{ background: palette.bg, color: palette.color }}>
           {icon}
         </span>
         <span className="min-w-0 text-left">
@@ -272,7 +272,7 @@ export function Metric({
     </>
   );
 
-  const base = "rounded-xl border bg-white p-3 shadow-[0_2px_8px_rgba(23,34,30,0.045)] sm:p-4";
+  const base = "rounded-[14px] border bg-white p-2.5 shadow-[0_2px_7px_rgba(23,34,30,0.04)] sm:rounded-xl sm:p-4";
   if (onClick) {
     return (
       <button onClick={onClick} className={`${base} text-left transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2`} style={{ borderColor: "var(--border)" }}>
@@ -300,7 +300,7 @@ export function StatusBadge({ status }: { status: string }) {
   const style = STATUS_STYLES[status] ?? { bg: "#eef0f4", text: "#5b6270" };
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-xs"
       style={{ background: style.bg, color: style.text }}
     >
       <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
@@ -330,9 +330,9 @@ export function Button({
   title?: string;
   "aria-label"?: string;
 }) {
-  const dimensions = size === "icon" ? "h-11 w-11 p-0 sm:h-9 sm:w-9" : size === "sm" ? "min-h-11 px-3 py-2 sm:min-h-9 sm:py-1.5" : "min-h-11 px-3.5 py-2 sm:min-h-9";
+  const dimensions = size === "icon" ? "h-10 w-10 p-0 sm:h-9 sm:w-9" : size === "sm" ? "min-h-10 px-2.5 py-1.5 sm:min-h-9 sm:px-3" : "min-h-[42px] px-3 py-1.5 sm:min-h-9 sm:px-3.5";
   const base =
-    `inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)] ${dimensions}`;
+    `inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-[13px] font-medium transition-colors sm:rounded-lg sm:text-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)] ${dimensions}`;
   if (variant === "danger") {
     return (
       <button
@@ -440,7 +440,7 @@ export function Modal({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4 print:hidden">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-2 sm:items-center sm:p-4 print:hidden">
       <button className="absolute inset-0 bg-black/40" aria-label="Закрыть окно" onClick={onClose} />
       <div
         ref={dialogRef}
@@ -448,9 +448,9 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative flex max-h-[calc(100dvh-.75rem)] w-full flex-col rounded-t-2xl bg-white pb-[env(safe-area-inset-bottom)] shadow-xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:pb-0 ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
+        className={`relative mb-[env(safe-area-inset-bottom)] flex max-h-[calc(100dvh-1rem-env(safe-area-inset-bottom))] w-full flex-col overflow-hidden rounded-[20px] bg-white shadow-2xl sm:mb-0 sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
       >
-        <div className="flex items-start justify-between gap-3 border-b px-4 py-3.5 sm:px-5" style={{ borderColor: "var(--border)" }}>
+        <div className="flex items-start justify-between gap-3 border-b px-3.5 py-3 sm:px-5 sm:py-3.5" style={{ borderColor: "var(--border)" }}>
           <div className="min-w-0">
             <h2 id={titleId} className="panel-title truncate">{title}</h2>
             {subtitle && <p className="muted mt-0.5 text-sm">{subtitle}</p>}
@@ -458,7 +458,7 @@ export function Modal({
           <button
             onClick={onClose}
             aria-label="Закрыть"
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-lg hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:h-9 sm:w-9"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:h-9 sm:w-9"
           >
             <IconX size={20} />
           </button>
@@ -489,16 +489,16 @@ export function ListCard({
   const inner = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <span className={`min-w-0 text-sm font-semibold ${accent ? "text-[var(--accent)]" : ""}`}>{title}</span>
-        {amount !== undefined && <span className="shrink-0 text-sm font-semibold tabular-nums">{amount}</span>}
+        <span className={`min-w-0 text-[13px] font-semibold sm:text-sm ${accent ? "text-[var(--accent)]" : ""}`}>{title}</span>
+        {amount !== undefined && <span className="shrink-0 text-[13px] font-semibold tabular-nums sm:text-sm">{amount}</span>}
       </div>
       {lines?.filter(Boolean).map((line, index) => (
-        <div key={index} className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
+        <div key={index} className="mt-0.5 text-[13px] leading-[1.35] sm:mt-1 sm:text-sm" style={{ color: "var(--text-muted)" }}>
           {line}
         </div>
       ))}
       {(badge || meta) && (
-        <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="mt-1.5 flex items-center justify-between gap-2 sm:mt-2">
           <span className="min-w-0">{badge}</span>
           {meta && <span className="shrink-0 text-xs" style={{ color: "var(--text-muted)" }}>{meta}</span>}
         </div>
@@ -506,7 +506,7 @@ export function ListCard({
     </>
   );
 
-  const className = "w-full rounded-xl border bg-white p-3 text-left shadow-[0_2px_8px_rgba(23,34,30,0.045)]";
+  const className = "w-full rounded-[14px] border bg-white p-2.5 text-left shadow-[0_2px_7px_rgba(23,34,30,0.04)] sm:rounded-xl sm:p-3";
   if (!onClick) {
     return <div className={className} style={{ borderColor: "var(--border)" }}>{inner}</div>;
   }
@@ -519,7 +519,7 @@ export function ListCard({
 
 export function EmptyState({ icon, title, hint }: { icon: ReactNode; title: string; hint?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+    <div className="flex flex-col items-center justify-center gap-1.5 py-7 text-center sm:gap-2 sm:py-10">
       <div className="grid h-12 w-12 place-items-center rounded-full bg-[#f1f3f2]" style={{ color: "var(--text-muted)" }}>
         {icon}
       </div>
