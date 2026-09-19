@@ -26,6 +26,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const OrderPrint = lazy(() => import("./pages/OrderPrint"));
 const MyWork = lazy(() => import("./pages/MyWork"));
 const Documents = lazy(() => import("./pages/Documents"));
+const Reputation = lazy(() => import("./pages/Reputation"));
 
 function RoleRoute({ path, children }: { path: string; children: ReactNode }) {
   const { cloud } = useAppStore();
@@ -62,6 +63,7 @@ function AppRoutes() {
                 <Route path="services" element={<RoleRoute path="/services"><Services /></RoleRoute>} />
                 <Route path="clients" element={<RoleRoute path="/clients"><Clients /></RoleRoute>} />
                 <Route path="clients/:clientId" element={<RoleRoute path="/clients"><ClientDetail /></RoleRoute>} />
+                <Route path="reputation" element={<RoleRoute path="/reputation"><Reputation /></RoleRoute>} />
                 <Route path="employees" element={<RoleRoute path="/employees"><Employees /></RoleRoute>} />
                 <Route path="finance" element={<RoleRoute path="/finance"><Finance /></RoleRoute>} />
                 <Route path="reports" element={<RoleRoute path="/reports"><Reports /></RoleRoute>} />
