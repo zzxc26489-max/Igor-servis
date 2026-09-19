@@ -32,3 +32,13 @@ test("atomic stock reservation migration locks shared state and checks free quan
   assert.match(sql, /'stockConflict', true/);
   assert.match(sql, /'stock_reserved'/);
 });
+
+
+test("atomic payment migration locks shared state and checks debt", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "008_atomic_order_payments.sql"), "utf8");
+  assert.match(sql, /for update/);
+  assert.match(sql, /if p_kind = 'payment' and v_total > v_debt/);
+  assert.match(sql, /if p_kind = 'refund' and v_total > v_paid/);
+  assert.match(sql, /'paymentConflict', true/);
+  assert.match(sql, /client_payment/);
+});

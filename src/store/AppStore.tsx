@@ -30,6 +30,7 @@ import { backfillTimeline } from "../lib/worktime";
 import { normalizeWorkDay, parseWorkHours, setWorkDay } from "../lib/workday";
 import { ensureLegacyPayments } from "../lib/payments";
 import {
+  applyCloudOrderPayment,
   createCloudBackup,
   listCloudAudit,
   listCloudBackups,
@@ -292,14 +293,14 @@ interface AppStoreValue extends DB {
     orderId: string,
     parts: Array<{ amount: number; method: PaymentMethod }>,
     employee?: string,
-  ) => string | null;
+  ) => Promise<string | null>;
   /** Вернуть клиенту ранее принятую оплату. */
   refundPayment: (
     orderId: string,
     amount: number,
     method: PaymentMethod,
     employee?: string,
-  ) => string | null;
+  ) => Promise<string | null>;
   /** Возврат запчасти поставщику: списывает со склада и заводит ожидание денег. */
   returnToSupplier: (input: ReturnToSupplierInput) => void;
   /** Деньги от поставщика пришли — возврат идёт в расчёты. */
@@ -1112,49 +1113,64 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return error;
       },
-      acceptPayment: (orderId, parts, employee) => {
+      acceptPayment: async (orderId, parts, employee) => {
+        const current = dbRef.current;
+        const order = current.orders.find((item) => item.id === orderId);
+        if (!order) return "Заказ-наряд не найден";
+        const normalized = parts
+          .filter((part) => Number.isFinite(part.amount) && part.amount > 0)
+          .map((part) => ({ ...part, amount: Math.round(part.amount), id: createId("pay") }));
+        const total = normalized.reduce((sum, part) => sum + part.amount, 0);
+        if (total <= 0) return "Укажите сумму хотя бы для одного способа оплаты";
+        const debt = Math.max(0, orderTotals(order).debt);
+        if (total > debt) return `Сумма оплаты больше долга на ${total - debt} ₽`;
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Оплату нужно подтвердить онлайн, чтобы исключить двойное списание долга.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальный долг: ${syncError}`;
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await applyCloudOrderPayment(session, orderId, "payment", normalized, employee);
+            const remote = migrate(result.data as DB);
+            cloudRevisionRef.current = result.revision;
+            cloudBaseRef.current = remote;
+            writeCloudBase(session.user.id, result.revision, remote);
+            rawSetDB(remote);
+            setCloud((prev) => ({
+              ...prev,
+              status: "ready",
+              revision: result.revision,
+              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+              error: undefined,
+            }));
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось подтвердить оплату";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return `Оплата не проведена: ${message}`;
+          }
+        }
+
         let error: string | null = null;
         setDB((prev) => {
-          const order = prev.orders.find((item) => item.id === orderId);
-          if (!order) {
-            error = "Заказ-наряд не найден";
-            return prev;
-          }
-          const normalized = parts
-            .filter((part) => Number.isFinite(part.amount) && part.amount > 0)
-            .map((part) => ({ ...part, amount: Math.round(part.amount) }));
-          const total = normalized.reduce((sum, part) => sum + part.amount, 0);
+          const localOrder = prev.orders.find((item) => item.id === orderId);
+          if (!localOrder) { error = "Заказ-наряд не найден"; return prev; }
           const shift = activeCashShift(prev.cashShifts);
           if (normalized.some((part) => part.method === "cash") && !shift) {
             error = "Для оплаты наличными сначала откройте кассовую смену в Финансах → Касса";
             return prev;
           }
-          if (total <= 0) {
-            error = "Укажите сумму хотя бы для одного способа оплаты";
-            return prev;
-          }
-          const debt = Math.max(0, orderTotals(order).debt);
-          if (total > debt) {
-            error = `Сумма оплаты больше долга на ${total - debt} ₽`;
-            return prev;
-          }
+          const currentDebt = Math.max(0, orderTotals(localOrder).debt);
+          if (total > currentDebt) { error = `Сумма оплаты больше долга на ${total - currentDebt} ₽`; return prev; }
           const at = nowISO();
-          const shiftId = shift?.id;
           return {
             ...prev,
-            orders: prev.orders.map((item) =>
-              item.id === orderId ? { ...item, paid: (item.paid ?? 0) + total } : item,
-            ),
+            orders: prev.orders.map((item) => item.id === orderId ? { ...item, paid: (item.paid ?? 0) + total } : item),
             payments: [
               ...normalized.map((part) => ({
-                id: createId("pay"),
-                orderId,
-                at,
-                amount: part.amount,
-                kind: "payment" as const,
-                method: part.method,
-                employee: employee?.trim() || order.advisor || undefined,
-                shiftId,
+                id: part.id, orderId, at, amount: part.amount, kind: "payment" as const, method: part.method,
+                employee: employee?.trim() || localOrder.advisor || undefined, shiftId: shift?.id,
               })),
               ...prev.payments,
             ],
@@ -1162,49 +1178,59 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return error;
       },
-      refundPayment: (orderId, amount, method, employee) => {
+      refundPayment: async (orderId, amount, method, employee) => {
+        const current = dbRef.current;
+        const order = current.orders.find((item) => item.id === orderId);
+        if (!order) return "Заказ-наряд не найден";
+        const accepted = Math.round(amount);
+        if (!Number.isFinite(accepted) || accepted <= 0) return "Сумма возврата должна быть больше нуля";
+        const paid = Math.max(0, order.paid ?? 0);
+        if (accepted > paid) return `Вернуть можно не больше уже оплаченных ${paid} ₽`;
+        const entry = [{ id: createId("pay"), amount: accepted, method }];
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Возврат нужно подтвердить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальную оплату: ${syncError}`;
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await applyCloudOrderPayment(session, orderId, "refund", entry, employee);
+            const remote = migrate(result.data as DB);
+            cloudRevisionRef.current = result.revision;
+            cloudBaseRef.current = remote;
+            writeCloudBase(session.user.id, result.revision, remote);
+            rawSetDB(remote);
+            setCloud((prev) => ({
+              ...prev,
+              status: "ready",
+              revision: result.revision,
+              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+              error: undefined,
+            }));
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось подтвердить возврат";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return `Возврат не проведён: ${message}`;
+          }
+        }
+
         let error: string | null = null;
         setDB((prev) => {
-          const order = prev.orders.find((item) => item.id === orderId);
-          if (!order) {
-            error = "Заказ-наряд не найден";
-            return prev;
-          }
-          const accepted = Math.round(amount);
+          const localOrder = prev.orders.find((item) => item.id === orderId);
+          if (!localOrder) { error = "Заказ-наряд не найден"; return prev; }
           const shift = activeCashShift(prev.cashShifts);
-          if (method === "cash" && !shift) {
-            error = "Для возврата наличными сначала откройте кассовую смену в Финансах → Касса";
-            return prev;
-          }
-          if (!Number.isFinite(accepted) || accepted <= 0) {
-            error = "Сумма возврата должна быть больше нуля";
-            return prev;
-          }
-          const paid = Math.max(0, order.paid ?? 0);
-          if (accepted > paid) {
-            error = `Вернуть можно не больше уже оплаченных ${paid} ₽`;
-            return prev;
-          }
+          if (method === "cash" && !shift) { error = "Для возврата наличными сначала откройте кассовую смену в Финансах → Касса"; return prev; }
+          const localPaid = Math.max(0, localOrder.paid ?? 0);
+          if (accepted > localPaid) { error = `Вернуть можно не больше уже оплаченных ${localPaid} ₽`; return prev; }
           const at = nowISO();
-          const shiftId = shift?.id;
           return {
             ...prev,
-            orders: prev.orders.map((item) =>
-              item.id === orderId ? { ...item, paid: Math.max(0, paid - accepted) } : item,
-            ),
-            payments: [
-              {
-                id: createId("pay"),
-                orderId,
-                at,
-                amount: accepted,
-                kind: "refund" as const,
-                method,
-                employee: employee?.trim() || order.advisor || undefined,
-                shiftId,
-              },
-              ...prev.payments,
-            ],
+            orders: prev.orders.map((item) => item.id === orderId ? { ...item, paid: Math.max(0, localPaid - accepted) } : item),
+            payments: [{
+              id: entry[0].id, orderId, at, amount: accepted, kind: "refund" as const, method,
+              employee: employee?.trim() || localOrder.advisor || undefined, shiftId: shift?.id,
+            }, ...prev.payments],
           };
         });
         return error;
