@@ -45,6 +45,8 @@ import { LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
 import { isValidQuantity, normalizeQuantity } from "../lib/quantity";
 import { activeCashShift, cashShiftSummary } from "../lib/cashShift";
 import { transitionWorkSessions } from "../lib/workSessions";
+import { createBackupJson, inspectBackupJson } from "../lib/backup";
+import { APP_VERSION, DB_VERSION } from "../data/version";
 
 const STORAGE_KEY = LOCAL_DB_KEY;
 
@@ -1218,11 +1220,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         return error;
       },
       resetToSeed: () => rawSetDB(migrate(seedDB())),
-      exportDB: () => JSON.stringify(db, null, 2),
+      exportDB: () => createBackupJson(db as unknown as Record<string, unknown>, {
+        appVersion: APP_VERSION,
+        dbVersion: DB_VERSION,
+      }),
       importDB: (json) => {
+        const inspected = inspectBackupJson(json);
+        if (!inspected) return false;
         try {
-          const parsed = JSON.parse(json) as Partial<DB>;
-          if (!Array.isArray(parsed.orders) || !Array.isArray(parsed.clients)) return false;
+          const parsed = inspected.data as Partial<DB>;
           rawSetDB(migrate({
             ...seedDB(),
             demo: false,
