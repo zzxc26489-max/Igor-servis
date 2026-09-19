@@ -933,7 +933,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        const vehicle = { ...rebasePatch(current, delta), id, clientId: current.clientId };
         const plateKey = vehicle.plate.replace(/[\s-]/g, "").toUpperCase();
         const vinKey = vehicle.vin?.replace(/[\s-]/g, "").toUpperCase();
         const duplicate = dbRef.current.vehicles.find((item) =>
@@ -972,6 +971,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        const vehicle = { ...rebasePatch(current, delta), id, clientId: current.clientId };
         const plateKey = vehicle.plate.replace(/[\s-]/g, "").toUpperCase();
         const vinKey = vehicle.vin?.replace(/[\s-]/g, "").toUpperCase();
         const duplicate = dbRef.current.vehicles.find((item) =>
