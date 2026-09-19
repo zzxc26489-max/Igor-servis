@@ -99,11 +99,12 @@ test("lazy route failures never become a blank screen", () => {
   assert.match(boundary, /window\.location\.reload\(\)/);
 });
 
-test("production build requires explicit Supabase configuration", () => {
+test("production build rejects partial or invalid Supabase configuration", () => {
   const config = readFileSync(join(process.cwd(), "vite.config.ts"), "utf8");
   assert.match(config, /mode === 'production'/);
-  assert.match(config, /valid HTTPS VITE_SUPABASE_URL/);
-  assert.match(config, /VITE_SUPABASE_ANON_KEY/);
+  assert.match(config, /hasUrl !== hasKey/);
+  assert.match(config, /both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, or neither for local-only mode/);
+  assert.match(config, /valid HTTPS URL/);
 });
 
 test("blocked Web Storage cannot crash AuthProvider initialization", () => {
