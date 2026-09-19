@@ -16,17 +16,21 @@ import {
   FOREIGN_PLATE_HINT,
   RU_PLATE_HINT,
   formatPhone,
+  VIN_HINT,
   isValidMileage,
   isValidPhone,
   isValidPlate,
+  isValidVin,
   looksRussian,
   normalizePlate,
+  normalizeVin,
   type PlateKind,
 } from "../lib/formats";
 import { CODE_PREFIX, useAppStore } from "../store/AppStore";
 import { createId, nextCode } from "../lib/id";
 import { todayISO } from "../lib/date";
 import { SLOT_MINUTES, fromMinutes, isSlotFree, liftState, toMinutes } from "../lib/lift";
+import { findClientByPhone, findVehicleByPlate, findVehicleByVin } from "../lib/dataIntegrity";
 
 const today = todayISO();
 
@@ -54,6 +58,7 @@ export default function NewOrder() {
   );
   const [touched, setTouched] = useState(false);
   const [mileage, setMileage] = useState(presetVehicle?.mileage ? String(presetVehicle.mileage) : "");
+  const [vin, setVin] = useState(presetVehicle?.vin ?? "");
   const presetDate = searchParams.get("date");
   const presetTime = searchParams.get("time");
   const presetLift = searchParams.get("lift");
@@ -101,6 +106,7 @@ export default function NewOrder() {
     setModel(vehicle?.model ?? "");
     setPlate(vehicle?.plate ?? "");
     setMileage(vehicle?.mileage ? String(vehicle.mileage) : "");
+    setVin(vehicle?.vin ?? "");
     setPlateKind(vehicle?.plate && !looksRussian(vehicle.plate) ? "foreign" : "ru");
   }
 
@@ -121,6 +127,7 @@ export default function NewOrder() {
       setModel("");
       setPlate("");
       setMileage("");
+      setVin("");
       setPlateKind("ru");
     }
   }
@@ -135,6 +142,7 @@ export default function NewOrder() {
     setModel("");
     setPlate("");
     setMileage("");
+    setVin("");
     setPlateKind("ru");
     setError("");
   }
@@ -156,17 +164,28 @@ export default function NewOrder() {
       setError(plateKind === "ru" ? `Проверьте госномер. ${RU_PLATE_HINT}` : `Проверьте госномер. ${FOREIGN_PLATE_HINT}`);
       return;
     }
+    if (vin.trim() && !isValidVin(vin)) {
+      setError(`VIN указан неверно: ${VIN_HINT}`);
+      return;
+    }
     if (!isValidMileage(mileage)) {
       setError("Пробег должен быть больше нуля и меньше 2 000 000 км.");
       return;
     }
 
     const normalizedPlate = normalizePlate(plate, plateKind);
-    const duplicate = !existingVehicleId
-      && vehicles.find((item) => normalizePlate(item.plate, looksRussian(item.plate) ? "ru" : "foreign") === normalizedPlate);
+    const normalizedVin = normalizeVin(vin);
+    const duplicate = !existingVehicleId ? findVehicleByPlate(vehicles, normalizedPlate) : undefined;
     if (duplicate) {
       const owner = clients.find((item) => item.id === duplicate.clientId);
       setError(`Автомобиль с номером ${duplicate.plate} уже есть в базе${owner ? ` — владелец ${owner.name}` : ""}. Найдите клиента по госномеру выше.`);
+      return;
+    }
+
+    const duplicateVin = !existingVehicleId && normalizedVin ? findVehicleByVin(vehicles, normalizedVin) : undefined;
+    if (duplicateVin) {
+      const owner = clients.find((item) => item.id === duplicateVin.clientId);
+      setError(`Автомобиль с VIN ${normalizedVin} уже есть в базе${owner ? ` — владелец ${owner.name}` : ""}. Найдите клиента по VIN через поиск выше.`);
       return;
     }
 
@@ -179,7 +198,7 @@ export default function NewOrder() {
       return;
     }
 
-    const samePhone = !existingClientId && clients.find((item) => item.phone.replace(/\D/g, "") === phone.replace(/\D/g, ""));
+    const samePhone = !existingClientId ? findClientByPhone(clients, phone) : undefined;
     if (samePhone) {
       setError(`Клиент с таким телефоном уже есть: ${samePhone.name}. Найдите его через поиск выше.`);
       return;
@@ -202,6 +221,7 @@ export default function NewOrder() {
         { label: "Клиент", value: `${clientName.trim()}${existingClientId ? "" : " (новый)"}` },
         { label: "Телефон", value: phone.trim() },
         { label: "Автомобиль", value: `${make.trim()} ${model.trim()} · ${normalizedPlate}${existingVehicleId ? "" : " (новый)"}` },
+        ...(normalizedVin ? [{ label: "VIN", value: normalizedVin }] : []),
         { label: "Дата и время", value: `${date}, ${time}–${endTime}` },
         { label: "Подъёмник", value: selectedLift?.name ?? "не назначен" },
       ],
@@ -231,6 +251,7 @@ export default function NewOrder() {
             make: make.trim(),
             model: model.trim(),
             plate: normalizedPlate,
+            vin: normalizedVin || vehicle.vin,
             mileage: mileage ? Number(mileage) : vehicle.mileage,
           } : vehicle)
         : [...previous.vehicles, {
@@ -240,6 +261,7 @@ export default function NewOrder() {
             make: make.trim(),
             model: model.trim(),
             plate: normalizedPlate,
+            vin: normalizedVin || undefined,
             mileage: mileage ? Number(mileage) : undefined,
           }],
       orders: [...previous.orders, {
@@ -298,7 +320,7 @@ export default function NewOrder() {
                       <input
                         value={clientQuery}
                         onChange={(event) => setClientQuery(event.target.value)}
-                        placeholder="Имя, телефон или госномер"
+                        placeholder="Имя, телефон, госномер или VIN"
                         className="w-full rounded-lg border bg-white py-2.5 pl-10 pr-10 text-sm outline-none focus:border-[var(--accent)]"
                         style={{ borderColor: "var(--border)" }}
                         aria-label="Поиск клиента"
@@ -385,6 +407,7 @@ export default function NewOrder() {
                           setModel("");
                           setPlate("");
                           setMileage("");
+                          setVin("");
                           setPlateKind("ru");
                         }
                       }}
@@ -410,6 +433,13 @@ export default function NewOrder() {
                     onKindChange={setPlateKind}
                     touched={touched}
                   />
+                  <Field
+                    label="VIN"
+                    hint={VIN_HINT}
+                    error={touched && vin.trim() && !isValidVin(vin) ? `Введено ${normalizeVin(vin).length} из 17 знаков` : undefined}
+                  >
+                    <input value={vin} onChange={(event) => setVin(normalizeVin(event.target.value))} className="uppercase" placeholder="XWEPH81ADMN123456" />
+                  </Field>
                   <Field
                     label="Пробег, км"
                     error={touched && !isValidMileage(mileage) ? "От 1 до 2 000 000 км" : undefined}
