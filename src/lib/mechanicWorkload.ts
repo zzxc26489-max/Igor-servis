@@ -1,4 +1,4 @@
-import type { Order } from "../types.ts";
+import type { Employee, Order } from "../types.ts";
 import { effectiveWorkStatus } from "./workSessions.ts";
 
 export interface MechanicWorkload {
@@ -37,4 +37,26 @@ export function mechanicWorkloadLabel(load: MechanicWorkload) {
     return `${load.activeWorks} активн. · ${load.runningWorks} сейчас`;
   }
   return `${load.activeWorks} активн.`;
+}
+
+
+/** Только сотрудники с явной ролью механика могут получать ремонтные работы. */
+export function isMechanicEmployee(employee: Employee) {
+  return employee.role.toLocaleLowerCase("ru-RU").includes("механик");
+}
+
+/**
+ * Кандидаты на работу: только механики, сначала наименее загруженные.
+ * keepName сохраняет текущего исполнителя в списке при редактировании старых данных.
+ */
+export function mechanicCandidates(employees: Employee[], orders: Order[], keepName?: string) {
+  return employees
+    .filter((employee) => isMechanicEmployee(employee) || employee.name === keepName)
+    .map((employee) => ({ employee, load: mechanicWorkload(orders, employee.name) }))
+    .sort((a, b) => {
+      if (a.load.runningWorks !== b.load.runningWorks) return a.load.runningWorks - b.load.runningWorks;
+      if (a.load.activeWorks !== b.load.activeWorks) return a.load.activeWorks - b.load.activeWorks;
+      if (a.load.remainingNormMinutes !== b.load.remainingNormMinutes) return a.load.remainingNormMinutes - b.load.remainingNormMinutes;
+      return a.employee.name.localeCompare(b.employee.name, "ru");
+    });
 }
