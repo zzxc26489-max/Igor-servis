@@ -24,3 +24,26 @@ test("pages deployment safely force-syncs after squash merges and manual main di
   assert.match(workflow, /Dependency audit \(non-blocking for Pages\)/);
   assert.match(workflow, /continue-on-error: true/);
 });
+
+
+test("cloud backup import cannot overwrite an initialized shared database", () => {
+  const store = readFileSync(join(process.cwd(), "src", "store", "AppStore.tsx"), "utf8");
+  const settings = readFileSync(join(process.cwd(), "src", "pages", "Settings.tsx"), "utf8");
+  assert.match(store, /importDB: \(json\) => \{[\s\S]*cloudConfigured && cloud\.status !== "needs_upload"[\s\S]*return false/);
+  assert.match(settings, /JSON-восстановление отключено для общей базы/);
+  assert.match(settings, /!cloud\.configured \|\| cloud\.status === "needs_upload"/);
+});
+
+test("order media metadata is server-confirmed before storage deletion", () => {
+  const store = readFileSync(join(process.cwd(), "src", "store", "AppStore.tsx"), "utf8");
+  const panel = readFileSync(join(process.cwd(), "src", "components", "OrderMediaPanel.tsx"), "utf8");
+  assert.match(store, /appendOrderMedia: async[\s\S]*await pushCloudState\(candidate\)[\s\S]*rawSetDB\(confirmed\)/);
+  assert.match(store, /removeOrderMedia: async[\s\S]*await pushCloudState\(candidate\)[\s\S]*rawSetDB\(confirmed\)/);
+  assert.match(panel, /await removeOrderMedia\(order\.id, item\.id\)[\s\S]*await deleteCloudOrderMedia/);
+});
+
+test("route pages are code-split for faster initial load", () => {
+  const app = readFileSync(join(process.cwd(), "src", "App.tsx"), "utf8");
+  assert.match(app, /lazy\(\(\) => import\("\.\/pages\/Dashboard"\)\)/);
+  assert.match(app, /<Suspense /);
+});
