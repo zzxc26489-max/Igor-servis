@@ -60,7 +60,7 @@ export interface CloudStockReserveInput {
 
 export type CloudPaymentResult =
   | { ok: true; revision: number; updatedAt?: string; data: unknown }
-  | { ok: false; paymentConflict: true; revision: number; message: string; data: unknown };
+  | { ok: false; paymentConflict: true; revision: number; message: string; data: unknown; updatedAt?: string };
 
 export interface CloudPaymentEntry {
   id: string;
