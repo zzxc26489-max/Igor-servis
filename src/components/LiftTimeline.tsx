@@ -142,12 +142,12 @@ export default function LiftTimeline({
                 <div className="relative z-10 min-w-0 py-3">
                   {dayOrders.map((order, index) => {
                     const start = toMinutes(order.scheduledStart ?? scale[0]);
-                    const end = toMinutes(order.scheduledEnd ?? scale[0]) || start + 60;
+                    const end = order.scheduledEnd ? toMinutes(order.scheduledEnd) : start + 60;
                     const client = clients.find((item) => item.id === order.clientId);
                     const vehicle = vehicles.find((item) => item.id === order.vehicleId);
                     const palette = PALETTE[index % PALETTE.length];
                     const left = Math.max(0, percent(start));
-                    const width = Math.max(0, Math.min(100 - left, percent(end) - percent(start)));
+                    const width = Math.max(0, Math.min(100 - left, Math.max(8, percent(end) - percent(start))));
 
                     return (
                       <Link
