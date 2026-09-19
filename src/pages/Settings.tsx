@@ -72,14 +72,14 @@ export default function Settings() {
     },
     {
       label: "Серверные миграции",
-      ok: !cloud.configured || !serverMigrationChecked || (serverMigration ?? 0) >= 13,
+      ok: !cloud.configured || !serverMigrationChecked || (serverMigration ?? 0) >= 14,
       detail: !cloud.configured
         ? "Проверка не нужна без Supabase"
         : !serverMigrationChecked
           ? "Проверяем версию серверной схемы…"
           : serverMigration !== null
             ? `Версия ${serverMigration} · актуально`
-            : "Схема устарела: выполните миграции 007–013 по порядку",
+            : "Схема устарела: выполните миграции 007–014 по порядку",
     },
     {
       label: "Резервная копия",

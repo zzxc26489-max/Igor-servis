@@ -33,6 +33,7 @@ import {
   applyCloudOrderPayment,
   closeCloudCashShift,
   createCloudBackup,
+  deleteCloudVehicle,
   createCloudOrder,
   listCloudAudit,
   listCloudBackups,
@@ -43,6 +44,7 @@ import {
   returnCloudStockSupplier,
   reserveCloudStockPart,
   saveCloudState,
+  saveCloudVehicle,
   type CloudAuditInfo,
   type CloudBackupInfo,
   type CloudRole,
@@ -292,9 +294,9 @@ interface AppStoreValue extends DB {
   deleteOrder: (id: string) => string | null;
   addClient: (client: Client) => void;
   updateClient: (id: string, patch: Partial<Client>) => void;
-  addVehicle: (vehicle: Vehicle) => void;
-  updateVehicle: (id: string, patch: Partial<Vehicle>) => void;
-  deleteVehicle: (id: string) => void;
+  addVehicle: (vehicle: Vehicle) => Promise<string | null>;
+  updateVehicle: (id: string, patch: Partial<Vehicle>) => Promise<string | null>;
+  deleteVehicle: (id: string) => Promise<string | null>;
   addStockMovement: (m: StockMovement) => void;
   updateStockItem: (id: string, patch: Partial<StockItem>) => void;
   receiveStock: (input: ReceiveStockInput) => Promise<string | null>;
@@ -776,17 +778,130 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ...prev,
           clients: prev.clients.map((c) => (c.id === id ? { ...c, ...patch } : c)),
         })),
-      addVehicle: (vehicle) =>
+      addVehicle: async (vehicle) => {
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Автомобиль нужно сохранить онлайн, чтобы исключить дубли госномера/VIN.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальную базу: ${syncError}`;
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await saveCloudVehicle(session, vehicle, true);
+            const remote = migrate(result.data as DB);
+            cloudRevisionRef.current = result.revision;
+            cloudBaseRef.current = remote;
+            writeCloudBase(session.user.id, result.revision, remote);
+            rawSetDB(remote);
+            setCloud((prev) => ({
+              ...prev,
+              status: "ready",
+              revision: result.revision,
+              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+              error: undefined,
+            }));
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось сохранить автомобиль";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
+        const plateKey = vehicle.plate.replace(/[\s-]/g, "").toUpperCase();
+        const vinKey = vehicle.vin?.replace(/[\s-]/g, "").toUpperCase();
+        const duplicate = dbRef.current.vehicles.find((item) =>
+          item.plate.replace(/[\s-]/g, "").toUpperCase() === plateKey
+          || (vinKey && item.vin?.replace(/[\s-]/g, "").toUpperCase() === vinKey)
+        );
+        if (duplicate) return `Автомобиль ${duplicate.plate} уже есть в базе`;
+
         setDB((prev) => ({
           ...prev,
           vehicles: [...prev.vehicles, { ...vehicle, code: vehicle.code ?? nextCode(CODE_PREFIX.vehicle, prev.vehicles.map((item) => item.code)) }],
-        })),
-      updateVehicle: (id, patch) =>
+        }));
+        return null;
+      },
+      updateVehicle: async (id, patch) => {
+        const current = dbRef.current.vehicles.find((item) => item.id === id);
+        if (!current) return "Автомобиль не найден";
+        const vehicle = { ...current, ...patch, id, clientId: current.clientId };
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Изменение автомобиля нужно подтвердить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальную базу: ${syncError}`;
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await saveCloudVehicle(session, vehicle, false);
+            const remote = migrate(result.data as DB);
+            cloudRevisionRef.current = result.revision;
+            cloudBaseRef.current = remote;
+            writeCloudBase(session.user.id, result.revision, remote);
+            rawSetDB(remote);
+            setCloud((prev) => ({
+              ...prev,
+              status: "ready",
+              revision: result.revision,
+              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+              error: undefined,
+            }));
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось обновить автомобиль";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
+        const plateKey = vehicle.plate.replace(/[\s-]/g, "").toUpperCase();
+        const vinKey = vehicle.vin?.replace(/[\s-]/g, "").toUpperCase();
+        const duplicate = dbRef.current.vehicles.find((item) =>
+          item.id !== id && (
+            item.plate.replace(/[\s-]/g, "").toUpperCase() === plateKey
+            || (vinKey && item.vin?.replace(/[\s-]/g, "").toUpperCase() === vinKey)
+          )
+        );
+        if (duplicate) return `Автомобиль ${duplicate.plate} уже есть в базе`;
+
         setDB((prev) => ({
           ...prev,
-          vehicles: prev.vehicles.map((v) => (v.id === id ? { ...v, ...patch } : v)),
-        })),
-      deleteVehicle: (id) => setDB((prev) => ({ ...prev, vehicles: prev.vehicles.filter((v) => v.id !== id) })),
+          vehicles: prev.vehicles.map((item) => item.id === id ? vehicle : item),
+        }));
+        return null;
+      },
+      deleteVehicle: async (id) => {
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Удаление автомобиля нужно подтвердить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальную базу: ${syncError}`;
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await deleteCloudVehicle(session, id);
+            const remote = migrate(result.data as DB);
+            cloudRevisionRef.current = result.revision;
+            cloudBaseRef.current = remote;
+            writeCloudBase(session.user.id, result.revision, remote);
+            rawSetDB(remote);
+            setCloud((prev) => ({
+              ...prev,
+              status: "ready",
+              revision: result.revision,
+              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+              error: undefined,
+            }));
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось удалить автомобиль";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
+        if (dbRef.current.orders.some((order) => order.vehicleId === id)) {
+          return "По этому автомобилю уже есть заказ-наряды, удалить его нельзя";
+        }
+        setDB((prev) => ({ ...prev, vehicles: prev.vehicles.filter((item) => item.id !== id) }));
+        return null;
+      },
       addStockMovement: (m) =>
         setDB((prev) => ({ ...prev, stockMovements: [m, ...prev.stockMovements] })),
       updateStockItem: (id, patch) =>
