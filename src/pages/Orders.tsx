@@ -251,8 +251,8 @@ export default function Orders() {
                   lines={[
                     client?.name,
                     `${vehicle?.make ?? ""} ${vehicle?.model ?? ""} · ${vehicle?.plate ?? ""}`,
-                    <span className="muted">Визит {visitLabel(order)}</span>,
-                    debt > 0 ? <span style={{ color: "var(--danger)" }}>Долг {formatMoney(debt)}</span> : null,
+                    <span key="visit" className="muted">Визит {visitLabel(order)}</span>,
+                    debt > 0 ? <span key="debt" style={{ color: "var(--danger)" }}>Долг {formatMoney(debt)}</span> : null,
                   ]}
                   badge={<StatusBadge status={order.status} />}
                 />
