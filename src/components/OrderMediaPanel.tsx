@@ -69,7 +69,7 @@ export default function OrderMediaPanel({
   compact?: boolean;
   defaultKind?: OrderMediaKind;
 }) {
-  const { updateOrder, cloud } = useAppStore();
+  const { appendOrderMedia, removeOrderMedia, cloud } = useAppStore();
   const { configured, session } = useAuth();
   const { showToast } = useToast();
   const confirm = useConfirm();
@@ -137,9 +137,22 @@ export default function OrderMediaPanel({
     }
 
     if (added.length) {
-      updateOrder(order.id, { media: [...(order.media ?? []), ...added] });
-      setNote("");
-      showToast(`Добавлено файлов: ${added.length}`);
+      const saveError = await appendOrderMedia(order.id, added);
+      if (saveError) {
+        for (const item of added) {
+          if (item.storagePath && session) {
+            try {
+              await deleteCloudOrderMedia(session, item.storagePath);
+            } catch {
+              // Cleanup is best-effort; the metadata was not confirmed by the server.
+            }
+          }
+        }
+        errors.push(saveError);
+      } else {
+        setNote("");
+        showToast(`Добавлено файлов: ${added.length}`);
+      }
     }
     if (errors.length) showToast(errors[0], "error");
     if (fileRef.current) fileRef.current.value = "";
@@ -165,8 +178,19 @@ export default function OrderMediaPanel({
     if (!ok) return;
 
     try {
-      if (item.storagePath && session) await deleteCloudOrderMedia(session, item.storagePath);
-      updateOrder(order.id, { media: (order.media ?? []).filter((entry) => entry.id !== item.id) });
+      const saveError = await removeOrderMedia(order.id, item.id);
+      if (saveError) {
+        showToast(saveError, "error");
+        return;
+      }
+      if (item.storagePath && session) {
+        try {
+          await deleteCloudOrderMedia(session, item.storagePath);
+        } catch {
+          showToast("Запись удалена из заказа, но файл не удалось удалить из хранилища. Его можно очистить позже.", "error");
+          return;
+        }
+      }
       showToast("Файл удалён");
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : "Не удалось удалить файл", "error");
