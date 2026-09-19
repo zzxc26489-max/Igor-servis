@@ -1,6 +1,6 @@
-import type { Lift, Order } from "../types";
-import { shiftISODate, toISODate, todayISO } from "./date";
-import { minutesToTime, timeToMinutes, workDay } from "./workday";
+import type { Lift, Order } from "../types.ts";
+import { shiftISODate, toISODate, todayISO } from "./date.ts";
+import { minutesToTime, timeToMinutes, workDay } from "./workday.ts";
 
 export const toMinutes = timeToMinutes;
 export const fromMinutes = minutesToTime;
