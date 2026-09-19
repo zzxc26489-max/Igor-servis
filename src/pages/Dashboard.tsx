@@ -30,6 +30,9 @@ export default function Dashboard() {
   const inWork = orders.filter((order) => order.status === "в работе" || order.status === "диагностика");
   const ready = orders.filter((order) => order.status === "готово");
   const waitingParts = orders.filter((order) => order.status === "ожидает запчасти");
+  const debtOrders = orders
+    .filter((order) => order.status === "выдан" && orderTotals(order).debt > 0)
+    .sort((a, b) => orderTotals(b).debt - orderTotals(a).debt);
   const liftStates = useMemo(
     () => lifts.map((lift) => ({ lift, state: liftState(orders, lift, today) })),
     [lifts, orders, today],
@@ -47,14 +50,17 @@ export default function Dashboard() {
   const maintenanceReminders = useMemo(() => serviceReminders(vehicles).slice(0, 6), [vehicles]);
 
   const attention = useMemo(() => {
-    const result: { order: Order; kind: "ready" | "parts" | "lift" }[] = [];
+    const result: { order: Order; kind: "ready" | "parts" | "lift" | "debt" }[] = [];
     ready.forEach((order) => result.push({ order, kind: "ready" }));
     waitingParts.forEach((order) => result.push({ order, kind: "parts" }));
     unassigned.forEach((order) => {
       if (!result.some((item) => item.order.id === order.id)) result.push({ order, kind: "lift" });
     });
+    debtOrders.forEach((order) => {
+      if (!result.some((item) => item.order.id === order.id)) result.push({ order, kind: "debt" });
+    });
     return result.slice(0, 6);
-  }, [ready, unassigned, waitingParts]);
+  }, [debtOrders, ready, unassigned, waitingParts]);
 
   const fullDate = new Intl.DateTimeFormat("ru-RU", {
     weekday: "long",
@@ -198,7 +204,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between gap-3 p-4">
               <div>
                 <h2 className="panel-title">Требуют действия</h2>
-                <p className="muted mt-0.5 text-xs">Выдача, детали и визиты без подъёмника</p>
+                <p className="muted mt-0.5 text-xs">Выдача, детали, долги и визиты без подъёмника</p>
               </div>
               <span className="rounded-md px-2 py-0.5 text-xs font-semibold" style={{ background: "var(--bg)", color: "var(--text-muted)" }}>{attention.length}</span>
             </div>
@@ -210,21 +216,39 @@ export default function Dashboard() {
                 {attention.map(({ order, kind }) => {
                   const client = clients.find((item) => item.id === order.clientId);
                   const vehicle = vehicles.find((item) => item.id === order.vehicleId);
-                  const { due } = orderTotals(order);
-                  const label = kind === "parts" ? "Ждём детали" : kind === "lift" ? "Без подъёмника" : "К выдаче";
-                  const color = kind === "parts" ? "var(--warning)" : kind === "lift" ? "var(--danger)" : "var(--accent-strong)";
-                  const bg = kind === "parts" ? "#fdf3e0" : kind === "lift" ? "#fff3f3" : "var(--accent-soft)";
+                  const { due, debt } = orderTotals(order);
+                  const label = kind === "parts"
+                    ? "Ждём детали"
+                    : kind === "lift"
+                      ? "Без подъёмника"
+                      : kind === "debt"
+                        ? "Ожидаем оплату"
+                        : "К выдаче";
+                  const color = kind === "parts"
+                    ? "var(--warning)"
+                    : kind === "lift" || kind === "debt"
+                      ? "var(--danger)"
+                      : "var(--accent-strong)";
+                  const bg = kind === "parts"
+                    ? "#fdf3e0"
+                    : kind === "lift" || kind === "debt"
+                      ? "#fff3f3"
+                      : "var(--accent-soft)";
 
                   return (
                     <div key={order.id} className="p-4">
                       <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: bg, color }}>
-                        {kind === "lift" && <IconAlertTriangle size={13} />}
+                        {(kind === "lift" || kind === "debt") && <IconAlertTriangle size={13} />}
                         {label}
                       </span>
                       <Link to={`/orders/${order.id}`} className="mt-2 block text-base font-bold hover:text-[var(--accent)]">{vehicle ? `${vehicle.make} ${vehicle.model}` : order.number}</Link>
                       <p className="muted text-sm">{vehicle?.plate ?? client?.name}</p>
                       <div className="mt-2 flex items-center justify-between gap-3">
-                        {kind === "ready" ? <b className="text-sm">{formatMoney(due)}</b> : <span className="muted text-xs">{order.scheduledStart ?? order.number}</span>}
+                        {kind === "ready"
+                          ? <b className="text-sm">{formatMoney(due)}</b>
+                          : kind === "debt"
+                            ? <b className="text-sm" style={{ color: "var(--danger)" }}>Долг {formatMoney(debt)}</b>
+                            : <span className="muted text-xs">{order.scheduledStart ?? order.number}</span>}
                         {client && <a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)]"><IconPhone size={16} /> Позвонить</a>}
                       </div>
                     </div>
@@ -234,6 +258,15 @@ export default function Dashboard() {
             )}
           </Card>
         </div>
+
+        {debtOrders.length > 0 && (
+          <div className="mt-4 flex justify-end">
+            <Link to="/orders?filter=debt" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)]">
+              Все долги клиентов · {formatMoney(debtOrders.reduce((sum, order) => sum + orderTotals(order).debt, 0))}
+              <IconArrowRight size={16} />
+            </Link>
+          </div>
+        )}
 
         {maintenanceReminders.length > 0 && (
           <Card className="mt-4 overflow-hidden p-0 max-sm:-mx-3 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
