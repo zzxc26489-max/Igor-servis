@@ -121,6 +121,35 @@ export interface CloudStockSupplierReturnInput {
 }
 
 
+export type CloudOrderCreateResult =
+  | {
+      ok: true;
+      revision: number;
+      updatedAt?: string;
+      orderId: string;
+      orderNumber: string;
+      clientCode?: string;
+      vehicleCode?: string;
+      data: unknown;
+    }
+  | {
+      ok: false;
+      orderConflict: true;
+      revision: number;
+      message: string;
+      data: unknown;
+      updatedAt?: string;
+    };
+
+export interface CloudOrderCreateInput {
+  client: unknown;
+  vehicle: unknown;
+  order: unknown;
+  existingClientId?: string;
+  existingVehicleId?: string;
+}
+
+
 const rawUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "");
 const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
 
@@ -194,6 +223,26 @@ export async function saveCloudState(
     },
     session.access_token,
   ) as Promise<CloudSaveResult>;
+}
+
+export async function createCloudOrder(
+  session: CloudSession,
+  input: CloudOrderCreateInput,
+): Promise<CloudOrderCreateResult> {
+  return request(
+    "/rest/v1/rpc/crm_create_order",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_client: input.client,
+        p_vehicle: input.vehicle,
+        p_order: input.order,
+        p_existing_client_id: input.existingClientId ?? null,
+        p_existing_vehicle_id: input.existingVehicleId ?? null,
+      }),
+    },
+    session.access_token,
+  ) as Promise<CloudOrderCreateResult>;
 }
 
 export async function reserveCloudStockPart(
