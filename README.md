@@ -114,6 +114,7 @@ npm run build
 7. `supabase/007_atomic_stock_reservation.sql`
 8. `supabase/008_atomic_order_payments.sql`
 9. `supabase/009_atomic_cash_shifts.sql`
+10. `supabase/010_advisor_stock_issue_sync.sql`
 
 
 ## Что ещё осталось перед боевым запуском
