@@ -8,6 +8,7 @@ import { ToastProvider } from "./components/Toast";
 import { ConfirmProvider } from "./components/Confirm";
 import { MobileMenuProvider } from "./components/MobileMenu";
 import Layout from "./components/Layout";
+import AppErrorBoundary from "./components/AppErrorBoundary";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Schedule = lazy(() => import("./pages/Schedule"));
 const Orders = lazy(() => import("./pages/Orders"));
@@ -45,6 +46,7 @@ function AppRoutes() {
       <ConfirmProvider>
         <MobileMenuProvider>
           <HashRouter>
+            <AppErrorBoundary>
             <Suspense fallback={<div className="p-6 text-sm muted">Загрузка раздела…</div>}>
             <Routes>
               <Route element={<Layout />}>
@@ -69,6 +71,7 @@ function AppRoutes() {
               </Route>
             </Routes>
             </Suspense>
+            </AppErrorBoundary>
           </HashRouter>
         </MobileMenuProvider>
       </ConfirmProvider>
