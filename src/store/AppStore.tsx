@@ -50,7 +50,7 @@ import {
   type CloudRole,
 } from "../lib/cloud";
 import { mergeConcurrentStateDetailed } from "../lib/stateMerge";
-import { shouldApplyServerRevision, shouldSurfaceServerLoadError } from "../lib/serverSyncPolicy";
+import { hasLocalChanges, SERVER_POLL_MS, shouldApplyServerRevision, shouldSurfaceServerLoadError } from "../lib/serverSyncPolicy";
 import { useAuth } from "../auth/AuthContext";
 import { LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
 import { isValidQuantity, normalizeQuantity } from "../lib/quantity";
@@ -60,7 +60,6 @@ import { completeWorksForReady, issueBlockers, orderedParts } from "../lib/order
 import { createBackupJson, inspectBackupJson } from "../lib/backup";
 import { employeeWorkPercent } from "../lib/payroll";
 import { APP_VERSION, DB_VERSION } from "../data/version";
-import { hasLocalChanges, SERVER_POLL_MS, shouldApplyServerRevision } from "../lib/syncPolicy";
 
 const STORAGE_KEY = LOCAL_DB_KEY;
 
