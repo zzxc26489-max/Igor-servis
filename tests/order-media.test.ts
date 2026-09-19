@@ -22,3 +22,10 @@ test("media validation rejects unsupported and oversized files", () => {
 test("media extension falls back to mime type", () => {
   assert.equal(mediaExtension("camera", "video/quicktime"), "mov");
 });
+
+
+test("media extension falls back to MIME when filename has no dot", () => {
+  assert.equal(mediaExtension("photo", "image/jpeg"), "jpg");
+  assert.equal(mediaExtension("scan", "image/png"), "png");
+  assert.equal(mediaExtension("clip", "video/quicktime"), "mov");
+});

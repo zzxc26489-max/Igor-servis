@@ -34,7 +34,10 @@ function safeSegment(value: string) {
 }
 
 export function mediaExtension(fileName: string, mimeType: string) {
-  const fromName = fileName.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const dot = fileName.lastIndexOf(".");
+  const fromName = dot > 0 && dot < fileName.length - 1
+    ? fileName.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, "")
+    : "";
   if (fromName && fromName.length <= 5) return fromName;
   if (mimeType === "image/jpeg") return "jpg";
   if (mimeType === "image/png") return "png";

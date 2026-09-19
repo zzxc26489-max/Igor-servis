@@ -82,7 +82,7 @@ export default function StockReceive({
   const total = Math.round((numericQty || 0) * (Number(unitPrice) || 0));
 
   // Артикул — ключ позиции: по нему подтягиваем прошлую цену закупки и ячейку.
-  function applySku(value: string) {
+  function applySku(value: string, scannedBarcode?: string) {
     setSku(value);
     const normalized = value.trim().toLowerCase();
     const found = stock.find((item) =>
@@ -93,7 +93,7 @@ export default function StockReceive({
       return;
     }
     setMatchedId(found.id);
-    setBarcode(found.barcode ?? value.trim());
+    setBarcode(scannedBarcode ?? found.barcode ?? "");
     setName(found.name);
     setBrand(found.brand ?? "");
     setCategory(found.category);
@@ -177,7 +177,7 @@ export default function StockReceive({
     });
     if (!ok) return;
 
-    const receiveError = receiveStock({
+    const receiveError = await receiveStock({
       itemId: matched?.id,
       name: name.trim(),
       sku: sku.trim(),
@@ -364,8 +364,7 @@ export default function StockReceive({
           const { parsed, item: found } = findStockItemByScannedCode(stock, value);
           const preferred = preferredScannedValue(value);
           if (found) {
-            setBarcode(found.barcode ?? parsed.barcode ?? preferred);
-            applySku(found.sku);
+            applySku(found.sku, found.barcode ?? parsed.barcode ?? preferred);
             showToast(`Найдена позиция: ${found.name}`);
             return;
           }

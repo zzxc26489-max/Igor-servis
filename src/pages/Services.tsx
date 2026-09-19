@@ -26,14 +26,16 @@ export default function Services() {
     () => Array.from(new Set(services.map((service) => service.category))).sort((a, b) => a.localeCompare(b, "ru")),
     [services],
   );
+  const activeCategoryFilter =
+    categoryFilter === "all" || allCategories.includes(categoryFilter) ? categoryFilter : "all";
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("ru-RU");
     return services.filter((service) => {
-      if (categoryFilter !== "all" && service.category !== categoryFilter) return false;
+      if (activeCategoryFilter !== "all" && service.category !== activeCategoryFilter) return false;
       if (!term) return true;
       return `${service.name} ${service.category}`.toLocaleLowerCase("ru-RU").includes(term);
     });
-  }, [categoryFilter, query, services]);
+  }, [activeCategoryFilter, query, services]);
   const categories = Array.from(new Set(filtered.map((service) => service.category)));
 
   function resetForm() {
@@ -115,16 +117,16 @@ export default function Services() {
                 onClick={() => setCategoryFilter("all")}
                 className="rounded-lg border px-3 py-2 text-sm font-medium"
                 style={{
-                  borderColor: categoryFilter === "all" ? "var(--accent)" : "var(--border)",
-                  background: categoryFilter === "all" ? "var(--accent)" : "white",
-                  color: categoryFilter === "all" ? "white" : "var(--text)",
+                  borderColor: activeCategoryFilter === "all" ? "var(--accent)" : "var(--border)",
+                  background: activeCategoryFilter === "all" ? "var(--accent)" : "white",
+                  color: activeCategoryFilter === "all" ? "white" : "var(--text)",
                 }}
               >
                 Все · {services.length}
               </button>
               {allCategories.map((item) => {
                 const count = services.filter((service) => service.category === item).length;
-                const active = categoryFilter === item;
+                const active = activeCategoryFilter === item;
                 return (
                   <button
                     key={item}

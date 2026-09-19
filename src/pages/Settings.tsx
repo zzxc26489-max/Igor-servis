@@ -13,6 +13,7 @@ import { todayISO } from "../lib/date";
 import { isValidTime, timeToMinutes } from "../lib/workday";
 import { backupCounts, inspectBackupJson } from "../lib/backup";
 import defaultLogo from "../assets/logo.jpg";
+import { compressImageToDataUrl } from "../lib/imageCompression";
 
 export default function Settings() {
   const {
@@ -134,40 +135,13 @@ export default function Settings() {
       return;
     }
 
-    const source = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ""));
-      reader.onerror = () => reject(new Error("read"));
-      reader.readAsDataURL(file);
-    }).catch(() => "");
-
-    if (!source) {
-      showToast("Не удалось прочитать логотип", "error");
-      return;
+    try {
+      const compressed = await compressImageToDataUrl(file, { maxSide: 420, quality: 0.82 });
+      setLogoDataUrl(compressed);
+      showToast("Логотип подготовлен. Нажмите «Сохранить»");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Не удалось подготовить логотип", "error");
     }
-
-    const image = await new Promise<HTMLImageElement | null>((resolve) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => resolve(null);
-      img.src = source;
-    });
-    if (!image) {
-      showToast("Не удалось открыть изображение", "error");
-      return;
-    }
-
-    const maxSide = 420;
-    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const compressed = canvas.toDataURL("image/webp", 0.86);
-    setLogoDataUrl(compressed);
-    showToast("Логотип подготовлен. Нажмите «Сохранить»");
   }
 
   function handleBackup() {

@@ -88,3 +88,30 @@ export function fileToDataUrl(file: Blob) {
     reader.readAsDataURL(file);
   });
 }
+
+
+/** Сжимает произвольное изображение для хранения как data URL в настройках. */
+export async function compressImageToDataUrl(
+  file: File,
+  options: { maxSide?: number; quality?: number } = {},
+) {
+  if (!file.type.startsWith("image/")) throw new Error("Файл не является изображением");
+  const image = await loadImage(file);
+  const maxSide = Math.max(64, options.maxSide ?? 420);
+  const quality = Math.min(0.95, Math.max(0.4, options.quality ?? 0.82));
+  const scale = Math.min(1, maxSide / Math.max(1, image.naturalWidth, image.naturalHeight));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Не удалось подготовить изображение");
+
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  const mimeType = outputType();
+  const blob = await canvasBlob(canvas, mimeType, quality);
+  return fileToDataUrl(blob);
+}
