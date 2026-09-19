@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mergeConcurrentState, mergeConcurrentStateDetailed } from "../src/lib/stateMerge.ts";
-import { hasLocalChanges, shouldApplyServerRevision } from "../src/lib/syncPolicy.ts";
+import { hasLocalChanges, shouldApplyServerRevision } from "../src/lib/serverSyncPolicy.ts";
 
 test("concurrent merge keeps changes to different entities", () => {
   const base = {
@@ -72,9 +72,9 @@ test("server deletion is not silently resurrected by a concurrent local edit", (
 });
 
 test("older server revision is rejected and equal/newer revisions are allowed", () => {
-  assert.equal(shouldApplyServerRevision(12, 11), false);
-  assert.equal(shouldApplyServerRevision(12, 12), true);
-  assert.equal(shouldApplyServerRevision(12, 13), true);
+  assert.equal(shouldApplyServerRevision({ currentRevision: 12, incomingRevision: 11 }), false);
+  assert.equal(shouldApplyServerRevision({ currentRevision: 12, incomingRevision: 12 }), true);
+  assert.equal(shouldApplyServerRevision({ currentRevision: 12, incomingRevision: 13 }), true);
 });
 
 test("dirty check compares local state with last confirmed server base", () => {
