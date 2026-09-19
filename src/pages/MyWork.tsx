@@ -10,6 +10,7 @@ import { todayISO } from "../lib/date";
 import { orderDay } from "../lib/lift";
 import type { OrderLineWork, WorkLineStatus } from "../types";
 import OrderMediaPanel from "../components/OrderMediaPanel";
+import OrderFollowUpPanel from "../components/OrderFollowUpPanel";
 
 export default function MyWork() {
   const { orders, vehicles, lifts, cloud, setWorkLineStatus } = useAppStore();
@@ -173,6 +174,9 @@ export default function MyWork() {
                         </div>
                       );
                     })}
+                  </div>
+                  <div className="border-t p-4 max-sm:px-3" style={{ borderColor: "var(--border)" }}>
+                    <OrderFollowUpPanel order={order} compact />
                   </div>
                   <div className="border-t p-4 max-sm:px-3" style={{ borderColor: "var(--border)" }}>
                     <OrderMediaPanel order={order} compact defaultKind="repair" />
