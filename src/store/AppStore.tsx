@@ -47,6 +47,7 @@ import { LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
 import { isValidQuantity, normalizeQuantity } from "../lib/quantity";
 import { activeCashShift, cashShiftSummary } from "../lib/cashShift";
 import { transitionWorkSessions } from "../lib/workSessions";
+import { completeWorksForReady, issueBlockers, orderedParts } from "../lib/orderIssue";
 import { createBackupJson, inspectBackupJson } from "../lib/backup";
 import { employeeWorkPercent } from "../lib/payroll";
 import { APP_VERSION, DB_VERSION } from "../data/version";
@@ -127,6 +128,11 @@ function migrate(db: DB): DB {
 
   const orders = db.orders.map((order) => ({
     ...order,
+    works: order.works.map((work) =>
+      (order.status === "готово" || order.status === "выдан") && !work.workStatus
+        ? { ...work, workStatus: "done" as const }
+        : work,
+    ),
     timeline: order.timeline?.length ? order.timeline : backfillTimeline(order),
     issuedAt: order.status === "выдан"
       ? (order.issuedAt ?? order.completedAt ?? (order.plannedAt ? `${order.plannedAt}T12:00:00` : order.createdAt))
@@ -860,6 +866,24 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           const willIssue = status === "выдан";
           const now = nowISO();
 
+          if (status === "готово") {
+            const pending = orderedParts(order);
+            if (pending.length > 0) {
+              error = pending.length === 1
+                ? `Нельзя завершить заказ: запчасть «${pending[0].name}» ещё заказана`
+                : `Нельзя завершить заказ: ещё заказано запчастей — ${pending.length}`;
+              return prev;
+            }
+          }
+
+          if (willIssue) {
+            const blockers = issueBlockers(order, prev.stock);
+            if (blockers.length > 0) {
+              error = blockers[0];
+              return prev;
+            }
+          }
+
           // Пишем историю статусов: из неё считается фактическое время на подъёмнике.
           const history = order.timeline?.length ? order.timeline : backfillTimeline(order);
           const last = history[history.length - 1];
@@ -874,7 +898,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 { status, at: now, actor },
               ];
           const patch: Partial<Order> = { status, timeline };
-          if (status === "готово" && !order.completedAt) patch.completedAt = now;
+          if (status === "готово") {
+            if (!order.completedAt) patch.completedAt = now;
+            patch.works = completeWorksForReady(order.works, now);
+          }
           if (status !== "готово" && status !== "выдан") patch.completedAt = undefined;
           if (willIssue) {
             patch.issuedAt = now;
