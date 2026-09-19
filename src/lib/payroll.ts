@@ -1,5 +1,11 @@
 import type { Employee, Order } from "../types";
 
+export function employeeWorkPercent(employee: Employee) {
+  if (employee.payType === "salary") return 0;
+  const value = employee.workPercent ?? employee.payValue;
+  return Math.max(0, Math.min(100, Number(value) || 0));
+}
+
 /** Зарплата начисляется только по выданным заказам: это единое правило для всей CRM. */
 export function accruingOrders(orders: Order[]) {
   return orders.filter((order) => order.status === "выдан");
@@ -14,12 +20,15 @@ export function computePayroll(employees: Employee[], orders: Order[]): Employee
   return employees.map((employee) => {
     if (employee.payType === "salary") return { ...employee, accrued: 0 };
 
-    const revenue = source
+    const accrued = source
       .flatMap((order) => order.works)
       .filter((work) => work.executor === employee.name)
-      .reduce((sum, work) => sum + work.price * work.qty, 0);
+      .reduce((sum, work) => {
+        const percent = work.payrollPercent ?? employeeWorkPercent(employee);
+        return sum + Math.round((work.price * work.qty * percent) / 100);
+      }, 0);
 
-    return { ...employee, accrued: Math.round((revenue * employee.payValue) / 100) };
+    return { ...employee, accrued };
   });
 }
 
@@ -60,7 +69,11 @@ export function payrollBreakdown(employee: Employee, orders: Order[]): PayrollBr
         orderNumber: order.number,
         completedAt: order.issuedAt ?? order.completedAt ?? order.createdAt,
         worksAmount,
-        accrued: Math.round((worksAmount * employee.payValue) / 100),
+        accrued: works.reduce((sum, work) => {
+          const original = order.works.find((item) => item.id === work.id);
+          const percent = original?.payrollPercent ?? employeeWorkPercent(employee);
+          return sum + Math.round((work.amount * percent) / 100);
+        }, 0),
         works,
       };
       return [item];
