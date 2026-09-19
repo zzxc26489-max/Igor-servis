@@ -1,4 +1,4 @@
-import type { Order } from "../types.ts";
+import type { Employee, Order } from "../types.ts";
 import { effectiveWorkStatus } from "./workSessions.ts";
 
 export interface MechanicWorkload {
@@ -37,4 +37,21 @@ export function mechanicWorkloadLabel(load: MechanicWorkload) {
     return `${load.activeWorks} активн. · ${load.runningWorks} сейчас`;
   }
   return `${load.activeWorks} активн.`;
+}
+
+
+export function canPerformWorkshopWork(employee: Employee) {
+  return /механик|мастер/i.test(employee.role);
+}
+
+export function mechanicCandidates(employees: Employee[], orders: Order[], keepName?: string) {
+  return employees
+    .filter((employee) => canPerformWorkshopWork(employee) || employee.name === keepName)
+    .map((employee) => ({ employee, load: mechanicWorkload(orders, employee.name) }))
+    .sort((a, b) => {
+      if (a.load.runningWorks !== b.load.runningWorks) return a.load.runningWorks - b.load.runningWorks;
+      if (a.load.activeWorks !== b.load.activeWorks) return a.load.activeWorks - b.load.activeWorks;
+      if (a.load.remainingNormMinutes !== b.load.remainingNormMinutes) return a.load.remainingNormMinutes - b.load.remainingNormMinutes;
+      return a.employee.name.localeCompare(b.employee.name, "ru");
+    });
 }
