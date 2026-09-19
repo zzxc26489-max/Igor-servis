@@ -161,13 +161,19 @@ function storageObjectPath(storagePath: string) {
   return storagePath.split("/").map(encodeURIComponent).join("/");
 }
 
-async function storageRequest(storagePath: string, init: RequestInit, session: CloudSession) {
+async function storageRequest(
+  storagePath: string,
+  init: RequestInit,
+  session: CloudSession,
+  authenticatedDownload = false,
+) {
   if (!cloudConfigured) throw new Error("Серверная база не настроена");
   const headers = new Headers(init.headers);
   headers.set("apikey", anonKey);
   headers.set("Authorization", `Bearer ${session.access_token}`);
+  const prefix = authenticatedDownload ? "object/authenticated" : "object";
   const response = await fetch(
-    `${rawUrl}/storage/v1/object/order-media/${storageObjectPath(storagePath)}`,
+    `${rawUrl}/storage/v1/${prefix}/order-media/${storageObjectPath(storagePath)}`,
     { ...init, headers },
   );
   if (!response.ok) {
@@ -190,7 +196,7 @@ export async function uploadCloudOrderMedia(session: CloudSession, storagePath: 
 }
 
 export async function downloadCloudOrderMedia(session: CloudSession, storagePath: string) {
-  const response = await storageRequest(storagePath, { method: "GET" }, session);
+  const response = await storageRequest(storagePath, { method: "GET" }, session, true);
   return response.blob();
 }
 
