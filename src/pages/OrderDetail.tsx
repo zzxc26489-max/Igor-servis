@@ -87,6 +87,9 @@ export default function OrderDetail() {
   const [cashAmount, setCashAmount] = useState("");
   const [terminalAmount, setTerminalAmount] = useState("");
   const [transferAmount, setTransferAmount] = useState("");
+  const [cashCommitted, setCashCommitted] = useState(0);
+  const [terminalCommitted, setTerminalCommitted] = useState(0);
+  const [transferCommitted, setTransferCommitted] = useState(0);
   const [payOpen, setPayOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundAmount, setRefundAmount] = useState("");
@@ -369,6 +372,9 @@ export default function OrderDetail() {
     setCashAmount("");
     setTerminalAmount("");
     setTransferAmount("");
+    setCashCommitted(0);
+    setTerminalCommitted(0);
+    setTransferCommitted(0);
     setPayOpen(false);
     showToast(`Принята оплата ${formatMoney(total)}`);
   }
@@ -593,16 +599,19 @@ export default function OrderDetail() {
             )}
 
             {debt > 0 && (
-              <Button className="mt-3 w-full justify-center" onClick={() => setPayOpen(true)}>Принять оплату</Button>
+              <Button className="mt-3 w-full justify-center" onClick={() => {
+              setCashAmount("");
+              setTerminalAmount("");
+              setTransferAmount("");
+              setCashCommitted(0);
+              setTerminalCommitted(0);
+              setTransferCommitted(0);
+              setPayOpen(true);
+            }}>Принять оплату</Button>
             )}
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-              <Link to={`/orders/${order.id}/print`} className="block">
-                <Button variant="secondary" className="w-full justify-center"><IconFileDescription size={18} /> Заказ-наряд</Button>
-              </Link>
-              <Link to={`/orders/${order.id}/act`} className="block">
-                <Button variant="secondary" className="w-full justify-center"><IconFileDescription size={18} /> Акт работ</Button>
-              </Link>
-            </div>
+            <Link to={`/orders/${order.id}/print`} className="mt-2 block">
+              <Button variant="secondary" className="w-full justify-center"><IconFileDescription size={18} /> Заказ-наряд для клиента</Button>
+            </Link>
 
             {settings.autoPriceAdjustment && (
               <div className="mt-3 rounded-lg border bg-[#f7faf8] p-3" style={{ borderColor: "var(--border)" }}>
@@ -1051,10 +1060,7 @@ export default function OrderDetail() {
                 <h2 className="panel-title mb-3">Документы по заказу</h2>
                 <div className="flex flex-wrap gap-2">
                   <Link to={`/orders/${order.id}/print`}>
-                    <Button variant="secondary"><IconFileDescription size={18} /> Заказ-наряд</Button>
-                  </Link>
-                  <Link to={`/orders/${order.id}/act`}>
-                    <Button variant="secondary"><IconFileDescription size={18} /> Акт выполненных работ</Button>
+                    <Button variant="secondary"><IconFileDescription size={18} /> Заказ-наряд для клиента</Button>
                   </Link>
                 </div>
                 <p className="muted mt-3 text-sm">В клиентской версии нет внутренних данных сервиса: подъёмника, рабочего времени, себестоимости, наценки и служебных комментариев.</p>
@@ -1101,11 +1107,27 @@ export default function OrderDetail() {
         </div>
         {order.status === "готово" ? (
           <div className="flex shrink-0 gap-2">
-            {debt > 0 && <Button variant="secondary" onClick={() => setPayOpen(true)}>Оплата</Button>}
+            {debt > 0 && <Button variant="secondary" onClick={() => {
+              setCashAmount("");
+              setTerminalAmount("");
+              setTransferAmount("");
+              setCashCommitted(0);
+              setTerminalCommitted(0);
+              setTransferCommitted(0);
+              setPayOpen(true);
+            }}>Оплата</Button>}
             <Button onClick={() => void handleChangeStatus("выдан")}><IconCheck size={18} /> Выдать</Button>
           </div>
         ) : debt > 0 ? (
-          <Button className="shrink-0" onClick={() => setPayOpen(true)}>Принять оплату</Button>
+          <Button className="shrink-0" onClick={() => {
+              setCashAmount("");
+              setTerminalAmount("");
+              setTransferAmount("");
+              setCashCommitted(0);
+              setTerminalCommitted(0);
+              setTransferCommitted(0);
+              setPayOpen(true);
+            }}>Принять оплату</Button>
         ) : (
           <span className="shrink-0 text-sm font-semibold" style={{ color: "var(--accent)" }}>Заказ оплачен</span>
         )}
@@ -1208,13 +1230,22 @@ export default function OrderDetail() {
               </div>
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
-              <Button variant="secondary" size="sm" onClick={() => { setCashAmount(String(debt)); setTerminalAmount(""); setTransferAmount(""); }}>
+              <Button variant="secondary" size="sm" onClick={() => {
+                setCashAmount(String(debt)); setTerminalAmount(""); setTransferAmount("");
+                setCashCommitted(debt); setTerminalCommitted(0); setTransferCommitted(0);
+              }}>
                 Весь долг наличными
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => { setCashAmount(""); setTerminalAmount(String(debt)); setTransferAmount(""); }}>
+              <Button variant="secondary" size="sm" onClick={() => {
+                setCashAmount(""); setTerminalAmount(String(debt)); setTransferAmount("");
+                setCashCommitted(0); setTerminalCommitted(debt); setTransferCommitted(0);
+              }}>
                 Весь долг по карте
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => { setCashAmount(""); setTerminalAmount(""); setTransferAmount(String(debt)); }}>
+              <Button variant="secondary" size="sm" onClick={() => {
+                setCashAmount(""); setTerminalAmount(""); setTransferAmount(String(debt));
+                setCashCommitted(0); setTerminalCommitted(0); setTransferCommitted(debt);
+              }}>
                 Весь долг переводом
               </Button>
             </div>
@@ -1235,6 +1266,7 @@ export default function OrderDetail() {
                     autoFocus
                     value={cashAmount}
                     onChange={(e) => setCashAmount(moneyInput(e.target.value))}
+                    onBlur={() => setCashCommitted(Number(cashAmount) || 0)}
                     placeholder="0"
                     inputMode="numeric"
                     aria-label="Оплата наличными"
@@ -1247,6 +1279,7 @@ export default function OrderDetail() {
                   <input
                     value={terminalAmount}
                     onChange={(e) => setTerminalAmount(moneyInput(e.target.value))}
+                    onBlur={() => setTerminalCommitted(Number(terminalAmount) || 0)}
                     placeholder="0"
                     inputMode="numeric"
                     aria-label="Оплата по терминалу"
@@ -1259,6 +1292,7 @@ export default function OrderDetail() {
                   <input
                     value={transferAmount}
                     onChange={(e) => setTransferAmount(moneyInput(e.target.value))}
+                    onBlur={() => setTransferCommitted(Number(transferAmount) || 0)}
                     placeholder="0"
                     inputMode="numeric"
                     aria-label="Оплата переводом"
@@ -1267,7 +1301,7 @@ export default function OrderDetail() {
               </label>
             </div>
             {(() => {
-              const total = (Number(cashAmount) || 0) + (Number(terminalAmount) || 0) + (Number(transferAmount) || 0);
+              const total = cashCommitted + terminalCommitted + transferCommitted;
               const left = debt - total;
               return (
                 <div className="rounded-lg p-3 text-sm" style={{ background: "var(--bg)" }}>

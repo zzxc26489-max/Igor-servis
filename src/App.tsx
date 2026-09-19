@@ -23,7 +23,6 @@ import Reports from "./pages/Reports";
 import NewOrder from "./pages/NewOrder";
 import Settings from "./pages/Settings";
 import OrderPrint from "./pages/OrderPrint";
-import OrderAct from "./pages/OrderAct";
 import MyWork from "./pages/MyWork";
 import Documents from "./pages/Documents";
 
@@ -54,7 +53,6 @@ function AppRoutes() {
                 <Route path="orders/new" element={<RoleRoute path="/orders"><NewOrder /></RoleRoute>} />
                 <Route path="orders/:orderId" element={<RoleRoute path="/orders"><OrderDetail /></RoleRoute>} />
                 <Route path="orders/:orderId/print" element={<RoleRoute path="/documents"><OrderPrint /></RoleRoute>} />
-                <Route path="orders/:orderId/act" element={<RoleRoute path="/documents"><OrderAct /></RoleRoute>} />
                 <Route path="documents" element={<RoleRoute path="/documents"><Documents /></RoleRoute>} />
                 <Route path="stock" element={<RoleRoute path="/stock"><Stock /></RoleRoute>} />
                 <Route path="purchases" element={<RoleRoute path="/purchases"><Purchases /></RoleRoute>} />
