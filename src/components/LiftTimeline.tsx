@@ -44,7 +44,7 @@ export default function LiftTimeline({
       <div className="min-w-[760px] px-3 pb-4 sm:min-w-[820px]">
         <div className="grid grid-cols-[80px_minmax(0,1fr)] sm:grid-cols-[156px_minmax(0,1fr)]">
           <div
-            className="sticky left-0 z-40 h-12 border-b border-r bg-white"
+            className="sticky left-0 z-20 h-12 border-b border-r bg-white"
             style={{ borderColor: "#e6ebe8" }}
           />
           <div
