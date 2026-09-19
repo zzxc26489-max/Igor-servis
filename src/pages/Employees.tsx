@@ -250,7 +250,6 @@ function PayDialog({
   onSubmit: (amount: number, method: PaymentMethod, component: PayrollComponent) => void;
 }) {
   const hasPiecework = employee.payType !== "salary";
-  const hasSalary = employee.payType !== "percent";
   const [component, setComponent] = useState<PayrollComponent>(hasPiecework ? "piecework" : "salary");
   const suggested = component === "piecework" ? payrollBalance(employee) : employeeSalaryAmount(employee);
   const [amount, setAmount] = useState(String(suggested));
