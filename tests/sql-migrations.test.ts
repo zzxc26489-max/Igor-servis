@@ -42,3 +42,13 @@ test("atomic payment migration locks shared state and checks debt", () => {
   assert.match(sql, /'paymentConflict', true/);
   assert.match(sql, /client_payment/);
 });
+
+
+test("atomic cash shift migration locks shared state and recalculates expected cash", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "009_atomic_cash_shifts.sql"), "utf8");
+  assert.match(sql, /for update/);
+  assert.match(sql, /Кассовая смена уже открыта на другом устройстве/);
+  assert.match(sql, /v_expected := v_opening \+ v_cash_payments - v_cash_refunds - v_cash_expenses \+ v_supplier_refunds/);
+  assert.match(sql, /При расхождении нужен комментарий/);
+  assert.match(sql, /cash_shift_closed/);
+});
