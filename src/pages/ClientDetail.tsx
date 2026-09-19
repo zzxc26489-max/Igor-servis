@@ -148,7 +148,7 @@ export default function ClientDetail() {
     setEditingClient(true);
   }
 
-  function handleClientSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleClientSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!client) return;
     setClientTouched(true);
@@ -184,7 +184,7 @@ export default function ClientDetail() {
       showToast(`Такой телефон уже указан у клиента ${duplicateClient.name}`, "error");
       return;
     }
-    updateClient(client.id, {
+    const error = await updateClient(client.id, {
       name,
       phone,
       phone2: form.phone2.trim() || undefined,
@@ -194,6 +194,10 @@ export default function ClientDetail() {
       discountPercent: form.discountPercent ? discount : undefined,
       notes: form.notes.trim() || undefined,
     });
+    if (error) {
+      showToast(error, "error");
+      return;
+    }
     setEditingClient(false);
     showToast("Данные клиента обновлены");
   }
