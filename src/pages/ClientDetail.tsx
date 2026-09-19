@@ -656,7 +656,7 @@ export default function ClientDetail() {
                   lines={[
                     vehicle ? `${vehicle.make} ${vehicle.model}` : null,
                     order.works.map((work) => work.name).join(", ") || null,
-                    debt > 0 ? <span style={{ color: "var(--danger)" }}>Долг {formatMoney(debt)}</span> : null,
+                    debt > 0 ? <span key="debt" style={{ color: "var(--danger)" }}>Долг {formatMoney(debt)}</span> : null,
                   ]}
                   badge={<StatusBadge status={order.status} />}
                   meta={formatDateTime(order.createdAt)}
