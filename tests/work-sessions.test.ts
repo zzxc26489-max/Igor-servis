@@ -74,3 +74,19 @@ test("issue blockers reject ordered and missing reserved parts", () => {
   assert.equal(blockers.some((item) => item.includes("заказан")), true);
   assert.equal(blockers.some((item) => item.includes("не найдена на складе")), true);
 });
+
+
+test("issue blockers reject overpayment before repeat issue", () => {
+  const order: Order = {
+    id: "o3",
+    number: "3",
+    clientId: "c1",
+    vehicleId: "v1",
+    status: "готово",
+    createdAt: "2026-09-19T09:00:00",
+    works: [{ ...work, price: 1000, workStatus: "done" }],
+    parts: [],
+    paid: 1500,
+  };
+  assert.equal(issueBlockers(order, []).some((item) => item.includes("переплата")), true);
+});
