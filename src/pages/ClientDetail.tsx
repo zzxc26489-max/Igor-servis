@@ -21,6 +21,7 @@ import { orderTotals } from "../lib/order";
 import { issuedVehicleOrders, vehicleOrders, vehicleServiceStats } from "../lib/serviceBook";
 import type { Vehicle } from "../types";
 import { todayISO } from "../lib/date";
+import { findClientByPhone, findVehicleByPlate, findVehicleByVin } from "../lib/dataIntegrity";
 
 const SOURCES = ["Сарафанное радио", "Яндекс Карты", "2ГИС", "Авито", "Telegram", "Проезжал мимо", "Другое"];
 
@@ -178,6 +179,11 @@ export default function ClientDetail() {
       showToast("Скидка должна быть от 0 до 100%", "error");
       return;
     }
+    const duplicateClient = findClientByPhone(clients, phone, client.id);
+    if (duplicateClient) {
+      showToast(`Такой телефон уже указан у клиента ${duplicateClient.name}`, "error");
+      return;
+    }
     updateClient(client.id, {
       name,
       phone,
@@ -251,19 +257,22 @@ export default function ClientDetail() {
       return;
     }
     const normalizedPlate = normalizePlate(vehicleForm.plate, plateKind);
-    const duplicate = vehicles.find(
-      (item) => item.id !== editingVehicleId
-        && normalizePlate(item.plate, looksRussian(item.plate) ? "ru" : "foreign") === normalizedPlate,
-    );
+    const duplicate = findVehicleByPlate(vehicles, normalizedPlate, editingVehicleId ?? undefined);
     if (duplicate) {
       showToast(`Автомобиль с номером ${duplicate.plate} уже заведён`, "error");
+      return;
+    }
+    const normalizedVin = normalizeVin(vehicleForm.vin);
+    const duplicateVin = normalizedVin ? findVehicleByVin(vehicles, normalizedVin, editingVehicleId ?? undefined) : undefined;
+    if (duplicateVin) {
+      showToast(`Автомобиль с VIN ${normalizedVin} уже заведён`, "error");
       return;
     }
     const patch = {
       make: vehicleForm.make.trim(),
       model: vehicleForm.model.trim(),
       plate: normalizePlate(vehicleForm.plate, plateKind),
-      vin: normalizeVin(vehicleForm.vin) || undefined,
+      vin: normalizedVin || undefined,
       year: vehicleForm.year ? Number(vehicleForm.year) : undefined,
       mileage: vehicleForm.mileage ? Number(vehicleForm.mileage) : undefined,
       color: vehicleForm.color.trim() || undefined,
