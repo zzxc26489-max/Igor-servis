@@ -75,7 +75,7 @@ const ACCOUNTANT_MOBILE_NAV: NavItem[] = [
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `relative flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+  `relative flex min-h-10 items-center gap-2.5 overflow-hidden rounded-xl px-2.5 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
     isActive ? "font-semibold text-white" : "text-[var(--sidebar-text)] hover:bg-white/8 hover:text-white"
   }`;
 
@@ -110,7 +110,7 @@ function SidebarContent({
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-2.5 pb-3">
+      <nav className="flex flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto px-2.5 pb-3">
         {NAV_GROUPS.map((group) => ({
           ...group,
           items: group.items.filter((item) => (item.to !== "/my-work" || role === "mechanic") && (!role || canOpenPath(role, item.to))),
@@ -122,7 +122,7 @@ function SidebarContent({
                 const badge = item.badge ? badges[item.badge] : 0;
                 return (
                   <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass} style={navLinkStyle} onClick={onNavigate}>
-                    <item.icon size={20} stroke={1.8} />
+                    <item.icon className="shrink-0" size={20} stroke={1.8} />
                     <span className="min-w-0 flex-1 truncate">{item.label}</span>
                     {badge > 0 && (
                       <span className="shrink-0 rounded-md bg-white/12 px-1.5 py-0.5 text-[11px] font-semibold text-white/80">
@@ -219,7 +219,7 @@ export default function Layout() {
         <div className="fixed inset-0 z-40 lg:hidden print:hidden">
           <button className="absolute inset-0 bg-black/40" aria-label="Закрыть меню" onClick={() => setOpen(false)} />
           <div
-            className="relative flex h-full w-72 max-w-[82vw] flex-col shadow-xl"
+            className="relative isolate flex h-full w-72 max-w-[82vw] flex-col overflow-hidden shadow-xl"
             style={{ background: "var(--sidebar-bg)", color: "var(--sidebar-text)" }}
           >
             <button
