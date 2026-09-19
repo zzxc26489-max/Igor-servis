@@ -1,5 +1,5 @@
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { AppStoreProvider, useAppStore } from "./store/AppStore";
 import { AuthProvider } from "./auth/AuthContext";
 import AuthGate from "./auth/AuthGate";
@@ -8,23 +8,23 @@ import { ToastProvider } from "./components/Toast";
 import { ConfirmProvider } from "./components/Confirm";
 import { MobileMenuProvider } from "./components/MobileMenu";
 import Layout from "./components/Layout";
-import Dashboard from "./pages/Dashboard";
-import Schedule from "./pages/Schedule";
-import Orders from "./pages/Orders";
-import OrderDetail from "./pages/OrderDetail";
-import Stock from "./pages/Stock";
-import Purchases from "./pages/Purchases";
-import Services from "./pages/Services";
-import Clients from "./pages/Clients";
-import ClientDetail from "./pages/ClientDetail";
-import Employees from "./pages/Employees";
-import Finance from "./pages/Finance";
-import Reports from "./pages/Reports";
-import NewOrder from "./pages/NewOrder";
-import Settings from "./pages/Settings";
-import OrderPrint from "./pages/OrderPrint";
-import MyWork from "./pages/MyWork";
-import Documents from "./pages/Documents";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Schedule = lazy(() => import("./pages/Schedule"));
+const Orders = lazy(() => import("./pages/Orders"));
+const OrderDetail = lazy(() => import("./pages/OrderDetail"));
+const Stock = lazy(() => import("./pages/Stock"));
+const Purchases = lazy(() => import("./pages/Purchases"));
+const Services = lazy(() => import("./pages/Services"));
+const Clients = lazy(() => import("./pages/Clients"));
+const ClientDetail = lazy(() => import("./pages/ClientDetail"));
+const Employees = lazy(() => import("./pages/Employees"));
+const Finance = lazy(() => import("./pages/Finance"));
+const Reports = lazy(() => import("./pages/Reports"));
+const NewOrder = lazy(() => import("./pages/NewOrder"));
+const Settings = lazy(() => import("./pages/Settings"));
+const OrderPrint = lazy(() => import("./pages/OrderPrint"));
+const MyWork = lazy(() => import("./pages/MyWork"));
+const Documents = lazy(() => import("./pages/Documents"));
 
 function RoleRoute({ path, children }: { path: string; children: ReactNode }) {
   const { cloud } = useAppStore();
@@ -45,6 +45,7 @@ function AppRoutes() {
       <ConfirmProvider>
         <MobileMenuProvider>
           <HashRouter>
+            <Suspense fallback={<div className="p-6 text-sm muted">Загрузка раздела…</div>}>
             <Routes>
               <Route element={<Layout />}>
                 <Route index element={<RoleHome />} />
@@ -67,6 +68,7 @@ function AppRoutes() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>
+            </Suspense>
           </HashRouter>
         </MobileMenuProvider>
       </ConfirmProvider>
