@@ -831,27 +831,35 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           if (syncError) return `Не удалось подтвердить актуальный заказ: ${syncError}`;
         }
 
-        const current = dbRef.current;
-        const order = current.orders.find((item) => item.id === orderId);
-        if (!order) return "Заказ-наряд не найден";
-
-        const existingIds = new Set((order.media ?? []).map((item) => item.id));
-        const nextMedia = [
-          ...(order.media ?? []),
-          ...additions.filter((item) => !existingIds.has(item.id)),
-        ];
-        const candidate: DB = {
-          ...current,
-          demo: current.demo ? false : current.demo,
-          orders: current.orders.map((item) => item.id === orderId ? { ...item, media: nextMedia } : item),
+        const applyAdditions = (source: DB) => {
+          const order = source.orders.find((item) => item.id === orderId);
+          if (!order) return null;
+          const existingIds = new Set((order.media ?? []).map((item) => item.id));
+          const nextMedia = [
+            ...(order.media ?? []),
+            ...additions.filter((item) => !existingIds.has(item.id)),
+          ];
+          return {
+            ...source,
+            demo: source.demo ? false : source.demo,
+            orders: source.orders.map((item) => item.id === orderId ? { ...item, media: nextMedia } : item),
+          } satisfies DB;
         };
+
+        const candidate = applyAdditions(dbRef.current);
+        if (!candidate) return "Заказ-наряд не найден";
 
         if (cloudConfigured && session) {
           const saveError = await pushCloudState(candidate);
           if (saveError) return `Сервер не подтвердил добавление файлов: ${saveError}`;
-          const confirmed = cloudBaseRef.current ?? candidate;
-          dbRef.current = confirmed;
-          rawSetDB(confirmed);
+
+          // За время round-trip пользователь мог изменить другие поля. Никогда не
+          // заменяем их cloudBaseRef-снимком: накладываем только media-дельту на
+          // самый свежий локальный state. Автосейв отправит оставшуюся дельту.
+          const rebased = applyAdditions(dbRef.current);
+          if (!rebased) return "Заказ-наряд уже удалён на другом устройстве";
+          dbRef.current = rebased;
+          rawSetDB(rebased);
           return null;
         }
 
@@ -866,27 +874,32 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           if (syncError) return `Не удалось подтвердить актуальный заказ: ${syncError}`;
         }
 
-        const current = dbRef.current;
-        const order = current.orders.find((item) => item.id === orderId);
-        if (!order) return "Заказ-наряд не найден";
-        if (!(order.media ?? []).some((item) => item.id === mediaId)) return null;
-
-        const candidate: DB = {
-          ...current,
-          demo: current.demo ? false : current.demo,
-          orders: current.orders.map((item) =>
-            item.id === orderId
-              ? { ...item, media: (item.media ?? []).filter((entry) => entry.id !== mediaId) }
-              : item,
-          ),
+        const applyRemoval = (source: DB) => {
+          const order = source.orders.find((item) => item.id === orderId);
+          if (!order) return null;
+          if (!(order.media ?? []).some((item) => item.id === mediaId)) return source;
+          return {
+            ...source,
+            demo: source.demo ? false : source.demo,
+            orders: source.orders.map((item) =>
+              item.id === orderId
+                ? { ...item, media: (item.media ?? []).filter((entry) => entry.id !== mediaId) }
+                : item,
+            ),
+          } satisfies DB;
         };
+
+        const candidate = applyRemoval(dbRef.current);
+        if (!candidate) return "Заказ-наряд не найден";
 
         if (cloudConfigured && session) {
           const saveError = await pushCloudState(candidate);
           if (saveError) return `Сервер не подтвердил удаление файла: ${saveError}`;
-          const confirmed = cloudBaseRef.current ?? candidate;
-          dbRef.current = confirmed;
-          rawSetDB(confirmed);
+
+          const rebased = applyRemoval(dbRef.current);
+          if (!rebased) return "Заказ-наряд уже удалён на другом устройстве";
+          dbRef.current = rebased;
+          rawSetDB(rebased);
           return null;
         }
 
