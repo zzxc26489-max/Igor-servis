@@ -461,6 +461,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     cloudBaseRef.current = remote;
     writeCloudBase(session.user.id, snapshot.revision, remote);
     localStorage.removeItem(STORAGE_KEY);
+    dbRef.current = next;
     rawSetDB(next);
     setCloud((prev) => ({
       ...prev,
@@ -502,6 +503,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     cloudRevisionRef.current = result.revision;
     cloudBaseRef.current = remote;
     writeCloudBase(session.user.id, result.revision, remote);
+    dbRef.current = next;
     rawSetDB(next);
     setCloud((prev) => ({
       ...prev,
@@ -596,6 +598,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         cloudRevisionRef.current = Math.max(cloudRevisionRef.current, result.revision);
         cloudBaseRef.current = remote;
         writeCloudBase(session.user.id, result.revision, remote);
+        dbRef.current = merged;
         rawSetDB(merged);
         if (mergeResult.conflicts.length) {
           setCloud((prev) => ({
@@ -721,6 +724,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       const remote = migrate(snapshot.data as DB);
       cloudBaseRef.current = remote;
       writeCloudBase(session.user.id, snapshot.revision, remote);
+      dbRef.current = remote;
       rawSetDB(remote);
       setCloud((prev) => ({
         ...prev,
@@ -1197,7 +1201,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             amount: total,
             note: input.note,
           };
-
           const expenses = createExpense && expenseId
             ? [
                 {
