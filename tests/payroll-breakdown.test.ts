@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { computePayroll, payrollBreakdown } from "../src/lib/payroll.ts";
+import { computePayroll, employeeSalaryAmount, employeeWorkPercent, payrollBreakdown } from "../src/lib/payroll.ts";
 import type { Employee, Order } from "../src/types.ts";
 
 const employee: Employee = {
@@ -54,4 +54,23 @@ test("employee workPercent is used for issued work without frozen legacy rate", 
   const changedEmployee: Employee = { ...employee, workPercent: 50 };
   const payroll = computePayroll([changedEmployee], [order]);
   assert.equal(payroll[0].accrued, 1500);
+});
+
+
+test("salary+percent stores salary and work percent independently", () => {
+  const combined: Employee = {
+    ...employee,
+    payType: "salary+percent",
+    payValue: 35,
+    salaryAmount: 50000,
+    workPercent: 30,
+  };
+  assert.equal(employeeSalaryAmount(combined), 50000);
+  assert.equal(employeeWorkPercent(combined), 30);
+});
+
+test("legacy salary still reads amount from payValue", () => {
+  const salaried: Employee = { ...employee, payType: "salary", payValue: 45000 };
+  assert.equal(employeeSalaryAmount(salaried), 45000);
+  assert.equal(employeeWorkPercent(salaried), 0);
 });
