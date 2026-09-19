@@ -10,6 +10,18 @@ import { clearCloudDeviceData } from "../lib/cloudCache";
 
 const SESSION_KEY = "igor-servis-cloud-session-v1";
 
+function saveSession(session: CloudSession) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  // Старые версии держали refresh-token в localStorage. После первого запуска
+  // на новой версии удаляем долговременную копию.
+  clearStoredSession();
+}
+
+function clearStoredSession() {
+  sessionStorage.removeItem(SESSION_KEY);
+  clearStoredSession();
+}
+
 interface AuthContextValue {
   configured: boolean;
   ready: boolean;
@@ -22,9 +34,17 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 function readSession(): CloudSession | null {
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) as CloudSession : null;
+    const current = sessionStorage.getItem(SESSION_KEY);
+    if (current) return JSON.parse(current) as CloudSession;
+
+    // Однократная миграция с прежнего долговременного хранения.
+    const legacy = localStorage.getItem(SESSION_KEY);
+    if (!legacy) return null;
+    const session = JSON.parse(legacy) as CloudSession;
+    saveSession(session);
+    return session;
   } catch {
+    clearStoredSession();
     return null;
   }
 }
@@ -54,11 +74,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshCloudSession(current.refresh_token)
       .then((next) => {
         if (cancelled) return;
-        localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+        saveSession(next);
         setSession(next);
       })
       .catch(() => {
-        localStorage.removeItem(SESSION_KEY);
+        clearStoredSession();
         if (!cancelled) setSession(null);
       })
       .finally(() => !cancelled && setReady(true));
@@ -72,10 +92,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     timer.current = window.setTimeout(async () => {
       try {
         const next = await refreshCloudSession(session.refresh_token);
-        localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+        saveSession(next);
         setSession(next);
       } catch {
-        localStorage.removeItem(SESSION_KEY);
+        clearStoredSession();
         setSession(null);
       }
     }, delay);
@@ -90,13 +110,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     signIn: async (email, password) => {
       const next = await signInWithPassword(email.trim(), password);
-      localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+      saveSession(next);
       setSession(next);
       setReady(true);
     },
     signOut: async () => {
       const current = session;
-      localStorage.removeItem(SESSION_KEY);
+      clearStoredSession();
       clearCloudDeviceData();
       setSession(null);
       if (current) await signOutCloud(current).catch(() => undefined);
