@@ -14,12 +14,12 @@ function saveSession(session: CloudSession) {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
   // Старые версии держали refresh-token в localStorage. После первого запуска
   // на новой версии удаляем долговременную копию.
-  clearStoredSession();
+  localStorage.removeItem(SESSION_KEY);
 }
 
 function clearStoredSession() {
   sessionStorage.removeItem(SESSION_KEY);
-  clearStoredSession();
+  localStorage.removeItem(SESSION_KEY);
 }
 
 interface AuthContextValue {
