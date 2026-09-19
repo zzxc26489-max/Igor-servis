@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { IconMenu2, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
+import defaultLogo from "../assets/logo.jpg";
 import { useMobileMenu } from "./MobileMenu";
 
 export function TopBar({
@@ -23,7 +24,7 @@ export function TopBar({
 }) {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
-  const { clients, vehicles, orders, demo } = useAppStore();
+  const { clients, vehicles, orders, demo, company } = useAppStore();
   const { setOpen } = useMobileMenu();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -95,6 +96,12 @@ export function TopBar({
         >
           <IconMenu2 size={22} />
         </button>
+
+        <img
+          src={company.logoDataUrl || defaultLogo}
+          alt=""
+          className="h-8 w-8 shrink-0 rounded-lg object-contain ring-1 ring-black/5 lg:hidden"
+        />
 
         <div className="relative min-w-0 flex-1">
           <IconSearch className="pointer-events-none absolute left-3 top-2.5" size={18} color="var(--text-muted)" aria-hidden="true" />
