@@ -37,8 +37,8 @@ test("cloud backup import cannot overwrite an initialized shared database", () =
 test("order media metadata is server-confirmed before storage deletion", () => {
   const store = readFileSync(join(process.cwd(), "src", "store", "AppStore.tsx"), "utf8");
   const panel = readFileSync(join(process.cwd(), "src", "components", "OrderMediaPanel.tsx"), "utf8");
-  assert.match(store, /appendOrderMedia: async[\s\S]*await pushCloudState\(candidate\)[\s\S]*rawSetDB\(confirmed\)/);
-  assert.match(store, /removeOrderMedia: async[\s\S]*await pushCloudState\(candidate\)[\s\S]*rawSetDB\(confirmed\)/);
+  assert.match(store, /appendOrderMedia: async[\s\S]*await pushCloudState\(candidate\)[\s\S]*const latest = applyAdditions\(dbRef\.current\)[\s\S]*rawSetDB\(latest\)/);
+  assert.match(store, /removeOrderMedia: async[\s\S]*await pushCloudState\(candidate\)[\s\S]*const latest = applyRemoval\(dbRef\.current\)[\s\S]*rawSetDB\(latest\)/);
   assert.match(panel, /await removeOrderMedia\(order\.id, item\.id\)[\s\S]*await deleteCloudOrderMedia/);
 });
 
