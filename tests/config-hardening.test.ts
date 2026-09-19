@@ -13,6 +13,7 @@ test("production CSP forbids inline scripts", () => {
   const config = readFileSync(join(process.cwd(), "vite.config.ts"), "utf8");
   assert.match(config, /production-csp/);
   assert.match(config, /script-src 'self'/);
+  assert.match(config, /injectTo: 'head-prepend'/);
   assert.doesNotMatch(config, /script-src 'self' 'unsafe-inline'/);
 });
 
@@ -20,4 +21,6 @@ test("pages deployment safely force-syncs after squash merges and manual main di
   const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "deploy-pages.yml"), "utf8");
   assert.match(workflow, /git push --force-with-lease origin HEAD:refs\/heads\/claude\/igor-workshop-website-yrdani/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'.*workflow_dispatch/);
+  assert.match(workflow, /Dependency audit \(non-blocking for Pages\)/);
+  assert.match(workflow, /continue-on-error: true/);
 });
