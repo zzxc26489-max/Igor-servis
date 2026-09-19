@@ -53,7 +53,7 @@ export default function StockReceive({
   const [category, setCategory] = useState(preset?.category ?? presetReference?.category ?? "");
   const [unit, setUnit] = useState(preset?.unit ?? presetReference?.unit ?? "шт.");
   const [minQty, setMinQty] = useState(preset ? String(preset.minQty) : "");
-  const [qty, setQty] = useState("1");
+  const [qty, setQty] = useState(preset?.onOrderQty ? String(preset.onOrderQty) : "1");
   const [unitPrice, setUnitPrice] = useState(
     preset ? String(preset.lastPurchasePrice ?? preset.purchasePrice ?? "") : "",
   );
@@ -104,6 +104,8 @@ export default function StockReceive({
     setRack(parts.rack);
     setShelf(parts.shelf);
     setPlace(parts.place);
+    setWithoutCell(!found.cell);
+    if (found.onOrderQty) setQty(String(found.onOrderQty));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -239,6 +241,7 @@ export default function StockReceive({
             <IconInfoCircle size={18} className="mt-0.5 shrink-0" />
             <div>
               Позиция уже на складе: остаток <b>{matched.qty} {matched.unit}</b>, средняя цена закупки <b>{formatMoney(matched.purchasePrice)}</b>
+              {matched.onOrderQty ? <> · ожидаем <b>{matched.onOrderQty} {matched.unit}</b></> : null}
               {matched.lastPurchasePrice ? (
                 <> · прошлая покупка <b>{formatMoney(matched.lastPurchasePrice)}</b>{matched.lastPurchaseAt ? ` от ${formatDate(matched.lastPurchaseAt)}` : ""}</>
               ) : null}
