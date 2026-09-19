@@ -45,6 +45,16 @@ function productionCsp(supabaseOrigin: string) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const supabaseOrigin = remoteOrigin(env.VITE_SUPABASE_URL)
+  const anonKey = String(env.VITE_SUPABASE_ANON_KEY ?? '').trim()
+
+  if (mode === 'production') {
+    if (!supabaseOrigin) {
+      throw new Error('Production build requires a valid HTTPS VITE_SUPABASE_URL')
+    }
+    if (!anonKey) {
+      throw new Error('Production build requires VITE_SUPABASE_ANON_KEY')
+    }
+  }
 
   return {
     base: '/Igor-servis/',
