@@ -32,7 +32,7 @@ export function payrollBalance(employee: Employee) {
 export interface PayrollBreakdownItem {
   orderId: string;
   orderNumber: string;
-  completedAt?: string;
+  completedAt: string;
   worksAmount: number;
   accrued: number;
   works: { id: string; name: string; qty: number; amount: number }[];
@@ -43,7 +43,7 @@ export function payrollBreakdown(employee: Employee, orders: Order[]): PayrollBr
   if (employee.payType === "salary") return [];
 
   return accruingOrders(orders)
-    .map((order) => {
+    .flatMap((order) => {
       const works = order.works
         .filter((work) => work.executor === employee.name)
         .map((work) => ({
@@ -53,9 +53,9 @@ export function payrollBreakdown(employee: Employee, orders: Order[]): PayrollBr
           amount: work.price * work.qty,
         }));
       const worksAmount = works.reduce((sum, work) => sum + work.amount, 0);
-      if (worksAmount <= 0) return null;
+      if (worksAmount <= 0) return [];
 
-      return {
+      const item: PayrollBreakdownItem = {
         orderId: order.id,
         orderNumber: order.number,
         completedAt: order.issuedAt ?? order.completedAt ?? order.createdAt,
@@ -63,7 +63,7 @@ export function payrollBreakdown(employee: Employee, orders: Order[]): PayrollBr
         accrued: Math.round((worksAmount * employee.payValue) / 100),
         works,
       };
+      return [item];
     })
-    .filter((item): item is PayrollBreakdownItem => Boolean(item))
-    .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""));
+    .sort((a, b) => b.completedAt.localeCompare(a.completedAt));
 }
