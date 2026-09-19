@@ -82,7 +82,8 @@ begin
     -- После удаления заказ-наряда его приватные файлы могут остаться в Storage.
     -- Только администраторские роли могут их увидеть и удалить; новую запись
     -- в несуществующий заказ по-прежнему загрузить нельзя.
-    return not p_write and v_role in ('owner', 'partner', 'advisor');
+    return v_role in ('owner', 'partner', 'advisor')
+      and (p_delete or (not p_write and not p_delete));
   end if;
 
   if p_delete and v_role not in ('owner', 'partner', 'advisor') then
