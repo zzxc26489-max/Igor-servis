@@ -47,3 +47,25 @@ test("route pages are code-split for faster initial load", () => {
   assert.match(app, /lazy\(\(\) => import\("\.\/pages\/Dashboard"\)\)/);
   assert.match(app, /<Suspense /);
 });
+
+
+test("session tokens are not persisted in localStorage", () => {
+  const auth = readFileSync(join(process.cwd(), "src", "auth", "AuthContext.tsx"), "utf8");
+  assert.match(auth, /sessionStorage\.setItem\(SESSION_KEY/);
+  assert.match(auth, /localStorage\.removeItem\(SESSION_KEY\)/);
+  assert.doesNotMatch(auth, /localStorage\.setItem\(SESSION_KEY/);
+});
+
+test("production CSP restricts network access to configured Supabase origin", () => {
+  const config = readFileSync(join(process.cwd(), "vite.config.ts"), "utf8");
+  assert.match(config, /remoteOrigin/);
+  assert.match(config, /connect-src 'self'/);
+  assert.doesNotMatch(config, /connect-src 'self' https:/);
+});
+
+test("pages workflow uses least privilege per job", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "deploy-pages.yml"), "utf8");
+  assert.match(workflow, /permissions:\n  contents: read/);
+  assert.match(workflow, /sync-pages-branch:[\s\S]*permissions:[\s\S]*contents: write[\s\S]*actions: write/);
+  assert.match(workflow, /deploy:[\s\S]*permissions:[\s\S]*pages: write[\s\S]*id-token: write/);
+});
