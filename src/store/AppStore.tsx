@@ -407,11 +407,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // До успешной инициализации облака не удаляем локальную базу:
-    // она может быть единственной реальной копией, которую нужно загрузить в пустой Supabase.
-    if (cloudConfigured) return;
+    // Локальный режим хранится постоянно. При пустом Supabase (needs_upload)
+    // также сохраняем подготовленную базу до успешного переноса на сервер,
+    // чтобы импорт JSON не потерялся при случайной перезагрузке вкладки.
+    if (cloudConfigured && cloud.status !== "needs_upload") return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-  }, [cloudConfigured, db]);
+  }, [cloud.status, cloudConfigured, db]);
 
   const applyCloudSnapshot = useCallback((snapshot: Awaited<ReturnType<typeof loadCloudState>>) => {
     if (!session) return false;
