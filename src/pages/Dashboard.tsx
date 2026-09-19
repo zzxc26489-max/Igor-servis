@@ -7,14 +7,13 @@ import {
   IconCalendarEvent,
   IconCheck,
   IconClipboardList,
-  IconClock,
   IconPackage,
   IconPhone,
-  IconPlus,
   IconTool,
 } from "@tabler/icons-react";
 import { Card, ListCard, Page, StatusBadge, TopBar } from "../components/ui";
-import { bookingTarget, liftLabel, liftState, orderDay } from "../lib/lift";
+import LiftTimeline from "../components/LiftTimeline";
+import { liftState, orderDay } from "../lib/lift";
 import { useAppStore } from "../store/AppStore";
 import { formatMoney, plural } from "../lib/format";
 import { orderTotals } from "../lib/order";
@@ -93,67 +92,24 @@ export default function Dashboard() {
           <Stat to="/schedule" icon={<IconClipboardList size={17} />} label="Свободны сейчас" value={freeLifts} unit={`из ${lifts.length} подъёмников`} />
         </div>
 
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="section-title">Подъёмники сейчас</h2>
-            <p className="muted mt-0.5 text-sm">Текущая машина и ближайшая запись по каждому месту.</p>
+        <details open className="mb-4 overflow-hidden rounded-xl border bg-white shadow-[0_2px_8px_rgba(23,34,30,0.045)]" style={{ borderColor: "var(--border)" }}>
+          <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3">
+            <span>
+              <span className="block text-sm font-semibold">Подъёмники сейчас</span>
+              <span className="muted mt-0.5 block text-xs">Временная шкала загрузки всех подъёмников на сегодня</span>
+            </span>
+            <Link
+              to="/schedule"
+              onClick={(event) => event.stopPropagation()}
+              className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-[var(--accent)]"
+            >
+              Полное расписание <IconArrowRight size={16} />
+            </Link>
+          </summary>
+          <div className="border-t" style={{ borderColor: "var(--border)" }}>
+            <LiftTimeline date={today} />
           </div>
-          <Link to="/schedule" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)]">
-            Полное расписание <IconArrowRight size={16} />
-          </Link>
-        </div>
-
-        <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {liftStates.map(({ lift, state }) => {
-            const current = state.current;
-            const next = state.next;
-            const currentVehicle = current ? vehicles.find((vehicle) => vehicle.id === current.vehicleId) : null;
-            const currentClient = current ? clients.find((client) => client.id === current.clientId) : null;
-            const nextVehicle = next ? vehicles.find((vehicle) => vehicle.id === next.vehicleId) : null;
-            const target = bookingTarget(lift.id, today, state, orders, lift);
-
-            return (
-              <Card key={lift.id} className="flex min-h-[190px] flex-col p-0">
-                <div className="border-b px-3 py-3" style={{ borderColor: "var(--border)" }}>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <IconTool size={17} style={{ color: state.busyNow ? "var(--accent)" : "var(--text-muted)" }} />
-                      <b className="truncate text-sm">{lift.name}</b>
-                    </span>
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: state.busyNow ? "var(--accent)" : state.orders.length ? "var(--warning)" : "#cbd4d0" }} />
-                  </div>
-                  <p className="muted mt-1 truncate text-xs">{liftLabel(state)}</p>
-                </div>
-
-                {current ? (
-                  <button onClick={() => navigate(`/orders/${current.id}`)} className="flex flex-1 flex-col justify-center px-3 py-3 text-left transition hover:bg-gray-50">
-                    <span className="text-[10px] font-bold uppercase tracking-[.08em] text-[var(--accent)]">Сейчас</span>
-                    <b className="mt-1 truncate text-sm">{currentVehicle ? `${currentVehicle.make} ${currentVehicle.model}` : current.number}</b>
-                    <span className="muted mt-0.5 truncate text-xs">{currentVehicle?.plate ?? currentClient?.name ?? "—"}</span>
-                    <span className="muted mt-1 truncate text-xs">{current.works[0]?.name ?? current.complaint ?? "Осмотр"}</span>
-                    <span className="mt-2"><StatusBadge status={current.status} /></span>
-                  </button>
-                ) : (
-                  <button onClick={() => navigate(target.to)} className="flex flex-1 flex-col items-center justify-center gap-2 px-3 py-4 text-center transition hover:bg-gray-50">
-                    <span className="grid h-9 w-9 place-items-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]"><IconPlus size={19} /></span>
-                    <b className="text-sm text-[var(--accent)]">Свободен сейчас</b>
-                    <span className="muted text-xs">{target.label}</span>
-                  </button>
-                )}
-
-                {next && next.id !== current?.id && (
-                  <button onClick={() => navigate(`/orders/${next.id}`)} className="border-t px-3 py-2 text-left transition hover:bg-gray-50" style={{ borderColor: "var(--border)" }}>
-                    <span className="flex items-center justify-between gap-2 text-xs">
-                      <span className="muted inline-flex min-w-0 items-center gap-1"><IconClock size={13} />Следом</span>
-                      <b className="shrink-0 tabular-nums">{next.scheduledStart}</b>
-                    </span>
-                    <span className="mt-0.5 block truncate text-xs font-medium">{nextVehicle ? `${nextVehicle.make} ${nextVehicle.model}` : next.number}</span>
-                  </button>
-                )}
-              </Card>
-            );
-          })}
-        </div>
+        </details>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <Card className="overflow-hidden p-0 max-sm:-mx-3 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
