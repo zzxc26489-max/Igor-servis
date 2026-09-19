@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - claude/igor-workshop-website-yrdani
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
   pages: write
   id-token: write
 
@@ -21,7 +21,24 @@ env:
   VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
 
 jobs:
+  sync-pages-branch:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Sync allowed Pages branch
+        run: |
+          git fetch origin claude/igor-workshop-website-yrdani
+          git push origin HEAD:refs/heads/claude/igor-workshop-website-yrdani
+      - name: Start Pages deployment from allowed branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-pages.yml --ref claude/igor-workshop-website-yrdani
+
   build:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/claude/igor-workshop-website-yrdani'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +55,7 @@ jobs:
           path: dist
 
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/claude/igor-workshop-website-yrdani'
     needs: build
     runs-on: ubuntu-latest
     environment:
