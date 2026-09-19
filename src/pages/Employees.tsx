@@ -72,7 +72,11 @@ export default function Employees() {
       confirmLabel: "Выплатить",
     });
     if (!ok) return;
-    payEmployee(employee.id, amount, undefined, method, component);
+    const payError = payEmployee(employee.id, amount, undefined, method, component);
+    if (payError) {
+      showToast(payError, "error");
+      return;
+    }
     setPayFor(null);
     showToast(`Выплачено ${formatMoney(amount)} · ${employee.name}`);
   }
