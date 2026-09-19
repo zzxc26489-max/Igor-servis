@@ -19,7 +19,7 @@ export interface NewWork {
 }
 
 /** Подбор работы: поиск и категории вместо одного длинного списка. */
-export default function AddWork({ onClose, onSubmit }: { onClose: () => void; onSubmit: (work: NewWork) => void }) {
+export default function AddWork({ onClose, onSubmit }: { onClose: () => void; onSubmit: (work: NewWork) => boolean }) {
   const { services, employees, orders } = useAppStore();
 
   const [query, setQuery] = useState("");
@@ -207,7 +207,7 @@ export default function AddWork({ onClose, onSubmit }: { onClose: () => void; on
                 onClick={() => {
                   if (submittedRef.current) return;
                   submittedRef.current = true;
-                  onSubmit({
+                  const accepted = onSubmit({
                     id: workIdRef.current,
                     name: name.trim(),
                     qty: count,
@@ -215,6 +215,7 @@ export default function AddWork({ onClose, onSubmit }: { onClose: () => void; on
                     executor: executor || undefined,
                     normMinutes: Number(norm) || undefined,
                   });
+                  if (!accepted) submittedRef.current = false;
                 }}
               >
                 Добавить в заказ
