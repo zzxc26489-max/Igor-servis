@@ -26,6 +26,7 @@ import type { OrderConsumable, OrderLinePart, OrderLineWork, OrderStatus, Paymen
 import { effectiveWorkStatus, reassignWork, WORK_STATUS_LABEL, workSessionMinutes } from "../lib/workSessions";
 import OrderMediaPanel from "../components/OrderMediaPanel";
 import ClientOrderDocument from "../components/ClientOrderDocument";
+import OrderFollowUpPanel from "../components/OrderFollowUpPanel";
 import { orderActivity } from "../lib/orderActivity";
 import { autoLiftEnd, autoLiftSchedulePatch, isSlotFree, orderDay, toMinutes } from "../lib/lift";
 import { mechanicCandidates, mechanicWorkloadLabel } from "../lib/mechanicWorkload";
@@ -33,7 +34,7 @@ import { issueBlockers, orderedParts } from "../lib/orderIssue";
 import { appendWorkOnce } from "../lib/orderWorks";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
-const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "История", "Документы"] as const;
+const TABS = ["Работы и запчасти", "Осмотр и follow-up", "Приёмка", "Оплаты", "История", "Документы"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function OrderDetail() {
@@ -1148,6 +1149,10 @@ export default function OrderDetail() {
                   </div>
                 </Card>
             </div>
+
+            {tab === "Осмотр и follow-up" && (
+              <OrderFollowUpPanel order={order} />
+            )}
 
             {tab === "Приёмка" && (
               <Card className="print:hidden">
