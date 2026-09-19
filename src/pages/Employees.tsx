@@ -1,33 +1,36 @@
 import { useState } from "react";
-import { IconCash, IconCheck, IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import { IconCash, IconCheck, IconChevronDown, IconChevronUp, IconPercentage } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { Button, Card, Modal, Page, TopBar } from "../components/ui";
 import { useConfirm } from "../components/Confirm";
 import { useToast } from "../components/Toast";
 import { formatDate, formatMoney, plural } from "../lib/format";
-import { computePayroll, payrollBalance, payrollBreakdown } from "../lib/payroll";
+import { computePayroll, employeeWorkPercent, payrollBalance, payrollBreakdown } from "../lib/payroll";
 import { moneyInput } from "../lib/formats";
 import type { Employee, PaymentMethod } from "../types";
 import { paymentMethodLabel } from "../lib/payments";
 import { activeCashShift } from "../lib/cashShift";
 
 function payLabel(employee: Employee) {
-  if (employee.payType === "percent") return `${employee.payValue}% от работ`;
+  if (employee.payType === "percent") return `${employeeWorkPercent(employee)}% от работ`;
   if (employee.payType === "salary") return `Оклад ${formatMoney(employee.payValue)} в месяц`;
-  return `Оклад + ${employee.payValue}% от работ`;
+  return `Оклад + ${employeeWorkPercent(employee)}% от работ`;
 }
 
 export default function Employees() {
-  const { employees: rawEmployees, orders, cashShifts, payEmployee } = useAppStore();
+  const { employees: rawEmployees, orders, cashShifts, payEmployee, updateEmployee, cloud } = useAppStore();
   const confirm = useConfirm();
   const { showToast } = useToast();
   const [payFor, setPayFor] = useState<string | null>(null);
   const [detailsFor, setDetailsFor] = useState<string | null>(null);
+  const [rateFor, setRateFor] = useState<string | null>(null);
 
   const employees = computePayroll(rawEmployees, orders);
   const totalAccrued = employees.reduce((sum, employee) => sum + employee.accrued, 0);
   const totalDue = employees.reduce((sum, employee) => sum + payrollBalance(employee), 0);
   const target = employees.find((employee) => employee.id === payFor) ?? null;
+  const rateTarget = rawEmployees.find((employee) => employee.id === rateFor) ?? null;
+  const canEditRates = !cloud.configured || cloud.role === "owner" || cloud.role === "partner";
 
   async function handlePay(employee: Employee, amount: number, method: PaymentMethod) {
     if (method === "cash" && !activeCashShift(cashShifts)) {
@@ -113,6 +116,16 @@ export default function Employees() {
                   )}
                 </div>
 
+                {sdelnaya && canEditRates && (
+                  <Button
+                    className="mt-3 w-full justify-center"
+                    variant="secondary"
+                    onClick={() => setRateFor(employee.id)}
+                  >
+                    <IconPercentage size={18} /> Процент от работ: {employeeWorkPercent(employee)}%
+                  </Button>
+                )}
+
                 {sdelnaya && (
                   <>
                     <button
@@ -177,6 +190,18 @@ export default function Employees() {
         </div>
       </Page>
 
+      {rateTarget && (
+        <WorkPercentDialog
+          employee={rateTarget}
+          onClose={() => setRateFor(null)}
+          onSubmit={(percent) => {
+            updateEmployee(rateTarget.id, { workPercent: percent });
+            setRateFor(null);
+            showToast(`Процент от работ обновлён: ${rateTarget.name} · ${percent}%`);
+          }}
+        />
+      )}
+
       {target && (
         <PayDialog
           employee={target}
@@ -238,6 +263,46 @@ function PayDialog({
             disabled={!method || value <= 0 || (sdelnaya && value > suggested)}
           >
             Выплатить
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+
+function WorkPercentDialog({
+  employee, onClose, onSubmit,
+}: {
+  employee: Employee;
+  onClose: () => void;
+  onSubmit: (percent: number) => void;
+}) {
+  const [value, setValue] = useState(String(employeeWorkPercent(employee)));
+  const percent = Number(value);
+
+  return (
+    <Modal title="Процент от работ" subtitle={employee.name} onClose={onClose}>
+      <div className="space-y-3 p-4">
+        <p className="muted text-sm">
+          Процент применяется к стоимости работ, где сотрудник указан исполнителем. Старые выданные заказы сохраняют ставку, действовавшую на момент выдачи.
+        </p>
+        <label className="block text-sm">
+          <span className="muted mb-1 block">Процент, %</span>
+          <div className="field-control">
+            <input
+              autoFocus
+              inputMode="decimal"
+              aria-label="Процент от работ"
+              value={value}
+              onChange={(event) => setValue(event.target.value.replace(",", ".").replace(/[^0-9.]/g, "").slice(0, 5))}
+            />
+          </div>
+        </label>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>Отмена</Button>
+          <Button disabled={!Number.isFinite(percent) || percent < 0 || percent > 100} onClick={() => onSubmit(percent)}>
+            Сохранить
           </Button>
         </div>
       </div>
