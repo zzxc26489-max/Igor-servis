@@ -867,8 +867,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             if (retryError) return `Сервер не подтвердил добавление файлов: ${retryError}`;
           }
 
-          dbRef.current = rebased;
-          rawSetDB(rebased);
+          const latest = applyAdditions(dbRef.current);
+          if (!latest) return "Заказ-наряд уже удалён на другом устройстве";
+          dbRef.current = latest;
+          rawSetDB(latest);
           return null;
         }
 
@@ -914,8 +916,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             if (retryError) return `Сервер не подтвердил удаление файла: ${retryError}`;
           }
 
-          dbRef.current = rebased;
-          rawSetDB(rebased);
+          const latest = applyRemoval(dbRef.current);
+          if (!latest) return "Заказ-наряд уже удалён на другом устройстве";
+          dbRef.current = latest;
+          rawSetDB(latest);
           return null;
         }
 
