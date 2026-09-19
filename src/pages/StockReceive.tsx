@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { IconCheck, IconInfoCircle, IconMapPin, IconX } from "@tabler/icons-react";
+import { IconCheck, IconInfoCircle, IconMapPin, IconScan, IconX } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
@@ -9,6 +9,7 @@ import { formatDate, formatMoney } from "../lib/format";
 import type { PartReference, PaymentMethod, StockItem } from "../types";
 import { isValidQuantity, parseQuantity } from "../lib/quantity";
 import { activeCashShift } from "../lib/cashShift";
+import BarcodeScanner from "../components/BarcodeScanner";
 
 export const RACKS = ["A", "B", "C"];
 export const SHELVES = ["01", "02", "03", "04"];
@@ -44,6 +45,8 @@ export default function StockReceive({
 
   const preset = presetItemId ? stock.find((item) => item.id === presetItemId) : undefined;
   const [sku, setSku] = useState(preset?.sku ?? presetReference?.sku ?? "");
+  const [barcode, setBarcode] = useState(preset?.barcode ?? "");
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [matchedId, setMatchedId] = useState(preset?.id ?? "");
   const [name, setName] = useState(preset?.name ?? presetReference?.name ?? "");
   const [brand, setBrand] = useState(preset?.brand ?? presetReference?.brand ?? "");
@@ -80,12 +83,16 @@ export default function StockReceive({
   // Артикул — ключ позиции: по нему подтягиваем прошлую цену закупки и ячейку.
   function applySku(value: string) {
     setSku(value);
-    const found = stock.find((item) => item.sku.toLowerCase() === value.trim().toLowerCase());
+    const normalized = value.trim().toLowerCase();
+    const found = stock.find((item) =>
+      item.sku.toLowerCase() === normalized || item.barcode?.toLowerCase() === normalized
+    );
     if (!found) {
       setMatchedId("");
       return;
     }
     setMatchedId(found.id);
+    setBarcode(found.barcode ?? value.trim());
     setName(found.name);
     setBrand(found.brand ?? "");
     setCategory(found.category);
@@ -171,6 +178,7 @@ export default function StockReceive({
       itemId: matched?.id,
       name: name.trim(),
       sku: sku.trim(),
+      barcode: barcode.trim() || undefined,
       brand: brand.trim() || undefined,
       category: category.trim() || "Без категории",
       unit: unit.trim() || "шт.",
@@ -193,6 +201,7 @@ export default function StockReceive({
   }
 
   return (
+    <>
     <Modal
       title="Приёмка на склад"
       subtitle="Введите артикул — если такая запчасть уже была, данные подставятся"
@@ -202,7 +211,12 @@ export default function StockReceive({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Артикул *">
-            <input value={sku} onChange={(event) => applySku(event.target.value)} list="stock-skus" placeholder="GDB1956" autoFocus />
+            <div className="flex gap-2">
+              <input value={sku} onChange={(event) => applySku(event.target.value)} list="stock-skus" placeholder="GDB1956" autoFocus />
+              <Button type="button" size="sm" variant="secondary" onClick={() => setScannerOpen(true)} title="Сканировать камерой телефона">
+                <IconScan size={17} />
+              </Button>
+            </div>
           </Field>
           <Field label="Название *">
             <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Тормозные колодки" />
@@ -211,6 +225,14 @@ export default function StockReceive({
         <datalist id="stock-skus">
           {stock.map((item) => <option key={item.id} value={item.sku}>{item.name}</option>)}
         </datalist>
+        <Field label="Штрихкод">
+          <div className="flex gap-2">
+            <input value={barcode} onChange={(event) => setBarcode(event.target.value.trim())} placeholder="EAN / UPC / Code128" inputMode="numeric" />
+            <Button type="button" size="sm" variant="secondary" onClick={() => setScannerOpen(true)}>
+              <IconScan size={17} /> Камера
+            </Button>
+          </div>
+        </Field>
 
         {matched && (
           <div className="flex items-start gap-2 rounded-lg p-3 text-sm" style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}>
@@ -326,6 +348,18 @@ export default function StockReceive({
         </div>
       </form>
     </Modal>
+    {scannerOpen && (
+      <BarcodeScanner
+        title="Сканировать запчасть"
+        onClose={() => setScannerOpen(false)}
+        onDetected={(value) => {
+          setBarcode(value);
+          applySku(value);
+          showToast(`Код считан: ${value}`);
+        }}
+      />
+    )}
+    </>
   );
 }
 
