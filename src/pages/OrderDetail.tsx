@@ -30,6 +30,7 @@ import { orderActivity } from "../lib/orderActivity";
 import { autoLiftEnd, autoLiftSchedulePatch, isSlotFree, orderDay, toMinutes } from "../lib/lift";
 import { mechanicCandidates, mechanicWorkloadLabel } from "../lib/mechanicWorkload";
 import { issueBlockers, orderedParts } from "../lib/orderIssue";
+import { appendWorkOnce } from "../lib/orderWorks";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
 const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "История", "Документы"] as const;
@@ -216,8 +217,8 @@ export default function OrderDetail() {
       showToast("Проверьте количество и цену работы", "error");
       return;
     }
-    const newWork: OrderLineWork = { id: createId("work"), ...work };
-    const nextWorks = [...order.works, newWork];
+    const newWork: OrderLineWork = work;
+    const nextWorks = appendWorkOnce(order.works, newWork);
     const target = Number(targetTotal);
     const pricedWorks = settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(nextWorks, target) : nextWorks;
     const liftPatch = autoLiftSchedulePatch(order, pricedWorks);
