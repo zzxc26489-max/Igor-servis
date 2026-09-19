@@ -37,8 +37,10 @@ export interface Employee {
   name: string;
   role: string;
   payType: "percent" | "salary+percent" | "salary";
-  /** Для percent — доля от работ в процентах, для оклада — сумма в месяц. */
+  /** Старое поле: для percent — процент, для salary — оклад. Оставлено для совместимости старых баз. */
   payValue: number;
+  /** Процент сотрудника от выполненных работ. Для новых данных используется вместо payValue. */
+  workPercent?: number;
   accrued: number;
   paid: number;
   lastPaidAt?: string;
@@ -116,6 +118,8 @@ export interface OrderLineWork {
   workSessions?: WorkSession[];
   /** История назначений и смен механика по этой работе. */
   assignmentHistory?: WorkAssignmentEvent[];
+  /** Процент зарплаты, зафиксированный для этой работы. Не меняется при последующей смене ставки сотрудника. */
+  payrollPercent?: number;
 }
 
 /** Отметка смены статуса — из них считается фактическое время на подъёмнике. */
