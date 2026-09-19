@@ -153,8 +153,14 @@ function migrate(db: DB): DB {
       ...db.company,
       // Старая маска-заглушка «+7 (___) ___-__-__» не проходила проверку и
       // не давала сохранить настройки — такой номер считаем незаполненным.
-      phone: isValidPhone(db.company.phone) ? formatPhone(db.company.phone) : "",
-      phone2: db.company.phone2 && isValidPhone(db.company.phone2) ? formatPhone(db.company.phone2) : undefined,
+      phone: isValidPhone(db.company.phone) ? formatPhone(db.company.phone) : formatPhone(companySeed.phone),
+      phoneLabel: db.company.phoneLabel?.trim() || companySeed.phoneLabel,
+      phone2: db.company.phone2 && isValidPhone(db.company.phone2)
+        ? formatPhone(db.company.phone2)
+        : companySeed.phone2 && isValidPhone(companySeed.phone2)
+          ? formatPhone(companySeed.phone2)
+          : undefined,
+      phone2Label: db.company.phone2Label?.trim() || companySeed.phone2Label,
       logoDataUrl: typeof db.company.logoDataUrl === "string" && db.company.logoDataUrl.startsWith("data:image/")
         ? db.company.logoDataUrl
         : undefined,
