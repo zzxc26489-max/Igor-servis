@@ -5,7 +5,7 @@ import { useAppStore } from "../store/AppStore";
 import { formatMoney } from "../lib/format";
 import { isValidMoney, moneyInput } from "../lib/formats";
 import { formatDuration } from "../lib/worktime";
-import { mechanicWorkload, mechanicWorkloadLabel } from "../lib/mechanicWorkload";
+import { mechanicCandidates, mechanicWorkloadLabel } from "../lib/mechanicWorkload";
 import type { Service } from "../types";
 
 export interface NewWork {
@@ -177,18 +177,15 @@ export default function AddWork({ onClose, onSubmit }: { onClose: () => void; on
             <div className="field-control">
               <select value={executor} onChange={(event) => setExecutor(event.target.value)} aria-label="Исполнитель">
                 <option value="">Пока не назначен</option>
-                {employees.map((employee) => {
-                  const load = mechanicWorkload(orders, employee.name);
-                  return (
-                    <option key={employee.id} value={employee.name}>
-                      {employee.name} · {mechanicWorkloadLabel(load)}
-                    </option>
-                  );
-                })}
+                {mechanicCandidates(employees, orders).map(({ employee, load }) => (
+                  <option key={employee.id} value={employee.name}>
+                    {employee.name} · {mechanicWorkloadLabel(load)}
+                  </option>
+                ))}
               </select>
             </div>
             <span className="muted mt-1 block text-xs">
-              Видна текущая загрузка, чтобы не назначать работу вслепую. От исполнителя также зависит зарплата и статистика по времени.
+              Показываются только механики, сначала менее загруженные. От исполнителя также зависит зарплата и статистика по времени.
             </span>
           </label>
 
