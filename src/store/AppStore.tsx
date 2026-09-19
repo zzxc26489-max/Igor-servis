@@ -845,13 +845,18 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           demo: current.demo ? false : current.demo,
           orders: current.orders.map((item) => item.id === orderId ? { ...item, media: nextMedia } : item),
         };
-        dbRef.current = candidate;
-        rawSetDB(candidate);
 
         if (cloudConfigured && session) {
           const saveError = await pushCloudState(candidate);
-          if (saveError) return `Файлы добавлены локально, но сервер пока не подтвердил изменение: ${saveError}`;
+          if (saveError) return `Сервер не подтвердил добавление файлов: ${saveError}`;
+          const confirmed = cloudBaseRef.current ?? candidate;
+          dbRef.current = confirmed;
+          rawSetDB(confirmed);
+          return null;
         }
+
+        dbRef.current = candidate;
+        rawSetDB(candidate);
         return null;
       },
       removeOrderMedia: async (orderId, mediaId) => {
@@ -875,13 +880,18 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
               : item,
           ),
         };
-        dbRef.current = candidate;
-        rawSetDB(candidate);
 
         if (cloudConfigured && session) {
           const saveError = await pushCloudState(candidate);
           if (saveError) return `Сервер не подтвердил удаление файла: ${saveError}`;
+          const confirmed = cloudBaseRef.current ?? candidate;
+          dbRef.current = confirmed;
+          rawSetDB(confirmed);
+          return null;
         }
+
+        dbRef.current = candidate;
+        rawSetDB(candidate);
         return null;
       },
       deleteOrder: async (id) => {
