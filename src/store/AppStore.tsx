@@ -37,12 +37,14 @@ import {
   deleteCloudVehicle,
   confirmCloudSupplierRefund,
   createCloudOrder,
+  deleteCloudOrder,
   listCloudAudit,
   listCloudBackups,
   loadCloudState,
   openCloudCashShift,
   payCloudEmployee,
   receiveCloudStock,
+  releaseCloudOrderPart,
   restoreCloudBackup,
   returnCloudStockSupplier,
   reserveCloudStockPart,
@@ -300,7 +302,7 @@ interface AppStoreValue extends DB {
   setDB: React.Dispatch<React.SetStateAction<DB>>;
   createOrderEntry: (input: CreateOrderEntryInput) => Promise<CreateOrderEntryResult>;
   updateOrder: (id: string, patch: Partial<Order>) => void;
-  deleteOrder: (id: string) => string | null;
+  deleteOrder: (id: string) => Promise<string | null>;
   addClient: (client: Client) => void;
   updateClient: (id: string, patch: Partial<Client>) => Promise<string | null>;
   addVehicle: (vehicle: Vehicle) => Promise<string | null>;
@@ -323,7 +325,7 @@ interface AppStoreValue extends DB {
   /** Добавить запчасть со склада в заказ (резерв, без списания остатка). */
   reservePart: (orderId: string, itemId: string, qty: number, price: number) => Promise<string | null>;
   /** Убрать запчасть из заказа и снять резерв. Выданный заказ менять нельзя. */
-  releasePart: (orderId: string, partId: string) => string | null;
+  releasePart: (orderId: string, partId: string) => Promise<string | null>;
   /** Принять одну или несколько частей оплаты; суммарно не больше долга. */
   acceptPayment: (
     orderId: string,
@@ -814,14 +816,30 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ...prev,
           orders: prev.orders.map((o) => (o.id === id ? { ...o, ...patch } : o)),
         })),
-      deleteOrder: (id) => {
+      deleteOrder: async (id) => {
+        const current = dbRef.current.orders.find((item) => item.id === id);
+        if (!current) return null;
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Удаление заказа нужно подтвердить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальный заказ: ${syncError}`;
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await deleteCloudOrder(session, id);
+            applyConfirmedServerState(result);
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось удалить заказ";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
         let error: string | null = null;
         setDB((prev) => {
           const order = prev.orders.find((item) => item.id === id);
-          if (!order) {
-            error = "Заказ-наряд не найден";
-            return prev;
-          }
+          if (!order) return prev;
           if (order.status === "выдан") {
             error = "Выданный заказ нельзя удалить. История склада и денег должна сохраниться.";
             return prev;
@@ -834,7 +852,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             const item = prev.stock.find((entry) => entry.sku === part.sku);
             return item
               ? [{
-                  id: createId("mv"),
+                  id: `delete-order:${id}:${part.id}`,
                   date: nowISO(),
                   itemId: item.id,
                   operation: "Снят резерв" as const,
@@ -848,7 +866,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           return {
             ...prev,
             orders: prev.orders.filter((item) => item.id !== id),
-            stockMovements: [...released, ...prev.stockMovements],
+            stockMovements: [
+              ...released.filter((movement) => !prev.stockMovements.some((item) => item.id === movement.id)),
+              ...prev.stockMovements,
+            ],
           };
         });
         return error;
@@ -1572,23 +1593,46 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return null;
       },
-      releasePart: (orderId, partId) => {
+      releasePart: async (orderId, partId) => {
+        const currentOrder = dbRef.current.orders.find((item) => item.id === orderId);
+        if (!currentOrder) return "Заказ-наряд не найден";
+        const currentPart = currentOrder.parts.find((item) => item.id === partId);
+        if (!currentPart) return null;
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Снятие резерва нужно подтвердить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальный заказ: ${syncError}`;
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await releaseCloudOrderPart(session, orderId, partId);
+            applyConfirmedServerState(result);
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось снять резерв";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
         let error: string | null = null;
         setDB((prev) => {
           const order = prev.orders.find((item) => item.id === orderId);
           const part = order?.parts.find((item) => item.id === partId);
-          if (!order || !part) {
-            error = "Запчасть в заказе не найдена";
+          if (!order) {
+            error = "Заказ-наряд не найден";
             return prev;
           }
+          if (!part) return prev;
           if (order.status === "выдан") {
             error = "Выданный заказ нельзя изменять. Сначала верните автомобиль в работу.";
             return prev;
           }
           const item = prev.stock.find((entry) => entry.sku === part.sku);
-          const movements = item
+          const movementId = `release-part:${orderId}:${partId}`;
+          const movements = item && !prev.stockMovements.some((entry) => entry.id === movementId)
             ? [{
-                id: createId("mv"),
+                id: movementId,
                 date: nowISO(),
                 itemId: item.id,
                 operation: "Снят резерв" as const,
