@@ -897,7 +897,7 @@ export default function OrderDetail() {
       <Page>
         <div className="order-doc">
         <div
-          className="order-facts mb-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border shadow-[0_2px_8px_rgba(23,34,30,0.045)] sm:grid-cols-2 lg:grid-cols-3"
+          className="order-facts mb-3 grid grid-cols-1 gap-px overflow-hidden rounded-[14px] border shadow-[0_2px_7px_rgba(23,34,30,0.04)] sm:mb-4 sm:grid-cols-2 sm:rounded-xl lg:grid-cols-3"
           style={{ background: "var(--border)", borderColor: "var(--border)" }}
         >
           <InfoCell icon={<IconUser size={18} />} tone="#e9f5ed" color="var(--accent)" label="Клиент">
@@ -967,7 +967,7 @@ export default function OrderDetail() {
           </div>
         </details>
 
-        <Card className="mb-4 p-3 print:hidden">
+        <Card className="mb-3 p-2.5 sm:mb-4 sm:p-3 print:hidden">
           <p className="muted mb-2 text-center text-[11px]">Нажмите на этап, чтобы перевести заказ вперёд или вернуть назад</p>
           <div className="flex items-center justify-between">
             {STATUS_FLOW.map((step, idx) => (
@@ -980,7 +980,7 @@ export default function OrderDetail() {
                 )}
                 <button
                   onClick={() => handleChangeStatus(step)}
-                  className="relative z-10 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-xs font-semibold text-white transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 sm:h-7 sm:w-7"
+                  className="relative z-10 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-[11px] font-semibold text-white transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 sm:h-7 sm:w-7 sm:text-xs"
                   style={{ background: idx <= currentStepIndex ? "var(--accent)" : "#cfd3da" }}
                   aria-label={`Установить статус «${step}»`}
                 >
@@ -992,9 +992,9 @@ export default function OrderDetail() {
           </div>
         </Card>
 
-        <div className="order-body grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="order-body grid grid-cols-1 gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
           <div className="min-w-0">
-            <div className="mb-3 flex snap-x gap-1 overflow-x-auto rounded-xl border bg-white p-1 print:hidden" style={{ borderColor: "var(--border)" }}>
+            <div className="mb-2.5 flex snap-x gap-1 overflow-x-auto rounded-[12px] border bg-white p-1 print:hidden sm:mb-3 sm:rounded-xl" style={{ borderColor: "var(--border)" }}>
               {TABS.map((item) => (
                 <button
                   key={item}
@@ -1014,7 +1014,7 @@ export default function OrderDetail() {
             {/* Работы и запчасти остаются в DOM: они нужны при печати с любой вкладки. */}
             <div className={tab === "Работы и запчасти" ? "space-y-4" : "hidden space-y-4 print:block"}>
                 <Card className="overflow-hidden p-0">
-                  <div className="flex items-center justify-between p-4">
+                  <div className="flex items-center justify-between p-3 sm:p-4">
                     <h2 className="panel-title">Работы</h2>
                     <button onClick={() => order.status === "выдан" ? showToast("Сначала верните автомобиль в работу", "error") : setAddingWork(true)} className="min-h-11 px-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:min-h-9 print:hidden" style={{ color: order.status === "выдан" ? "var(--text-muted)" : "var(--accent)" }}>
                       + Добавить работу
@@ -1070,13 +1070,13 @@ export default function OrderDetail() {
                     </tbody>
                   </table>
 
-                  <div className="border-t bg-[#fafbfa] p-4 text-right text-sm font-semibold" style={{ borderColor: "var(--border)" }}>
+                  <div className="border-t bg-[#fafbfa] p-3 text-right text-[13px] font-semibold sm:p-4 sm:text-sm" style={{ borderColor: "var(--border)" }}>
                     Итого за работы: {formatMoney(worksTotal)}
                   </div>
                 </Card>
 
                 <Card className="overflow-hidden p-0">
-                  <div className="flex items-center justify-between p-4">
+                  <div className="flex items-center justify-between p-3 sm:p-4">
                     <h2 className="panel-title">Запчасти</h2>
                     <button onClick={() => {
                        if (order.status === "выдан") {
@@ -1143,7 +1143,7 @@ export default function OrderDetail() {
                     </tbody>
                   </table>
 
-                  <div className="border-t bg-[#fafbfa] p-4 text-right text-sm font-semibold" style={{ borderColor: "var(--border)" }}>
+                  <div className="border-t bg-[#fafbfa] p-3 text-right text-[13px] font-semibold sm:p-4 sm:text-sm" style={{ borderColor: "var(--border)" }}>
                     Итого за запчасти: {formatMoney(partsTotal)}
                   </div>
                 </Card>
@@ -1378,7 +1378,7 @@ export default function OrderDetail() {
       </Page>
 
       <div
-        className="fixed inset-x-0 bottom-16 z-20 flex items-center justify-between gap-3 border-t bg-white/95 px-4 py-3 backdrop-blur xl:hidden print:hidden"
+        className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 flex items-center justify-between gap-2 border-t bg-white/95 px-3 py-2 backdrop-blur xl:hidden print:hidden"
         style={{ borderColor: "var(--border)" }}
       >
         <div className="min-w-0">
