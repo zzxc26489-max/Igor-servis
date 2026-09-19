@@ -1,5 +1,5 @@
 import type { Order, StockItem } from "../types";
-import { reservedByItem } from "./stock";
+import { reservedByItem } from "./stock.ts";
 
 /**
  * Позиции, которые пора докупить: свободный остаток (за вычетом резерва)
