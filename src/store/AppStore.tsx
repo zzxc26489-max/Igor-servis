@@ -30,15 +30,18 @@ import { backfillTimeline } from "../lib/worktime";
 import { normalizeWorkDay, parseWorkHours, setWorkDay } from "../lib/workday";
 import { ensureLegacyPayments } from "../lib/payments";
 import {
+  addCloudExpense,
   applyCloudOrderPayment,
   closeCloudCashShift,
   createCloudBackup,
   deleteCloudVehicle,
+  confirmCloudSupplierRefund,
   createCloudOrder,
   listCloudAudit,
   listCloudBackups,
   loadCloudState,
   openCloudCashShift,
+  payCloudEmployee,
   receiveCloudStock,
   restoreCloudBackup,
   returnCloudStockSupplier,
@@ -303,7 +306,7 @@ interface AppStoreValue extends DB {
   addStockMovement: (m: StockMovement) => void;
   updateStockItem: (id: string, patch: Partial<StockItem>) => void;
   receiveStock: (input: ReceiveStockInput) => Promise<string | null>;
-  addExpense: (e: Expense) => string | null;
+  addExpense: (e: Expense) => Promise<string | null>;
   updateCompany: (patch: Partial<CompanyInfo>) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   updateEmployee: (id: string, patch: Partial<Employee>) => void;
@@ -334,9 +337,9 @@ interface AppStoreValue extends DB {
   /** Возврат запчасти поставщику: списывает со склада и заводит ожидание денег. */
   returnToSupplier: (input: ReturnToSupplierInput) => Promise<string | null>;
   /** Деньги от поставщика пришли — возврат идёт в расчёты. */
-  confirmRefund: (expenseId: string, method: PaymentMethod) => string | null;
+  confirmRefund: (expenseId: string, method: PaymentMethod, operationId?: string) => Promise<string | null>;
   /** Выплата зарплаты сотруднику. */
-  payEmployee: (employeeId: string, amount: number, note?: string, method?: PaymentMethod, component?: PayrollComponent) => string | null;
+  payEmployee: (employeeId: string, amount: number, note?: string, method?: PaymentMethod, component?: PayrollComponent, operationId?: string) => Promise<string | null>;
   /** Открыть кассовую смену. */
   openCashShift: (openingCash: number, openedBy: string) => Promise<string | null>;
   /** Закрыть кассовую смену после пересчёта наличных. */
@@ -953,9 +956,27 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ...prev,
           stock: prev.stock.map((s) => (s.id === id ? { ...s, ...patch } : s)),
         })),
-      addExpense: (e) => {
+      addExpense: async (e) => {
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Расход нужно подтвердить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальные финансы: ${syncError}`;
+
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await addCloudExpense(session, e);
+            applyConfirmedServerState(result);
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось добавить расход";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
         let error: string | null = null;
         setDB((prev) => {
+          if (prev.expenses.some((item) => item.id === e.id)) return prev;
           const shift = activeCashShift(prev.cashShifts);
           if (e.paymentMethod === "cash" && !shift) {
             error = "Для расхода наличными сначала откройте кассовую смену";
@@ -1656,7 +1677,26 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return error;
       },
-      confirmRefund: (expenseId, method) => {
+      confirmRefund: async (expenseId, method, operationId) => {
+        const opId = operationId ?? `supplier-refund-${expenseId}`;
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Возврат нужно подтвердить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальные финансы: ${syncError}`;
+
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await confirmCloudSupplierRefund(session, expenseId, method, opId);
+            applyConfirmedServerState(result);
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось подтвердить возврат";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
         let error: string | null = null;
         setDB((prev) => {
           const shift = activeCashShift(prev.cashShifts);
@@ -1665,10 +1705,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             return prev;
           }
           const expense = prev.expenses.find((item) => item.id === expenseId);
-          if (!expense || expense.source !== "supplier_refund" || expense.status === "Возвращено") {
-            error = "Возврат поставщика не найден или уже подтверждён";
+          if (!expense || expense.source !== "supplier_refund") {
+            error = "Возврат поставщика не найден";
             return prev;
           }
+          if (expense.status === "Возвращено") return prev;
           return {
             ...prev,
             expenses: prev.expenses.map((item) =>
@@ -1686,19 +1727,54 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return error;
       },
-      payEmployee: (employeeId, amount, note, method, component) => {
+      payEmployee: async (employeeId, amount, note, method, component, operationId) => {
+        const currentEmployee = dbRef.current.employees.find((item) => item.id === employeeId);
+        if (!currentEmployee) return "Сотрудник не найден";
+        if (!method) return "Выберите способ выплаты";
+        if (!Number.isFinite(amount) || amount <= 0) return "Сумма выплаты должна быть больше нуля";
+
+        const resolvedComponent: PayrollComponent = component
+          ?? (currentEmployee.payType === "salary" ? "salary" : "piecework");
+        const expenseId = operationId ?? createId("exp");
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Выплату нужно подтвердить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальные начисления: ${syncError}`;
+
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await payCloudEmployee(session, {
+              employeeId,
+              amount,
+              method,
+              component: resolvedComponent,
+              expenseId,
+              note,
+            });
+            applyConfirmedServerState(result);
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось провести выплату";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
         let error: string | null = null;
         setDB((prev) => {
+          if (prev.expenses.some((entry) => entry.id === expenseId)) return prev;
           const shift = activeCashShift(prev.cashShifts);
           if (method === "cash" && !shift) {
             error = "Для выплаты наличными сначала откройте кассовую смену";
             return prev;
           }
           const employee = prev.employees.find((item) => item.id === employeeId);
-          if (!employee || amount <= 0) return prev;
+          if (!employee) {
+            error = "Сотрудник не найден";
+            return prev;
+          }
           const now = nowISO();
-          const resolvedComponent: PayrollComponent = component
-            ?? (employee.payType === "salary" ? "salary" : "piecework");
           const isPiecework = resolvedComponent === "piecework";
           return {
             ...prev,
@@ -1709,7 +1785,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             }),
             expenses: [
               {
-                id: createId("exp"),
+                id: expenseId,
                 code: nextCode(CODE_PREFIX.expense, prev.expenses.map((entry) => entry.code)),
                 date: now.slice(0, 10),
                 category: "Зарплата",
