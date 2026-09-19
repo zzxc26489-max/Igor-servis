@@ -1,5 +1,6 @@
 import type { Order, OrderLineWork, StockItem } from "../types.ts";
 import { effectiveWorkStatus, transitionWorkSessions } from "./workSessions.ts";
+import { orderTotals } from "./order.ts";
 
 export function completeWorksForReady(works: OrderLineWork[], at: string) {
   return works.map((work) => ({
@@ -26,6 +27,10 @@ export function issueBlockers(order: Order, stock: StockItem[]) {
         ? `Не завершена работа «${unfinished[0].name}».`
         : `Не завершено работ: ${unfinished.length}.`,
     );
+  }
+
+  if (orderTotals(order).debt < -0.0001) {
+    blockers.push("По заказу есть переплата. Сначала оформите возврат клиенту или скорректируйте сумму заказа.");
   }
 
   const pendingParts = orderedParts(order);
