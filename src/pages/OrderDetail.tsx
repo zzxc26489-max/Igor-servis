@@ -208,14 +208,14 @@ export default function OrderDetail() {
   }
 
   function handleAddWork(work: NewWork) {
-    if (!order) return;
+    if (!order) return false;
     if (order.status === "выдан") {
       showToast("Выданный заказ нельзя изменять. Сначала верните автомобиль в работу.", "error");
-      return;
+      return false;
     }
     if (!Number.isInteger(work.qty) || work.qty <= 0 || work.price <= 0 || work.price > 10_000_000) {
       showToast("Проверьте количество и цену работы", "error");
-      return;
+      return false;
     }
     const newWork: OrderLineWork = work;
     const nextWorks = appendWorkOnce(order.works, newWork);
@@ -238,6 +238,7 @@ export default function OrderDetail() {
     } else {
       showToast(`Добавлена работа «${work.name}»`);
     }
+    return true;
   }
 
   function openReassignWork(work: OrderLineWork) {
