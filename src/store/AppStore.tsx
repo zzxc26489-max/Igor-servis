@@ -450,60 +450,68 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     void loadFromCloud(true);
   }, [cloudConfigured, loadFromCloud, session]);
 
-  const pushCloudState = useCallback(async (candidate: DB, attempt = 0): Promise<string | null> => {
-    if (!cloudConfigured || !session) return "Серверная база не подключена";
-    try {
-      if (cloudRetryTimerRef.current) {
-        window.clearTimeout(cloudRetryTimerRef.current);
-        cloudRetryTimerRef.current = null;
-      }
-      setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
-      const result = await saveCloudState(session, cloudRevisionRef.current, candidate);
-      if (result.ok) {
+  const pushCloudState = useCallback((candidate: DB, attempt = 0): Promise<string | null> => {
+    async function push(nextCandidate: DB, nextAttempt: number): Promise<string | null> {
+      if (!cloudConfigured || !session) return "Серверная база не подключена";
+      try {
+        if (cloudRetryTimerRef.current) {
+          window.clearTimeout(cloudRetryTimerRef.current);
+          cloudRetryTimerRef.current = null;
+        }
+        setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+        const result = await saveCloudState(session, cloudRevisionRef.current, nextCandidate);
+        if (result.ok) {
+          cloudRevisionRef.current = result.revision;
+          cloudBaseRef.current = nextCandidate;
+          writeCloudBase(session.user.id, result.revision, nextCandidate);
+          setCloud((prev) => ({
+            ...prev,
+            status: "ready",
+            revision: result.revision,
+            lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+            error: undefined,
+          }));
+          return null;
+        }
+
+        const remote = migrate(result.data as DB);
+        const base = cloudBaseRef.current ?? remote;
+        const merged = migrate(
+          mergeConcurrentState(
+            base as unknown as Record<string, unknown>,
+            nextCandidate as unknown as Record<string, unknown>,
+            remote as unknown as Record<string, unknown>,
+          ) as unknown as DB,
+        );
         cloudRevisionRef.current = result.revision;
-        cloudBaseRef.current = candidate;
-        writeCloudBase(session.user.id, result.revision, candidate);
+        cloudBaseRef.current = remote;
+        writeCloudBase(session.user.id, result.revision, remote);
+        rawSetDB(merged);
+
+        if (nextAttempt >= 2) {
+          const message = "Одновременно изменились одни и те же данные. Обновите страницу и проверьте последние изменения.";
+          setCloud((prev) => ({ ...prev, status: "error", revision: result.revision, error: message }));
+          return message;
+        }
+        return push(merged, nextAttempt + 1);
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : "Не удалось сохранить данные на сервер";
         setCloud((prev) => ({
           ...prev,
-          status: "ready",
-          revision: result.revision,
-          lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
-          error: undefined,
+          status: "error",
+          error: `${message}. Изменения сохранены на устройстве, повторим автоматически.`,
         }));
-        return null;
-      }
-
-      const remote = migrate(result.data as DB);
-      const base = cloudBaseRef.current ?? remote;
-      const merged = migrate(
-        mergeConcurrentState(
-          base as unknown as Record<string, unknown>,
-          candidate as unknown as Record<string, unknown>,
-          remote as unknown as Record<string, unknown>,
-        ) as unknown as DB,
-      );
-      cloudRevisionRef.current = result.revision;
-      cloudBaseRef.current = remote;
-      writeCloudBase(session.user.id, result.revision, remote);
-      rawSetDB(merged);
-
-      if (attempt >= 2) {
-        const message = "Одновременно изменились одни и те же данные. Обновите страницу и проверьте последние изменения.";
-        setCloud((prev) => ({ ...prev, status: "error", revision: result.revision, error: message }));
+        if (nextAttempt < 6) {
+          const delay = Math.min(30_000, 1_000 * (2 ** nextAttempt));
+          cloudRetryTimerRef.current = window.setTimeout(() => {
+            void push(dbRef.current, nextAttempt + 1);
+          }, delay);
+        }
         return message;
       }
-      return pushCloudState(merged, attempt + 1);
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Не удалось сохранить данные на сервер";
-      setCloud((prev) => ({ ...prev, status: "error", error: `${message}. Изменения сохранены на устройстве, повторим автоматически.` }));
-      if (attempt < 6) {
-        const delay = Math.min(30_000, 1_000 * (2 ** attempt));
-        cloudRetryTimerRef.current = window.setTimeout(() => {
-          void pushCloudState(dbRef.current, attempt + 1);
-        }, delay);
-      }
-      return message;
     }
+
+    return push(candidate, attempt);
   }, [cloudConfigured, session]);
 
   useEffect(() => {
