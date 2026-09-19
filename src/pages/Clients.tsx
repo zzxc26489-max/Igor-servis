@@ -23,29 +23,29 @@ export default function Clients() {
     <>
       <TopBar title="Клиенты" subtitle={query ? `Найдено: ${filteredClients.length}` : `Всего: ${clients.length}`} />
       <Page>
-        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Card className="flex items-start gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#edf4ff] text-[#3978c9]">
+        <div className="mb-3 grid grid-cols-2 gap-2 sm:mb-4 sm:gap-3">
+          <Card className="flex items-center gap-2.5 sm:items-start sm:gap-3">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] sm:h-11 sm:w-11 sm:rounded-xl bg-[#edf4ff] text-[#3978c9]">
               <IconUsers size={22} />
             </div>
             <div>
               <p className="muted text-sm">Всего клиентов</p>
-              <p className="mt-1 text-2xl font-semibold">{clients.length}</p>
+              <p className="mt-0.5 text-xl font-semibold sm:mt-1 sm:text-2xl">{clients.length}</p>
             </div>
           </Card>
-          <Card className="flex items-start gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e9f5ed] text-[var(--accent)]">
+          <Card className="flex items-center gap-2.5 sm:items-start sm:gap-3">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] sm:h-11 sm:w-11 sm:rounded-xl bg-[#e9f5ed] text-[var(--accent)]">
               <IconStar size={22} />
             </div>
             <div>
               <p className="muted text-sm">Постоянные клиенты</p>
-              <p className="mt-1 text-2xl font-semibold">{regularCount}</p>
+              <p className="mt-0.5 text-xl font-semibold sm:mt-1 sm:text-2xl">{regularCount}</p>
             </div>
           </Card>
         </div>
 
-        <Card className="overflow-hidden p-0 max-sm:-mx-3 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
-          <div className="space-y-2 p-3 max-sm:p-2 lg:hidden">
+        <Card className="overflow-hidden p-0 max-sm:-mx-2.5 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
+          <div className="space-y-1.5 p-2 lg:hidden sm:space-y-2 sm:p-3">
             {filteredClients.map((c) => {
               const clientVehicles = vehicles.filter((v) => v.clientId === c.id);
               const clientOrders = orders.filter((o) => o.clientId === c.id);
