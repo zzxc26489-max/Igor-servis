@@ -27,10 +27,13 @@ export default function BarcodeScanner({
   const closeRef = useRef(onClose);
   const [manual, setManual] = useState("");
 
-  detectedRef.current = onDetected;
-  closeRef.current = onClose;
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    detectedRef.current = onDetected;
+    closeRef.current = onClose;
+  }, [onDetected, onClose]);
 
   useEffect(() => {
     let stream: MediaStream | null = null;

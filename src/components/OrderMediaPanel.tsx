@@ -25,20 +25,18 @@ function canDelete(role?: string) {
 
 function MediaPreview({ media }: { media: OrderMedia }) {
   const { session } = useAuth();
-  const [src, setSrc] = useState(media.localDataUrl ?? "");
+  const [remoteSrc, setRemoteSrc] = useState("");
   const [error, setError] = useState("");
+  const src = media.localDataUrl ?? remoteSrc;
 
   useEffect(() => {
-    if (media.localDataUrl || !media.storagePath || !session) {
-      setSrc(media.localDataUrl ?? "");
-      return;
-    }
+    if (media.localDataUrl || !media.storagePath || !session) return;
     let disposed = false;
     setError("");
     void createCloudOrderMediaSignedUrl(session, media.storagePath)
       .then((url) => {
         if (disposed) return;
-        setSrc(url);
+        setRemoteSrc(url);
       })
       .catch(() => {
         if (!disposed) setError("Не удалось открыть файл");
