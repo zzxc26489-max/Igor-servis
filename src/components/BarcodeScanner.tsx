@@ -20,7 +20,12 @@ export default function BarcodeScanner({
   title?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const detectedRef = useRef(onDetected);
+  const closeRef = useRef(onClose);
   const [manual, setManual] = useState("");
+
+  detectedRef.current = onDetected;
+  closeRef.current = onClose;
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
 
@@ -63,8 +68,8 @@ export default function BarcodeScanner({
             const value = found[0]?.rawValue?.trim();
             if (value) {
               stopped = true;
-              onDetected(value);
-              onClose();
+              detectedRef.current(value);
+              closeRef.current();
             }
           } catch {
             // Кадр мог смениться во время распознавания — следующий проход попробует снова.
@@ -83,7 +88,7 @@ export default function BarcodeScanner({
       if (timer) window.clearInterval(timer);
       stream?.getTracks().forEach((track) => track.stop());
     };
-  }, [onClose, onDetected]);
+  }, []);
 
   function submitManual(event: FormEvent) {
     event.preventDefault();
