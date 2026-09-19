@@ -177,7 +177,7 @@ export default function StockReceive({
     });
     if (!ok) return;
 
-    const receiveError = receiveStock({
+    const receiveError = await receiveStock({
       itemId: matched?.id,
       name: name.trim(),
       sku: sku.trim(),
