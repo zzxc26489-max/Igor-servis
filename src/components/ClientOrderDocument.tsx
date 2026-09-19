@@ -23,6 +23,7 @@ export default function ClientOrderDocument({
   const paid = Math.max(0, recordedForOrder(payments, order.id));
   const debt = Math.max(0, total - paid);
   const number = order.number.replace("№", "");
+  const documentMileage = order.mileageAtIntake ?? (order.status === "выдан" ? undefined : vehicle?.mileage);
 
   return (
     <article
@@ -64,7 +65,7 @@ export default function ClientOrderDocument({
             {vehicle?.year ? ` · ${vehicle.year} г.` : ""}
           </div>
           {vehicle?.vin && <div>VIN: {vehicle.vin}</div>}
-          {vehicle?.mileage ? <div>Пробег: {vehicle.mileage.toLocaleString("ru-RU")} км</div> : null}
+          {documentMileage ? <div>Пробег: {documentMileage.toLocaleString("ru-RU")} км</div> : null}
         </div>
       </section>
 
