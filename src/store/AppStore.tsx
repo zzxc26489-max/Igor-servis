@@ -49,7 +49,7 @@ import {
   type CloudBackupInfo,
   type CloudRole,
 } from "../lib/cloud";
-import { mergeConcurrentState } from "../lib/stateMerge";
+import { mergeConcurrentStateDetailed } from "../lib/stateMerge";
 import { useAuth } from "../auth/AuthContext";
 import { LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
 import { isValidQuantity, normalizeQuantity } from "../lib/quantity";
@@ -278,6 +278,8 @@ export interface CloudSyncInfo {
   revision?: number;
   lastSyncedAt?: string;
   error?: string;
+  conflictCount?: number;
+  lastConflictAt?: string;
 }
 
 interface AppStoreValue extends DB {
@@ -362,6 +364,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const cloudSaveTimerRef = useRef<number | null>(null);
   const cloudRetryTimerRef = useRef<number | null>(null);
   const cloudLoadingKeyRef = useRef<string | null>(null);
+  const cloudLoadRequestRef = useRef(0);
   const [cloud, setCloud] = useState<CloudSyncInfo>({
     configured: cloudConfigured,
     status: cloudConfigured ? "loading" : "local",
@@ -397,8 +400,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   }, [cloudConfigured, db]);
 
   const applyCloudSnapshot = useCallback((snapshot: Awaited<ReturnType<typeof loadCloudState>>) => {
-    if (!session) return;
-    cloudRevisionRef.current = snapshot.revision;
+    if (!session) return false;
+
+    // Главное правило опроса: ревизия на устройстве никогда не движется назад.
+    // Поздний ответ старого запроса просто игнорируем.
+    if (snapshot.revision < cloudRevisionRef.current) return false;
+
     const meta = {
       configured: true,
       workshopId: snapshot.workshopId,
@@ -409,9 +416,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     } satisfies Partial<CloudSyncInfo>;
 
     if (snapshot.empty) {
+      // Пустой сервер допустим только до первой серверной ревизии.
+      if (cloudRevisionRef.current > 0) return false;
+      cloudRevisionRef.current = snapshot.revision;
       cloudBaseRef.current = migrate(dbRef.current);
-      setCloud({ ...meta, status: "needs_upload" } as CloudSyncInfo);
-      return;
+      setCloud((prev) => ({ ...prev, ...meta, status: "needs_upload", error: undefined } as CloudSyncInfo));
+      return true;
     }
 
     const remote = migrate(snapshot.data as DB);
@@ -419,37 +429,54 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     const base = cloudBaseRef.current ?? (cached ? migrate(cached.base) : null);
     const local = migrate(dbRef.current);
     const hasUnsavedLocal = Boolean(base && JSON.stringify(local) !== JSON.stringify(base));
-    const next = hasUnsavedLocal && base
-      ? migrate(
-          mergeConcurrentState(
-            base as unknown as Record<string, unknown>,
-            local as unknown as Record<string, unknown>,
-            remote as unknown as Record<string, unknown>,
-          ) as unknown as DB,
-        )
-      : remote;
 
+    let next = remote;
+    let conflicts = 0;
+    if (hasUnsavedLocal && base) {
+      const merged = mergeConcurrentStateDetailed(
+        base as unknown as Record<string, unknown>,
+        local as unknown as Record<string, unknown>,
+        remote as unknown as Record<string, unknown>,
+      );
+      next = migrate(merged.value as unknown as DB);
+      conflicts = merged.conflicts.length;
+    }
+
+    cloudRevisionRef.current = snapshot.revision;
     cloudBaseRef.current = remote;
     writeCloudBase(session.user.id, snapshot.revision, remote);
-    // Серверная база успешно загружена — общий локальный ключ больше не нужен
-    // и не сможет раскрыть данные следующему пользователю этого браузера.
     localStorage.removeItem(STORAGE_KEY);
     rawSetDB(next);
-    setCloud({ ...meta, status: "ready", lastSyncedAt: new Date().toISOString() } as CloudSyncInfo);
+    setCloud((prev) => ({
+      ...prev,
+      ...meta,
+      status: "ready",
+      lastSyncedAt: new Date().toISOString(),
+      error: undefined,
+      conflictCount: conflicts || prev.conflictCount,
+      lastConflictAt: conflicts ? new Date().toISOString() : prev.lastConflictAt,
+    } as CloudSyncInfo));
+    return true;
   }, [session]);
 
   const loadFromCloud = useCallback(async (showLoading = true) => {
     if (!cloudConfigured || !session) return "Серверная база не подключена";
+    const requestId = ++cloudLoadRequestRef.current;
     try {
       if (showLoading) {
         setCloud((prev) => ({ ...prev, configured: true, status: "loading", error: undefined }));
       }
       const snapshot = await loadCloudState(session);
+      // Более старый запрос не должен менять интерфейс после более нового ответа.
+      if (requestId < cloudLoadRequestRef.current && snapshot.revision <= cloudRevisionRef.current) return null;
       applyCloudSnapshot(snapshot);
       return null;
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Не удалось загрузить общую базу";
-      setCloud((prev) => ({ ...prev, configured: true, status: "error", error: message }));
+      // Ошибка старого запроса не должна перекрыть состояние более свежей синхронизации.
+      if (requestId === cloudLoadRequestRef.current) {
+        setCloud((prev) => ({ ...prev, configured: true, status: "error", error: message }));
+      }
       return message;
     }
   }, [applyCloudSnapshot, cloudConfigured, session]);
@@ -457,6 +484,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!cloudConfigured || !session) {
       cloudLoadingKeyRef.current = null;
+      cloudLoadRequestRef.current += 1;
       cloudBaseRef.current = null;
       cloudRevisionRef.current = 0;
       setCloud({ configured: cloudConfigured, status: cloudConfigured ? "loading" : "local" });
@@ -494,20 +522,26 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
         const remote = migrate(result.data as DB);
         const base = cloudBaseRef.current ?? remote;
-        const merged = migrate(
-          mergeConcurrentState(
-            base as unknown as Record<string, unknown>,
-            nextCandidate as unknown as Record<string, unknown>,
-            remote as unknown as Record<string, unknown>,
-          ) as unknown as DB,
+        const mergeResult = mergeConcurrentStateDetailed(
+          base as unknown as Record<string, unknown>,
+          nextCandidate as unknown as Record<string, unknown>,
+          remote as unknown as Record<string, unknown>,
         );
-        cloudRevisionRef.current = result.revision;
+        const merged = migrate(mergeResult.value as unknown as DB);
+        cloudRevisionRef.current = Math.max(cloudRevisionRef.current, result.revision);
         cloudBaseRef.current = remote;
         writeCloudBase(session.user.id, result.revision, remote);
         rawSetDB(merged);
+        if (mergeResult.conflicts.length) {
+          setCloud((prev) => ({
+            ...prev,
+            conflictCount: (prev.conflictCount ?? 0) + mergeResult.conflicts.length,
+            lastConflictAt: new Date().toISOString(),
+          }));
+        }
 
         if (nextAttempt >= 2) {
-          const message = "Одновременно изменились одни и те же данные. Обновите страницу и проверьте последние изменения.";
+          const message = "Не удалось автоматически подтвердить все изменения после нескольких серверных ревизий. Обновите данные перед повторной правкой.";
           setCloud((prev) => ({ ...prev, status: "error", revision: result.revision, error: message }));
           return message;
         }
