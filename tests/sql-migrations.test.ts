@@ -52,3 +52,12 @@ test("atomic cash shift migration locks shared state and recalculates expected c
   assert.match(sql, /При расхождении нужен комментарий/);
   assert.match(sql, /cash_shift_closed/);
 });
+
+
+test("advisor stock sync migration persists stock together with issue movements", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "010_advisor_stock_issue_sync.sql"), "utf8");
+  assert.match(sql, /elsif v_role = 'advisor'/);
+  assert.match(sql, /'stock', coalesce\(p_data -> 'stock', v_current\.data -> 'stock'\)/);
+  assert.match(sql, /'stockMovements', coalesce\(p_data -> 'stockMovements'/);
+  assert.match(sql, /'orders', coalesce\(p_data -> 'orders'/);
+});
