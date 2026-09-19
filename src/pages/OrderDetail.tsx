@@ -26,6 +26,7 @@ import { nowISO } from "../lib/date";
 import type { OrderConsumable, OrderLinePart, OrderLineWork, OrderStatus, PaymentMethod } from "../types";
 import defaultLogo from "../assets/logo.jpg";
 import { effectiveWorkStatus, WORK_STATUS_LABEL, workSessionMinutes } from "../lib/workSessions";
+import OrderMediaPanel from "../components/OrderMediaPanel";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
 const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "Документы"] as const;
@@ -978,6 +979,9 @@ export default function OrderDetail() {
                       <input inputMode="numeric" value={intakeMileage} onChange={(e) => setIntakeMileage(e.target.value.replace(/\D/g, "").slice(0, 7))} placeholder="Например, 121000" />
                     </div>
                   </label>
+                </div>
+                <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--border)" }}>
+                  <OrderMediaPanel order={order} defaultKind="intake" />
                 </div>
                 <div className="mt-4 flex justify-end border-t pt-4" style={{ borderColor: "var(--border)" }}>
                   <Button onClick={saveIntake}>Сохранить приёмку</Button>
