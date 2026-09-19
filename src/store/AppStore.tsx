@@ -859,6 +859,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           // самый свежий локальный state. Автосейв отправит оставшуюся дельту.
           const rebased = applyAdditions(dbRef.current);
           if (!rebased) return "Заказ-наряд уже удалён на другом устройстве";
+
+          const confirmedOrder = cloudBaseRef.current?.orders.find((item) => item.id === orderId);
+          const confirmedIds = new Set((confirmedOrder?.media ?? []).map((item) => item.id));
+          if (additions.some((item) => !confirmedIds.has(item.id))) {
+            const retryError = await pushCloudState(rebased);
+            if (retryError) return `Сервер не подтвердил добавление файлов: ${retryError}`;
+          }
+
           dbRef.current = rebased;
           rawSetDB(rebased);
           return null;
@@ -899,6 +907,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
           const rebased = applyRemoval(dbRef.current);
           if (!rebased) return "Заказ-наряд уже удалён на другом устройстве";
+
+          const confirmedOrder = cloudBaseRef.current?.orders.find((item) => item.id === orderId);
+          if ((confirmedOrder?.media ?? []).some((item) => item.id === mediaId)) {
+            const retryError = await pushCloudState(rebased);
+            if (retryError) return `Сервер не подтвердил удаление файла: ${retryError}`;
+          }
+
           dbRef.current = rebased;
           rawSetDB(rebased);
           return null;
