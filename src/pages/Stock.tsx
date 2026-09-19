@@ -8,7 +8,7 @@ import { useAppStore } from "../store/AppStore";
 import { Button, Card, EmptyState, ListCard, Metric, Modal, Page, TopBar } from "../components/ui";
 import { formatDateTime, formatMoney, plural } from "../lib/format";
 import { reservedByItem, reservingOrders } from "../lib/stock";
-import { lowStockItems } from "../lib/lowStock";
+import { incomingStockItems, lowStockItems } from "../lib/lowStock";
 import { useConfirm } from "../components/Confirm";
 import { useToast } from "../components/Toast";
 import StockReceive from "./StockReceive";
@@ -17,7 +17,7 @@ import { findPartReferences } from "../data/partReferences";
 import type { Order, PartReference, StockItem } from "../types";
 import { canManageStock } from "../lib/access";
 
-type Chip = "all" | "low" | "reserved" | "movements" | "catalog";
+type Chip = "all" | "low" | "reserved" | "incoming" | "movements" | "catalog";
 
 export default function Stock() {
   const { stock, stockMovements, orders, vehicles, employees, returnToSupplier, cloud } = useAppStore();
@@ -41,12 +41,14 @@ export default function Stock() {
 
   const lowCount = lowStockItems(stock, orders).length;
   const reservedCount = stock.filter((item) => (reservations.get(item.id) ?? 0) > 0).length;
+  const incomingCount = incomingStockItems(stock).length;
   const totalValue = stock.reduce((sum, item) => sum + item.qty * item.purchasePrice, 0);
 
   const CHIPS: { value: Chip; label: string; count?: number }[] = [
     { value: "all", label: "Все", count: stock.length },
     { value: "low", label: "Заканчиваются", count: lowCount },
     { value: "reserved", label: "В резерве", count: reservedCount },
+    { value: "incoming", label: "В поставке", count: incomingCount },
     { value: "movements", label: "Движения" },
     { value: "catalog", label: "Справочник артикулов" },
   ];
@@ -57,6 +59,7 @@ export default function Stock() {
       .filter((item) => {
         if (chip === "low" && item.qty - (reservations.get(item.id) ?? 0) > item.minQty) return false;
         if (chip === "reserved" && (reservations.get(item.id) ?? 0) === 0) return false;
+        if (chip === "incoming" && (item.onOrderQty ?? 0) <= 0) return false;
         if (category !== "all" && item.category !== category) return false;
         if (!term) return true;
         return `${item.code ?? ""} ${item.name} ${item.sku} ${item.barcode ?? ""} ${item.brand ?? ""} ${item.cell ?? ""}`
@@ -318,6 +321,7 @@ export default function Stock() {
                           {item.cell ? <><IconMapPin size={13} className="inline" /> {item.cell} · </> : null}
                           закупка {formatMoney(item.purchasePrice)}
                           {reserved > 0 ? ` · в резерве ${reserved}` : ""}
+                          {item.onOrderQty ? ` · в поставке ${item.onOrderQty}` : ""}
                         </>,
                       ]}
                       meta={formatMoney(item.qty * item.purchasePrice)}
@@ -494,6 +498,7 @@ function ItemCard({
         <Row label="Цена закупки" value={formatMoney(item.purchasePrice)} />
         {item.lastPurchasePrice !== undefined && <Row label="Последняя закупка" value={formatMoney(item.lastPurchasePrice)} />}
         {item.supplier && <Row label="Поставщик" value={item.supplier} />}
+        {item.onOrderQty ? <Row label="В поставке" value={`${item.onOrderQty} ${item.unit}${item.expectedAt ? ` · до ${item.expectedAt}` : ""}`} /> : null}
         <Row label="Стоимость остатка" value={formatMoney(item.qty * item.purchasePrice)} />
       </div>
 

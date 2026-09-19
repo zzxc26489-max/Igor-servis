@@ -224,6 +224,14 @@ export interface StockItem {
   lastPurchasePrice?: number;
   lastPurchaseAt?: string;
   supplier?: string;
+  /** Количество, уже заказанное у поставщика, но ещё не принятое на склад. */
+  onOrderQty?: number;
+  /** Состояние текущего пополнения. */
+  supplyStatus?: "ordered" | "in_transit";
+  /** Когда заказали текущее пополнение. */
+  orderedAt?: string;
+  /** Ожидаемая дата поставки. */
+  expectedAt?: string;
 }
 
 export interface PartReference {
@@ -245,7 +253,7 @@ export interface StockMovement {
   id: string;
   date: string;
   itemId: string;
-  operation: "Приёмка" | "Списание" | "Перемещение" | "Резерв" | "Снят резерв" | "Возврат" | "Возврат поставщику";
+  operation: "Приёмка" | "Списание" | "Перемещение" | "Резерв" | "Снят резерв" | "Возврат" | "Возврат поставщику" | "Заказ поставщику" | "В пути" | "Отмена заказа";
   qty: number;
   from?: string;
   to?: string;

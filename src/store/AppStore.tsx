@@ -680,6 +680,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 const purchasePrice = input.unitPrice > 0 && qty > 0
                   ? Math.round((item.qty * item.purchasePrice + total) / qty)
                   : item.purchasePrice;
+                const remainingOnOrder = Math.max(0, (item.onOrderQty ?? 0) - receivedQty);
                 return {
                   ...item,
                   qty,
@@ -690,6 +691,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                   supplier: input.supplier || item.supplier,
                   lastPurchasePrice: input.unitPrice > 0 ? input.unitPrice : item.lastPurchasePrice,
                   lastPurchaseAt: input.unitPrice > 0 ? now : item.lastPurchaseAt,
+                  onOrderQty: remainingOnOrder > 0 ? remainingOnOrder : undefined,
+                  supplyStatus: remainingOnOrder > 0 ? item.supplyStatus : undefined,
+                  orderedAt: remainingOnOrder > 0 ? item.orderedAt : undefined,
+                  expectedAt: remainingOnOrder > 0 ? item.expectedAt : undefined,
                 };
               })
             : [
