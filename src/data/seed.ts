@@ -88,7 +88,56 @@ const employeeList: Employee[] = [
   },
 ];
 
-export const clients: Client[] = [
+const DEMO_REVIEWS_BY_CLIENT: Record<string, NonNullable<Client["reviews"]>> = {
+  "cl-1": [
+    { id: "rev-01", platform: "yandex", rating: 5, text: "Обслуживаюсь не первый раз. Всё объясняют по делу, лишнего не навязывают. Машину отдали в обещанное время.", createdAt: at(-2, "18:20"), status: "resolved" },
+    { id: "rev-02", platform: "2gis", rating: 5, text: "Заезжал на ТО и диагностику подвески. Понравилось, что заранее согласовали стоимость и показали старые детали.", createdAt: at(-74, "12:10"), status: "resolved" },
+  ],
+  "cl-2": [
+    { id: "rev-03", platform: "yandex", rating: 5, text: "Быстро нашли причину ошибки, до этого в другом месте только меняли детали наугад. Спасибо за нормальную диагностику.", createdAt: at(-4, "10:35"), status: "resolved" },
+  ],
+  "cl-3": [
+    { id: "rev-04", platform: "yandex", rating: 3, text: "По ремонту всё хорошо, но машину забрал позже обещанного времени и пришлось самому уточнять готовность.", createdAt: at(-1, "16:40"), status: "new" },
+    { id: "rev-05", platform: "2gis", rating: 5, text: "После разговора всё объяснили и исправили вопрос по срокам. К качеству ремонта претензий нет.", createdAt: at(-92, "14:00"), status: "updated" },
+  ],
+  "cl-4": [
+    { id: "rev-06", platform: "yandex", rating: 4, text: "Хороший сервис рядом с домом. Цены понятные, мастер всё показывает. Хотелось бы чуть быстрее согласование по телефону.", createdAt: at(-7, "19:15"), status: "resolved" },
+  ],
+  "cl-5": [
+    { id: "rev-07", platform: "yandex", rating: 5, text: "Меняли масло и тормоза. Всё аккуратно, по цене совпало с тем, что сказали до начала работ.", createdAt: at(-9, "11:05"), status: "resolved" },
+    { id: "rev-08", platform: "google", rating: 5, text: "Friendly service, clear estimate and quick repair. Would come back again.", createdAt: at(-128, "15:30"), status: "resolved" },
+  ],
+  "cl-6": [
+    { id: "rev-09", platform: "2gis", rating: 5, text: "Обслуживаем здесь рабочие машины. Для нас главное, что можно быстро понять сроки и что реально нужно менять.", createdAt: at(-3, "09:20"), status: "resolved" },
+  ],
+  "cl-7": [
+    { id: "rev-10", platform: "yandex", rating: 2, text: "После ремонта появился посторонний звук. Позвонила в сервис, договорились приехать на повторную проверку.", createdAt: at(-5, "17:55"), status: "contacted" },
+  ],
+  "cl-8": [
+    { id: "rev-11", platform: "yandex", rating: 5, text: "Записался на удобное время, приняли без ожидания. Сделали диагностику и сразу прислали, что стоит делать сейчас, а что можно отложить.", createdAt: at(-11, "13:45"), status: "resolved" },
+    { id: "rev-12", platform: "2gis", rating: 4, text: "В целом доволен. Работу сделали хорошо, зона ожидания простая, но для меня это не критично.", createdAt: at(-184, "18:10"), status: "resolved" },
+  ],
+  "cl-9": [
+    { id: "rev-13", platform: "yandex", rating: 5, text: "Спасибо за честный подход. Вместо дорогой замены сначала предложили проверить узел, в итоге ремонт вышел заметно дешевле.", createdAt: at(-6, "12:25"), status: "resolved" },
+  ],
+  "cl-10": [
+    { id: "rev-14", platform: "2gis", rating: 5, text: "Приехал по рекомендации. Сделали обслуживание и нашли мелкую течь, всё показали на месте.", createdAt: at(-14, "16:05"), status: "resolved" },
+  ],
+  "cl-11": [
+    { id: "rev-15", platform: "yandex", rating: 1, text: "Не понравилось, что итоговая стоимость оказалась выше первоначальной оценки. Сейчас разбираемся с сервисом по работам.", createdAt: at(-8, "20:10"), status: "resolving" },
+  ],
+  "cl-12": [
+    { id: "rev-16", platform: "yandex", rating: 5, text: "Очень удобно, что можно заранее записаться и не ждать в очереди. По машине всё объяснили понятным языком.", createdAt: at(-12, "09:50"), status: "resolved" },
+  ],
+  "cl-13": [
+    { id: "rev-17", platform: "yandex", rating: 5, text: "Первый визит прошёл отлично. Быстро, без лишних работ, цена адекватная.", createdAt: at(-1, "11:30"), status: "resolved" },
+  ],
+  "cl-14": [
+    { id: "rev-18", platform: "2gis", rating: 4, text: "Хорошее впечатление от сервиса. Всё сделали как договаривались, машину забрала вечером.", createdAt: at(-4, "18:45"), status: "resolved" },
+  ],
+};
+
+const clientBase: Client[] = [
   { id: "cl-1", code: "К-0001", name: "Смирнов Алексей", phone: "+7 (916) 000-00-01", isRegular: true, discountPercent: 5, source: "Сарафанное радио", createdAt: day(-900), birthday: "1988-06-04", notes: "Приезжает по субботам, просит звонить заранее" },
   { id: "cl-2", code: "К-0002", name: "Кузнецова Мария", phone: "+7 (916) 000-00-02", isRegular: true, discountPercent: 5, source: "Яндекс Карты", createdAt: day(-760), email: "kuznecova@example.com" },
   { id: "cl-3", code: "К-0003", name: "Волков Дмитрий", phone: "+7 (916) 000-00-03", source: "Авито", createdAt: day(-480) },
@@ -105,6 +154,11 @@ export const clients: Client[] = [
   { id: "cl-14", code: "К-0014", name: "Мельникова Дарья", phone: "+7 (916) 000-00-14", source: "2ГИС", createdAt: day(-5) },
   { id: "cl-15", code: "К-0015", name: "Логинов Артём", phone: "+7 (916) 000-00-15", source: "Авито", createdAt: day(-2) },
 ];
+
+export const clients: Client[] = clientBase.map((client) => ({
+  ...client,
+  reviews: DEMO_REVIEWS_BY_CLIENT[client.id] ?? [],
+}));
 
 export const vehicles: Vehicle[] = [
   { id: "veh-1", code: "А-0001", clientId: "cl-1", make: "Toyota", model: "Camry", plate: "А123ВС 797", mileage: 82000, year: 2019, color: "Чёрный", engine: "2.5 бензин", transmission: "АКПП", nextServiceMileage: 92000, nextServiceDate: day(74) },
