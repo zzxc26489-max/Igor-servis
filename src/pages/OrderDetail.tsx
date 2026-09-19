@@ -92,9 +92,6 @@ export default function OrderDetail() {
   const [cashAmount, setCashAmount] = useState("");
   const [terminalAmount, setTerminalAmount] = useState("");
   const [transferAmount, setTransferAmount] = useState("");
-  const [cashCommitted, setCashCommitted] = useState(0);
-  const [terminalCommitted, setTerminalCommitted] = useState(0);
-  const [transferCommitted, setTransferCommitted] = useState(0);
   const [payOpen, setPayOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundAmount, setRefundAmount] = useState("");
@@ -531,9 +528,6 @@ export default function OrderDetail() {
     setCashAmount("");
     setTerminalAmount("");
     setTransferAmount("");
-    setCashCommitted(0);
-    setTerminalCommitted(0);
-    setTransferCommitted(0);
     setPayOpen(false);
     showToast(`Принята оплата ${formatMoney(total)}`);
   }
@@ -662,7 +656,10 @@ export default function OrderDetail() {
 
   function finishWithConsumables() {
     if (!order) return;
-    const chosen = CONSUMABLE_PRESETS.filter((item) => selectedConsumables[item.key]);
+    const alreadyApplied = new Set((order.consumables ?? []).map((item) => item.key));
+    const chosen = CONSUMABLE_PRESETS.filter(
+      (item) => selectedConsumables[item.key] && !alreadyApplied.has(item.key),
+    );
     const total = chosen.reduce((sum, item) => sum + item.amount, 0);
     if (total > 0 && order.works.length === 0) {
       showToast("Чтобы включить внутренние расходники в сумму, в заказе должна быть хотя бы одна работа", "error");
@@ -1614,19 +1611,16 @@ export default function OrderDetail() {
             <div className="grid gap-2 sm:grid-cols-3">
               <Button variant="secondary" size="sm" onClick={() => {
                 setCashAmount(String(debt)); setTerminalAmount(""); setTransferAmount("");
-                setCashCommitted(debt); setTerminalCommitted(0); setTransferCommitted(0);
               }}>
                 Весь долг наличными
               </Button>
               <Button variant="secondary" size="sm" onClick={() => {
                 setCashAmount(""); setTerminalAmount(String(debt)); setTransferAmount("");
-                setCashCommitted(0); setTerminalCommitted(debt); setTransferCommitted(0);
               }}>
                 Весь долг по карте
               </Button>
               <Button variant="secondary" size="sm" onClick={() => {
                 setCashAmount(""); setTerminalAmount(""); setTransferAmount(String(debt));
-                setCashCommitted(0); setTerminalCommitted(0); setTransferCommitted(debt);
               }}>
                 Весь долг переводом
               </Button>
@@ -1648,7 +1642,6 @@ export default function OrderDetail() {
                     autoFocus
                     value={cashAmount}
                     onChange={(e) => setCashAmount(moneyInput(e.target.value))}
-                    onBlur={() => setCashCommitted(Number(cashAmount) || 0)}
                     placeholder="0"
                     inputMode="numeric"
                     aria-label="Оплата наличными"
@@ -1661,7 +1654,6 @@ export default function OrderDetail() {
                   <input
                     value={terminalAmount}
                     onChange={(e) => setTerminalAmount(moneyInput(e.target.value))}
-                    onBlur={() => setTerminalCommitted(Number(terminalAmount) || 0)}
                     placeholder="0"
                     inputMode="numeric"
                     aria-label="Оплата по терминалу"
@@ -1674,7 +1666,6 @@ export default function OrderDetail() {
                   <input
                     value={transferAmount}
                     onChange={(e) => setTransferAmount(moneyInput(e.target.value))}
-                    onBlur={() => setTransferCommitted(Number(transferAmount) || 0)}
                     placeholder="0"
                     inputMode="numeric"
                     aria-label="Оплата переводом"
@@ -1683,7 +1674,10 @@ export default function OrderDetail() {
               </label>
             </div>
             {(() => {
-              const total = cashCommitted + terminalCommitted + transferCommitted;
+              const total =
+                (Number(cashAmount) || 0) +
+                (Number(terminalAmount) || 0) +
+                (Number(transferAmount) || 0);
               const left = debt - total;
               return (
                 <div className="rounded-lg p-3 text-sm" style={{ background: "var(--bg)" }}>
