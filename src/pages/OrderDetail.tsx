@@ -439,7 +439,7 @@ export default function OrderDetail() {
       danger: true,
     });
     if (!ok) return;
-    const error = releasePart(order.id, part.id);
+    const error = await releasePart(order.id, part.id);
     if (error) {
       showToast(error, "error");
       return;
@@ -481,7 +481,7 @@ export default function OrderDetail() {
       danger: true,
     });
     if (!ok) return;
-    const error = deleteOrder(order.id);
+    const error = await deleteOrder(order.id);
     if (error) {
       showToast(error, "error");
       return;
