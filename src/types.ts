@@ -89,6 +89,17 @@ export type WorkLineStatus = "planned" | "in_progress" | "paused" | "done";
 export interface WorkSession {
   startedAt: string;
   endedAt?: string;
+  /** Механик, которому принадлежит именно эта сессия. Нужен при переназначении работы. */
+  executor?: string;
+}
+
+export interface WorkAssignmentEvent {
+  from?: string;
+  to?: string;
+  at: string;
+  /** Кто выполнил переназначение. */
+  actor?: string;
+  reason?: string;
 }
 
 export interface OrderLineWork {
@@ -103,6 +114,8 @@ export interface OrderLineWork {
   workStatus?: WorkLineStatus;
   /** Реальные сессии работы: старт / пауза / продолжение. */
   workSessions?: WorkSession[];
+  /** История назначений и смен механика по этой работе. */
+  assignmentHistory?: WorkAssignmentEvent[];
 }
 
 /** Отметка смены статуса — из них считается фактическое время на подъёмнике. */
