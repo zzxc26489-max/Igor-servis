@@ -710,25 +710,104 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return error;
       },
-      receiveStock: (input) => {
+      receiveStock: async (input) => {
+        const receivedQty = normalizeQuantity(input.qty);
+        if (!isValidQuantity(receivedQty)) return "Количество должно быть больше нуля";
+        if (!Number.isFinite(input.unitPrice) || input.unitPrice < 0 || input.unitPrice > 10_000_000) {
+          return "Цена должна быть от 0 до 10 млн ₽";
+        }
+
+        const current = dbRef.current;
+        const existing = input.itemId
+          ? current.stock.find((item) => item.id === input.itemId)
+          : current.stock.find((item) => item.sku.toLocaleLowerCase() === input.sku.toLocaleLowerCase());
+        const itemId = existing?.id ?? createId("st");
+        const itemCode = existing?.code ?? nextCode(CODE_PREFIX.stock, current.stock.map((item) => item.code));
+        const movementId = createId("mv");
+        const total = Math.round(receivedQty * input.unitPrice);
+        const createExpense = input.createExpense && total > 0;
+        const expenseId = createExpense ? createId("exp") : undefined;
+        const expenseCode = createExpense
+          ? nextCode(CODE_PREFIX.expense, current.expenses.map((item) => item.code))
+          : undefined;
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) {
+            return "Нет связи с сервером. Приёмку склада нужно подтвердить онлайн.";
+          }
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальный склад: ${syncError}`;
+
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await receiveCloudStock(session, {
+              item: {
+                id: itemId,
+                code: itemCode,
+                name: input.name,
+                sku: input.sku,
+                barcode: input.barcode,
+                brand: input.brand,
+                category: input.category,
+                unit: input.unit,
+                minQty: input.minQty,
+                cell: input.cell,
+                supplier: input.supplier,
+              },
+              qty: receivedQty,
+              unitPrice: input.unitPrice,
+              movementId,
+              expenseId,
+              expenseCode,
+              createExpense,
+              expenseMethod: input.expenseMethod,
+              employee: input.employee,
+              note: input.note,
+            });
+
+            const remote = migrate(result.data as DB);
+            cloudRevisionRef.current = result.revision;
+            cloudBaseRef.current = remote;
+            writeCloudBase(session.user.id, result.revision, remote);
+            rawSetDB(remote);
+            setCloud((prev) => ({
+              ...prev,
+              status: "ready",
+              revision: result.revision,
+              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+              error: undefined,
+            }));
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось подтвердить приёмку";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return `Приёмка не проведена: ${message}`;
+          }
+        }
+
         let error: string | null = null;
         setDB((prev) => {
-          if (input.createExpense && input.expenseMethod === "cash" && !activeCashShift(prev.cashShifts)) {
+          const shift = activeCashShift(prev.cashShifts);
+          if (createExpense && input.expenseMethod === "cash" && !shift) {
             error = "Для оплаты поставки наличными сначала откройте кассовую смену";
             return prev;
           }
-          const stamp = Date.now();
-          const now = nowISO();
-          const receivedQty = normalizeQuantity(input.qty);
-          if (!isValidQuantity(receivedQty)) return prev;
-          const total = Math.round(receivedQty * input.unitPrice);
-          const existing = input.itemId ? prev.stock.find((item) => item.id === input.itemId) : undefined;
-          const itemId = existing?.id ?? `st-${stamp}`;
 
-          // Средневзвешенная закупочная цена: старый остаток по старой цене плюс новый приход.
-          const nextStock = existing
+          const localExisting = prev.stock.find((item) => item.id === itemId)
+            ?? prev.stock.find((item) => item.sku.toLocaleLowerCase() === input.sku.toLocaleLowerCase());
+          const occupied = input.cell
+            ? prev.stock.find((item) => item.cell === input.cell && item.id !== localExisting?.id)
+            : undefined;
+          if (occupied) {
+            error = `Ячейка ${input.cell} уже занята: ${occupied.name}`;
+            return prev;
+          }
+
+          const now = nowISO();
+          const localItemId = localExisting?.id ?? itemId;
+          const nextStock = localExisting
             ? prev.stock.map((item) => {
-                if (item.id !== existing.id) return item;
+                if (item.id !== localExisting.id) return item;
                 const qty = normalizeQuantity(item.qty + receivedQty);
                 const purchasePrice = input.unitPrice > 0 && qty > 0
                   ? Math.round((item.qty * item.purchasePrice + total) / qty)
@@ -739,8 +818,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                   qty,
                   purchasePrice,
                   barcode: input.barcode || item.barcode,
+                  brand: input.brand || item.brand,
+                  category: input.category || item.category,
+                  unit: input.unit || item.unit,
                   cell: input.cell || item.cell,
-                  minQty: input.minQty || item.minQty,
+                  minQty: input.minQty,
                   supplier: input.supplier || item.supplier,
                   lastPurchasePrice: input.unitPrice > 0 ? input.unitPrice : item.lastPurchasePrice,
                   lastPurchaseAt: input.unitPrice > 0 ? now : item.lastPurchaseAt,
@@ -753,8 +835,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             : [
                 ...prev.stock,
                 {
-                  id: itemId,
-                  code: nextCode(CODE_PREFIX.stock, prev.stock.map((item) => item.code)),
+                  id: localItemId,
+                  code: itemCode,
                   name: input.name,
                   sku: input.sku,
                   barcode: input.barcode,
@@ -772,9 +854,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
               ];
 
           const movement: StockMovement = {
-            id: `mv-${stamp}`,
+            id: movementId,
             date: now,
-            itemId,
+            itemId: localItemId,
             operation: "Приёмка",
             qty: receivedQty,
             to: input.cell,
@@ -784,11 +866,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             note: input.note,
           };
 
-          const expenses = input.createExpense && total > 0
+          const expenses = createExpense && expenseId
             ? [
                 {
-                  id: `exp-${stamp}`,
-                  code: nextCode(CODE_PREFIX.expense, prev.expenses.map((item) => item.code)),
+                  id: expenseId,
+                  code: expenseCode,
                   date: now.slice(0, 10),
                   category: "Закупка запчастей",
                   description: `Приёмка: ${input.name} — ${receivedQty} ${input.unit}`,
@@ -797,14 +879,19 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                   status: "Оплачено" as const,
                   source: "stock_purchase" as const,
                   paymentMethod: input.expenseMethod,
-                  shiftId: input.expenseMethod && activeCashShift(prev.cashShifts)?.id,
-                  itemId,
+                  shiftId: input.expenseMethod === "cash" ? shift?.id : undefined,
+                  itemId: localItemId,
                 },
                 ...prev.expenses,
               ]
             : prev.expenses;
 
-          return { ...prev, stock: nextStock, stockMovements: [movement, ...prev.stockMovements], expenses };
+          return {
+            ...prev,
+            stock: nextStock,
+            stockMovements: [movement, ...prev.stockMovements],
+            expenses,
+          };
         });
         return error;
       },
@@ -1260,26 +1347,95 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return error;
       },
-      returnToSupplier: (input) =>
+      returnToSupplier: async (input) => {
+        const current = dbRef.current;
+        const item = current.stock.find((entry) => entry.id === input.itemId);
+        if (!item) return "Складская позиция не найдена";
+        const requestedQty = normalizeQuantity(input.qty);
+        if (!isValidQuantity(requestedQty)) return "Количество должно быть больше нуля";
+
+        const reserved = reservedByItem(current.orders, current.stock).get(item.id) ?? 0;
+        const available = item.qty - reserved;
+        if (requestedQty > available + 0.0001) {
+          return `Свободно только ${available} ${item.unit}: ${reserved} уже в резерве`;
+        }
+
+        const movementId = createId("mv");
+        const expenseId = createId("exp");
+        const expenseCode = nextCode(CODE_PREFIX.expense, current.expenses.map((entry) => entry.code));
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) {
+            return "Нет связи с сервером. Возврат поставщику нужно подтвердить онлайн.";
+          }
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальный склад: ${syncError}`;
+
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await returnCloudStockSupplier(session, {
+              itemId: item.id,
+              qty: requestedQty,
+              unitPrice: input.unitPrice,
+              supplier: input.supplier,
+              employee: input.employee,
+              reason: input.reason,
+              movementId,
+              expenseId,
+              expenseCode,
+            });
+
+            const remote = migrate(result.data as DB);
+            cloudRevisionRef.current = result.revision;
+            cloudBaseRef.current = remote;
+            writeCloudBase(session.user.id, result.revision, remote);
+            rawSetDB(remote);
+            setCloud((prev) => ({
+              ...prev,
+              status: "ready",
+              revision: result.revision,
+              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+              error: undefined,
+            }));
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось подтвердить возврат поставщику";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return `Возврат не проведён: ${message}`;
+          }
+        }
+
+        let error: string | null = null;
         setDB((prev) => {
-          const item = prev.stock.find((entry) => entry.id === input.itemId);
-          if (!item || input.qty <= 0) return prev;
-          const reserved = reservedByItem(prev.orders, prev.stock).get(item.id) ?? 0;
-          const qty = Math.min(input.qty, item.qty - reserved);
-          if (qty <= 0) return prev;
+          const localItem = prev.stock.find((entry) => entry.id === input.itemId);
+          if (!localItem) {
+            error = "Складская позиция не найдена";
+            return prev;
+          }
+          const localReserved = reservedByItem(prev.orders, prev.stock).get(localItem.id) ?? 0;
+          const localAvailable = localItem.qty - localReserved;
+          if (requestedQty > localAvailable + 0.0001) {
+            error = `Свободно только ${localAvailable} ${localItem.unit}: ${localReserved} уже в резерве`;
+            return prev;
+          }
+
           const now = nowISO();
-          const amount = Math.round(qty * input.unitPrice);
+          const amount = Math.round(requestedQty * input.unitPrice);
           return {
             ...prev,
-            stock: prev.stock.map((entry) => (entry.id === item.id ? { ...entry, qty: entry.qty - qty } : entry)),
+            stock: prev.stock.map((entry) =>
+              entry.id === localItem.id
+                ? { ...entry, qty: normalizeQuantity(entry.qty - requestedQty) }
+                : entry,
+            ),
             stockMovements: [
               {
-                id: createId("mv"),
+                id: movementId,
                 date: now,
-                itemId: item.id,
+                itemId: localItem.id,
                 operation: "Возврат поставщику" as const,
-                qty,
-                from: item.cell,
+                qty: requestedQty,
+                from: localItem.cell,
                 employee: input.employee,
                 unitPrice: input.unitPrice,
                 amount,
@@ -1289,22 +1445,24 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             ],
             expenses: [
               {
-                id: createId("exp"),
-                code: nextCode(CODE_PREFIX.expense, prev.expenses.map((entry) => entry.code)),
+                id: expenseId,
+                code: expenseCode,
                 date: now.slice(0, 10),
                 category: "Возврат поставщику",
-                description: `Возврат: ${item.name} — ${qty} ${item.unit}`,
+                description: `Возврат: ${localItem.name} — ${requestedQty} ${localItem.unit}`,
                 amount,
-                counterparty: input.supplier || item.supplier || "Поставщик",
+                counterparty: input.supplier || localItem.supplier || "Поставщик",
                 status: "Ждём возврат" as const,
                 source: "supplier_refund" as const,
-                itemId: item.id,
+                itemId: localItem.id,
                 comment: input.reason,
               },
               ...prev.expenses,
             ],
           };
-        }),
+        });
+        return error;
+      },
       confirmRefund: (expenseId, method) => {
         let error: string | null = null;
         setDB((prev) => {
