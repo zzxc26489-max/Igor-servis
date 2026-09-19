@@ -3,10 +3,11 @@ import { NavLink, Outlet } from "react-router-dom";
 import {
   IconCalendarEvent, IconChartBar, IconChevronDown, IconClipboardList, IconCoin,
   IconCube, IconDotsCircleHorizontal, IconHome2, IconSettings, IconShoppingCart,
-  IconTool, IconUsers, IconUsersGroup, IconX, IconGauge, IconFileDescription, IconStar,
+  IconTool, IconUsers, IconUsersGroup, IconX, IconGauge, IconFileDescription, IconStar, IconBellRinging,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { needsPurchaseItems } from "../lib/lowStock";
+import { buildAttentionItems } from "../lib/attention";
 import { useMobileMenu } from "./MobileMenu";
 import logo from "../assets/logo.jpg";
 import { APP_VERSION } from "../data/version";
@@ -19,7 +20,7 @@ type NavItem = {
   label: string;
   icon: typeof IconHome2;
   end?: boolean;
-  badge?: "orders" | "purchases";
+  badge?: "orders" | "purchases" | "attention";
 };
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
@@ -27,6 +28,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Работа",
     items: [
       { to: "/", label: "Сегодня", icon: IconHome2, end: true },
+      { to: "/attention", label: "Фокус внимания", icon: IconBellRinging, badge: "attention" },
       { to: "/schedule", label: "Расписание", icon: IconCalendarEvent },
       { to: "/orders", label: "Заказ-наряды", icon: IconClipboardList, badge: "orders" },
       { to: "/my-work", label: "Мои работы", icon: IconGauge },
@@ -91,7 +93,7 @@ function SidebarContent({
   onSignOut,
   brandLogo,
 }: {
-  badges: { orders: number; purchases: number };
+  badges: { orders: number; purchases: number; attention: number };
   role?: CloudRole;
   displayName?: string;
   cloudConnected?: boolean;
@@ -170,7 +172,7 @@ function SidebarContent({
 }
 
 export default function Layout() {
-  const { orders, stock, cloud, company } = useAppStore();
+  const { orders, stock, clients, vehicles, cloud, company } = useAppStore();
   const { session, signOut } = useAuth();
   const { open, setOpen } = useMobileMenu();
 
@@ -195,9 +197,13 @@ export default function Layout() {
     appleIcon.href = brandLogo;
   }, [brandLogo]);
 
+  const attentionCount = buildAttentionItems({ orders, clients, vehicles, stock })
+    .filter((item) => item.priority !== "normal").length;
+
   const badges = {
     orders: orders.filter((order) => order.status !== "выдан").length,
     purchases: needsPurchaseItems(stock, orders).length,
+    attention: attentionCount,
   };
 
   return (
