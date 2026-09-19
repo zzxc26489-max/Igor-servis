@@ -18,7 +18,7 @@ function payLabel(employee: Employee) {
 }
 
 export default function Employees() {
-  const { employees: rawEmployees, orders, cashShifts, payEmployee, updateEmployee } = useAppStore();
+  const { employees: rawEmployees, orders, cashShifts, payEmployee, updateEmployee, cloud } = useAppStore();
   const confirm = useConfirm();
   const { showToast } = useToast();
   const [payFor, setPayFor] = useState<string | null>(null);
@@ -30,6 +30,7 @@ export default function Employees() {
   const totalDue = employees.reduce((sum, employee) => sum + payrollBalance(employee), 0);
   const target = employees.find((employee) => employee.id === payFor) ?? null;
   const rateTarget = rawEmployees.find((employee) => employee.id === rateFor) ?? null;
+  const canEditRates = !cloud.configured || cloud.role === "owner" || cloud.role === "partner";
 
   async function handlePay(employee: Employee, amount: number, method: PaymentMethod) {
     if (method === "cash" && !activeCashShift(cashShifts)) {
@@ -115,7 +116,7 @@ export default function Employees() {
                   )}
                 </div>
 
-                {sdelnaya && (
+                {sdelnaya && canEditRates && (
                   <Button
                     className="mt-3 w-full justify-center"
                     variant="secondary"
