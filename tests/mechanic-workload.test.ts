@@ -56,11 +56,12 @@ const employee = (id: string, name: string, role: string): Employee => ({
   paid: 0,
 });
 
-test("only mechanic roles are assignable to repair work", () => {
+test("mechanics and workshop owners are assignable to repair work", () => {
   assert.equal(isMechanicEmployee(employee("1", "Иван", "Механик")), true);
   assert.equal(isMechanicEmployee(employee("2", "Пётр", "Автомеханик-диагност")), true);
-  assert.equal(isMechanicEmployee(employee("3", "Игорь", "Владелец, мастер-приёмщик")), false);
-  assert.equal(isMechanicEmployee(employee("4", "Елена", "Учёт, документы")), false);
+  assert.equal(isMechanicEmployee(employee("3", "Игорь", "Владелец, мастер-приёмщик")), true);
+  assert.equal(isMechanicEmployee(employee("4", "Юра", "Владелец, администрирование, счета")), true);
+  assert.equal(isMechanicEmployee(employee("5", "Елена", "Учёт, документы")), false);
 });
 
 test("mechanic candidates exclude office roles and sort by workload", () => {
