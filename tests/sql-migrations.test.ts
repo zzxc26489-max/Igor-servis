@@ -22,3 +22,13 @@ test("security hardening migration restricts mechanic media deletion and foreign
   assert.match(sql, /when incoming\.item is null or not permission\.allowed then current_order\.item/);
   assert.match(sql, /where work ->> 'executor' = p_display/);
 });
+
+
+test("atomic stock reservation migration locks shared state and checks free quantity", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "007_atomic_stock_reservation.sql"), "utf8");
+  assert.match(sql, /for update/);
+  assert.match(sql, /v_available := v_stock_qty - v_reserved/);
+  assert.match(sql, /if p_qty > v_available \+ 0\.0001 then/);
+  assert.match(sql, /'stockConflict', true/);
+  assert.match(sql, /'stock_reserved'/);
+});
