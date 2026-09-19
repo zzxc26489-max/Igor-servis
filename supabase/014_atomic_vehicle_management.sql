@@ -127,7 +127,20 @@ begin
     v_vehicles := coalesce(v_current.data -> 'vehicles', '[]'::jsonb) || jsonb_build_array(v_saved);
   else
     v_code := v_existing ->> 'code';
-    v_saved := v_existing || (p_vehicle - 'code');
+    -- p_vehicle — полный снимок редактируемого автомобиля. Ключи с undefined
+    -- не попадают в JSON, поэтому заранее убираем необязательные поля:
+    -- их отсутствие означает явную очистку значения пользователем.
+    v_saved :=
+      (v_existing
+        - 'vin'
+        - 'mileage'
+        - 'year'
+        - 'color'
+        - 'engine'
+        - 'transmission'
+        - 'nextServiceDate'
+        - 'nextServiceMileage')
+      || (p_vehicle - 'code');
     select jsonb_agg(
       case when item ->> 'id' = v_vehicle_id then v_saved else item end
       order by ordinality
