@@ -10,6 +10,7 @@ import { formatQuantity, isValidQuantity, parseQuantity } from "../lib/quantity"
 import type { StockItem, Vehicle } from "../types";
 import BarcodeScanner from "../components/BarcodeScanner";
 import { useToast } from "../components/Toast";
+import { findStockItemByScannedCode, preferredScannedValue } from "../lib/scannedCode";
 
 /**
  * Подбор запчасти для заказ-наряда: сначала выбираем позицию поиском и
@@ -248,19 +249,18 @@ export default function AddPart({
     </Modal>
     {scannerOpen && (
       <BarcodeScanner
-        title="Найти запчасть по штрихкоду"
+        title="Найти запчасть по штрихкоду или QR"
         onClose={() => setScannerOpen(false)}
         onDetected={(value) => {
-          const code = value.trim().toLowerCase();
-          const exact = stock.find((item) => item.barcode?.trim().toLowerCase() === code);
+          const { item: exact } = findStockItemByScannedCode(stock, value);
           if (!exact) {
-            setQuery(value);
+            setQuery(preferredScannedValue(value));
             setCategory("all");
-            showToast("Такого штрихкода на складе нет", "error");
+            showToast("Позиция по этому коду на складе не найдена", "error");
             return;
           }
           if (available(exact) <= 0) {
-            setQuery(value);
+            setQuery(exact.sku);
             setCategory("all");
             showToast(`${exact.name}: свободного остатка нет`, "error");
             return;
