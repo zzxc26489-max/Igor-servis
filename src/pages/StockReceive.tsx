@@ -10,6 +10,7 @@ import type { PartReference, PaymentMethod, StockItem } from "../types";
 import { isValidQuantity, parseQuantity } from "../lib/quantity";
 import { activeCashShift } from "../lib/cashShift";
 import BarcodeScanner from "../components/BarcodeScanner";
+import { findStockItemByScannedCode, preferredScannedValue } from "../lib/scannedCode";
 
 export const RACKS = ["A", "B", "C"];
 export const SHELVES = ["01", "02", "03", "04"];
@@ -229,7 +230,7 @@ export default function StockReceive({
         </datalist>
         <Field label="Штрихкод">
           <div className="flex gap-2">
-            <input value={barcode} onChange={(event) => setBarcode(event.target.value.trim())} placeholder="EAN / UPC / Code128" inputMode="numeric" />
+            <input value={barcode} onChange={(event) => setBarcode(event.target.value.trim())} placeholder="EAN / UPC / Code128 / QR" />
             <Button type="button" size="sm" variant="secondary" onClick={() => setScannerOpen(true)}>
               <IconScan size={17} /> Камера
             </Button>
@@ -353,18 +354,25 @@ export default function StockReceive({
     </Modal>
     {scannerOpen && (
       <BarcodeScanner
-        title="Сканировать запчасть"
+        title="Сканировать штрихкод или QR"
         onClose={() => setScannerOpen(false)}
         onDetected={(value) => {
-          const found = stock.find((item) => item.barcode?.toLowerCase() === value.trim().toLowerCase());
-          setBarcode(value);
+          const { parsed, item: found } = findStockItemByScannedCode(stock, value);
+          const preferred = preferredScannedValue(value);
           if (found) {
+            setBarcode(found.barcode ?? parsed.barcode ?? preferred);
             applySku(found.sku);
             showToast(`Найдена позиция: ${found.name}`);
-          } else {
-            setMatchedId("");
-            showToast("Штрихкод сохранён. Укажите артикул новой позиции.");
+            return;
           }
+
+          setMatchedId("");
+          if (parsed.barcode) setBarcode(parsed.barcode);
+          if (parsed.sku) setSku(parsed.sku);
+          if (!parsed.barcode && !parsed.sku) setSku(preferred);
+          showToast(parsed.kind === "plain"
+            ? "Код не найден. Значение подставлено для новой позиции."
+            : "QR распознан. Данные подставлены для новой позиции.");
         }}
       />
     )}

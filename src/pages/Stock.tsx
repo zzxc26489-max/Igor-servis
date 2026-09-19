@@ -16,6 +16,7 @@ import BarcodeScanner from "../components/BarcodeScanner";
 import { findPartReferences } from "../data/partReferences";
 import type { Order, PartReference, StockItem } from "../types";
 import { canManageStock } from "../lib/access";
+import { findStockItemByScannedCode, preferredScannedValue } from "../lib/scannedCode";
 
 type Chip = "all" | "low" | "reserved" | "incoming" | "movements" | "catalog";
 
@@ -167,7 +168,7 @@ export default function Stock() {
             <Button
               variant="secondary"
               onClick={() => setScannerOpen(true)}
-              title="Открыть камеру телефона для сканирования штрихкода"
+              title="Открыть камеру телефона для сканирования штрихкода или QR"
             >
               <IconScan size={18} /> Сканировать
             </Button>
@@ -406,13 +407,21 @@ export default function Stock() {
 
       {scannerOpen && (
         <BarcodeScanner
-          title="Найти запчасть по штрихкоду"
+          title="Найти запчасть по штрихкоду или QR"
           onClose={() => setScannerOpen(false)}
           onDetected={(value) => {
-            setQuery(value);
+            const { item } = findStockItemByScannedCode(stock, value);
             setChip("all");
+            if (item) {
+              setQuery(item.sku);
+              setSelectedId(item.id);
+              showToast(`Найдена позиция: ${item.name}`);
+            } else {
+              const preferred = preferredScannedValue(value);
+              setQuery(preferred);
+              showToast(`Код считан: ${preferred}`);
+            }
             searchRef.current?.focus();
-            showToast(`Код считан: ${value}`);
           }}
         />
       )}
