@@ -33,6 +33,7 @@ import {
   applyCloudOrderPayment,
   closeCloudCashShift,
   createCloudBackup,
+  createCloudOrder,
   listCloudAudit,
   listCloudBackups,
   loadCloudState,
@@ -249,6 +250,20 @@ export interface ReceiveStockInput {
   expenseMethod?: PaymentMethod;
 }
 
+export interface CreateOrderEntryInput {
+  client: Client;
+  vehicle: Vehicle;
+  order: Order;
+  existingClientId?: string;
+  existingVehicleId?: string;
+}
+
+export interface CreateOrderEntryResult {
+  error: string | null;
+  orderId: string;
+  orderNumber?: string;
+}
+
 export type CloudSyncStatus = "local" | "loading" | "needs_upload" | "ready" | "saving" | "error";
 
 export interface CloudSyncInfo {
@@ -272,6 +287,7 @@ interface AppStoreValue extends DB {
   listAudit: () => Promise<CloudAuditInfo[]>;
   restoreBackup: (backupId: string) => Promise<string | null>;
   setDB: React.Dispatch<React.SetStateAction<DB>>;
+  createOrderEntry: (input: CreateOrderEntryInput) => Promise<CreateOrderEntryResult>;
   updateOrder: (id: string, patch: Partial<Order>) => void;
   deleteOrder: (id: string) => string | null;
   addClient: (client: Client) => void;
@@ -629,6 +645,83 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       listAudit,
       restoreBackup,
       setDB,
+      createOrderEntry: async (input) => {
+        const current = dbRef.current;
+        const clientId = input.existingClientId || input.client.id;
+        const vehicleId = input.existingVehicleId || input.vehicle.id;
+        const orderId = input.order.id;
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) {
+            return {
+              error: "Нет связи с сервером. Новую запись нужно создать онлайн, чтобы исключить дубли номеров и подъёмников.",
+              orderId,
+            };
+          }
+
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) {
+            return { error: `Не удалось подтвердить актуальную базу: ${syncError}`, orderId };
+          }
+
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await createCloudOrder(session, {
+              client: input.client,
+              vehicle: input.vehicle,
+              order: input.order,
+              existingClientId: input.existingClientId,
+              existingVehicleId: input.existingVehicleId,
+            });
+
+            const remote = migrate(result.data as DB);
+            cloudRevisionRef.current = result.revision;
+            cloudBaseRef.current = remote;
+            writeCloudBase(session.user.id, result.revision, remote);
+            rawSetDB(remote);
+            setCloud((prev) => ({
+              ...prev,
+              status: "ready",
+              revision: result.revision,
+              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+              error: undefined,
+            }));
+
+            return result.ok
+              ? { error: null, orderId: result.orderId, orderNumber: result.orderNumber }
+              : { error: result.message, orderId };
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось создать заказ-наряд";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return { error: `Запись не создана: ${message}`, orderId };
+          }
+        }
+
+        const lastOrderNumber = current.orders.reduce((max, item) => {
+          const digits = Number(item.number.replace(/\D/g, ""));
+          return Number.isNaN(digits) ? max : Math.max(max, digits);
+        }, 0);
+        const orderNumber = `№АИ-${String(lastOrderNumber + 1).padStart(4, "0")}`;
+        const nextClient = input.existingClientId
+          ? { ...current.clients.find((item) => item.id === clientId), ...input.client, id: clientId }
+          : { ...input.client, id: clientId, code: nextCode(CODE_PREFIX.client, current.clients.map((item) => item.code)) };
+        const nextVehicle = input.existingVehicleId
+          ? { ...current.vehicles.find((item) => item.id === vehicleId), ...input.vehicle, id: vehicleId, clientId }
+          : { ...input.vehicle, id: vehicleId, clientId, code: nextCode(CODE_PREFIX.vehicle, current.vehicles.map((item) => item.code)) };
+        const nextOrder = { ...input.order, id: orderId, number: orderNumber, clientId, vehicleId };
+
+        setDB((prev) => ({
+          ...prev,
+          clients: input.existingClientId
+            ? prev.clients.map((item) => item.id === clientId ? nextClient as Client : item)
+            : [...prev.clients, nextClient as Client],
+          vehicles: input.existingVehicleId
+            ? prev.vehicles.map((item) => item.id === vehicleId ? nextVehicle as Vehicle : item)
+            : [...prev.vehicles, nextVehicle as Vehicle],
+          orders: [...prev.orders, nextOrder],
+        }));
+        return { error: null, orderId, orderNumber };
+      },
       updateOrder: (id, patch) =>
         setDB((prev) => ({
           ...prev,

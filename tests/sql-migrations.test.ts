@@ -81,3 +81,16 @@ test("server capabilities migration reports latest schema version", () => {
   assert.match(sql, /'latestMigration', 12/);
   assert.match(sql, /atomic-stock-receive-return/);
 });
+
+
+test("atomic order creation migration prevents duplicate numbers, vehicles and lift slots", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "013_atomic_order_create.sql"), "utf8");
+  assert.match(sql, /create or replace function public\.crm_create_order/);
+  assert.match(sql, /for update/);
+  assert.match(sql, /Клиент с таким телефоном уже есть/);
+  assert.match(sql, /Автомобиль %s уже есть в базе/);
+  assert.match(sql, /Подъёмник уже занят заказом/);
+  assert.match(sql, /v_order_number := '№АИ-' \|\| lpad\(v_order_seq::text, 4, '0'\)/);
+  assert.match(sql, /'latestMigration', 13/);
+  assert.match(sql, /atomic-order-create/);
+});
