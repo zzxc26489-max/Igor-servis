@@ -603,6 +603,11 @@ export default function ClientDetail() {
                                     {historyOrder.defects && (
                                       <div className="muted mt-1 text-xs">Состояние: {historyOrder.defects}</div>
                                     )}
+                                    {historyOrder.recommendations && (
+                                      <div className="mt-1 rounded-md bg-[#fff8e8] px-2 py-1.5 text-xs">
+                                        <b>Рекомендации:</b> {historyOrder.recommendations}
+                                      </div>
+                                    )}
                                     {historyOrder.parts.length > 0 && (
                                       <div className="muted mt-1 text-xs">
                                         Запчасти: {historyOrder.parts.map((part) => `${part.name} × ${part.qty}`).join(", ")}
