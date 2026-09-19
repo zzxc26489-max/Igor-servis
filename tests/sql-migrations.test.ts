@@ -192,3 +192,9 @@ test("security migration 020 hardens storage and blocks generic financial writes
   assert.match(sql, /'latestMigration', 20/);
   assert.match(sql, /security-hardening-020/);
 });
+
+
+test("orphan media remains administratively removable without allowing new orphan uploads", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "020_security_hardening.sql"), "utf8");
+  assert.match(sql, /if not v_order_exists then[\s\S]*v_role in \('owner', 'partner', 'advisor'\)[\s\S]*p_delete or \(not p_write and not p_delete\)/);
+});
