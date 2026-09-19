@@ -21,7 +21,7 @@ import { Button, Card, Modal, Page, StatusBadge, TopBar } from "../components/ui
 import { formatDate, formatDateTime, formatMoney } from "../lib/format";
 import { CONSUMABLE_PRESETS } from "../data/consumables";
 import { formatQuantity, isValidQuantity } from "../lib/quantity";
-import { nowISO } from "../lib/date";
+import { nowISO, todayISO } from "../lib/date";
 import type { OrderConsumable, OrderLinePart, OrderLineWork, OrderStatus, PaymentMethod } from "../types";
 import { effectiveWorkStatus, WORK_STATUS_LABEL, workSessionMinutes } from "../lib/workSessions";
 import OrderMediaPanel from "../components/OrderMediaPanel";
@@ -263,11 +263,11 @@ export default function OrderDetail() {
 
   function setLiftScheduleNow() {
     const now = new Date();
-    const minutes = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 15) * 15;
+    const minutes = Math.min(23 * 60 + 45, Math.ceil((now.getHours() * 60 + now.getMinutes()) / 15) * 15);
     const start = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
     const endMinutes = Math.min(23 * 60 + 59, minutes + Math.max(60, orderNorm || 60));
     const end = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
-    setLiftScheduleDate(new Date().toISOString().slice(0, 10));
+    setLiftScheduleDate(todayISO());
     setLiftScheduleStart(start);
     setLiftScheduleEnd(end);
   }
