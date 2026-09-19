@@ -27,7 +27,7 @@ export default function Services() {
     [services],
   );
   const activeCategoryFilter =
-    activeCategoryFilter === "all" || allCategories.includes(categoryFilter) ? categoryFilter : "all";
+    categoryFilter === "all" || allCategories.includes(categoryFilter) ? categoryFilter : "all";
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("ru-RU");
     return services.filter((service) => {
