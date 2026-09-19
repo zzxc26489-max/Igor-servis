@@ -98,6 +98,21 @@ export default function Reputation() {
     [clients, orders, vehicles],
   );
 
+  const tomorrow = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    return date.toISOString().slice(0, 10);
+  }, []);
+
+  const appointmentReminders = useMemo(() => orders
+    .filter((order) => order.status === "запись" && order.plannedAt === tomorrow)
+    .filter((order) => {
+      const client = clients.find((item) => item.id === order.clientId);
+      return client && !(client.communications ?? []).some(
+        (entry) => entry.type === "appointment_reminder" && entry.orderId === order.id,
+      );
+    }), [clients, orders, tomorrow]);
+
   const serviceDue = useMemo(() => vehicles
     .filter((vehicle) => vehicle.nextServiceDate && vehicle.nextServiceDate <= todayISO())
     .map((vehicle) => ({
@@ -182,7 +197,7 @@ export default function Reputation() {
           <Metric icon={<IconStar size={18} />} label="Отзывов за месяц" value={String(monthReviews.length)} />
           <Metric icon={<IconStar size={18} />} tone="blue" label="Средняя оценка" value={average ? average.toFixed(1) : "—"} />
           <Metric icon={<IconAlertTriangle size={18} />} tone="danger" label="Требуют реакции" value={String(negative.length)} />
-          <Metric icon={<IconBell size={18} />} tone="warning" label="Follow-up задач" value={String(reviewRequests.length + deferred.length + serviceDue.length)} />
+          <Metric icon={<IconBell size={18} />} tone="warning" label="Follow-up задач" value={String(reviewRequests.length + deferred.length + serviceDue.length + appointmentReminders.length)} />
         </div>
 
         <div className="grid gap-3 xl:grid-cols-2">
@@ -264,6 +279,29 @@ export default function Reputation() {
                 </div>
               ))}
               {deferred.length === 0 && <EmptyState icon={<IconCheck size={20} />} title="Отложенных рекомендаций нет" />}
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="panel-title">Напоминания о завтрашней записи</h2>
+            <div className="mt-3 space-y-2">
+              {appointmentReminders.map((order) => {
+                const client = clients.find((item) => item.id === order.clientId)!;
+                const vehicle = vehicles.find((item) => item.id === order.vehicleId);
+                const message = `${client.name}, напоминаем: завтра вы записаны в наш сервис${order.scheduledStart ? ` на ${order.scheduledStart}` : ""}. ${vehicle ? `${vehicle.make} ${vehicle.model}` : ""}. Если планы изменились, пожалуйста, сообщите нам.`;
+                return (
+                  <div key={order.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3" style={{ borderColor: "var(--border)" }}>
+                    <div>
+                      <Link to={`/orders/${order.id}`} className="font-semibold hover:text-[var(--accent)]">{client.name}</Link>
+                      <div className="muted text-xs">{vehicle ? `${vehicle.make} ${vehicle.model}` : order.number}{order.scheduledStart ? ` · ${order.scheduledStart}` : ""}</div>
+                    </div>
+                    <a href={whatsappHref(client.phone, message)} target="_blank" rel="noreferrer" onClick={() => void logCommunication(client, "appointment_reminder", "Отправлено напоминание о записи", order.id, order.vehicleId)}>
+                      <Button size="sm" variant="secondary"><IconBrandWhatsapp size={16} /> Напомнить</Button>
+                    </a>
+                  </div>
+                );
+              })}
+              {appointmentReminders.length === 0 && <EmptyState icon={<IconCheck size={20} />} title="Все записи на завтра подтверждены" />}
             </div>
           </Card>
 
