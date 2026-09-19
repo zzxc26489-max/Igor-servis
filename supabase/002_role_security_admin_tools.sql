@@ -7,7 +7,7 @@ returns jsonb
 language sql
 immutable
 set search_path = public
-as $
+as $$
   select coalesce(
     jsonb_agg(
       jsonb_set(
@@ -31,7 +31,7 @@ as $
     '[]'::jsonb
   )
   from jsonb_array_elements(coalesce(p_orders, '[]'::jsonb)) item;
-$;
+$$;
 
 revoke all on function public.crm_parts_orders_view(jsonb) from public;
 
