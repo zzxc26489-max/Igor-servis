@@ -28,6 +28,7 @@ export function canOpenPath(role: CloudRole, path: string) {
   if (role === "advisor") {
     return (
       path === "/" ||
+      path.startsWith("/attention") ||
       path.startsWith("/schedule") ||
       path.startsWith("/orders") ||
       path.startsWith("/clients") ||
@@ -39,6 +40,7 @@ export function canOpenPath(role: CloudRole, path: string) {
 
   return (
     path === "/" ||
+    path.startsWith("/attention") ||
     path.startsWith("/orders") ||
     path.startsWith("/stock") ||
     path.startsWith("/purchases")
