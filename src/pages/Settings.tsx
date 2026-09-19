@@ -192,6 +192,10 @@ export default function Settings() {
   }
 
   async function handleRestore(file: File) {
+    if (cloud.configured && cloud.status !== "needs_upload") {
+      showToast("В общей базе восстановление из JSON отключено. Используйте серверные резервные копии.", "error");
+      return;
+    }
     const text = await file.text();
     const inspected = inspectBackupJson(text);
     if (!inspected) {
@@ -205,7 +209,9 @@ export default function Settings() {
 
     const ok = await confirm({
       title: "Восстановить из резервной копии",
-      question: "Текущие данные в этом браузере будут полностью заменены содержимым файла.",
+      question: cloud.configured
+        ? "Файл станет локальной базой для первичного переноса на пустой сервер."
+        : "Текущие данные в этом браузере будут полностью заменены содержимым файла.",
       summary: [
         { label: "Файл", value: file.name },
         { label: "Копия", value: backupInfo },
@@ -501,9 +507,11 @@ export default function Settings() {
               <Button onClick={handleBackup}>
                 <IconDownload size={18} /> Скачать JSON-копию
               </Button>
-              <Button variant="secondary" onClick={() => fileRef.current?.click()}>
-                <IconUpload size={18} /> Восстановить из файла
-              </Button>
+              {(!cloud.configured || cloud.status === "needs_upload") && (
+                <Button variant="secondary" onClick={() => fileRef.current?.click()}>
+                  <IconUpload size={18} /> Восстановить из файла
+                </Button>
+              )}
               {cloud.configured && cloud.status !== "needs_upload" && (
                 <>
                   <Button variant="secondary" onClick={() => void handleRefreshCloud()}>
@@ -520,6 +528,11 @@ export default function Settings() {
                 </Button>
               )}
             </div>
+            {cloud.configured && cloud.status !== "needs_upload" && (
+              <p className="mt-3 text-xs muted">
+                JSON-восстановление отключено для общей базы. Для отката используйте серверные резервные копии ниже.
+              </p>
+            )}
             <input
               ref={fileRef}
               type="file"
