@@ -297,7 +297,7 @@ begin
       'atomic-order-payments',
       'atomic-cash-shifts',
       'advisor-stock-sync',
-      'atomic-stock-rece-return',
+      'atomic-stock-receive-return',
       'atomic-order-create',
       'atomic-vehicle-management',
       'idempotent-financial-mutations',
