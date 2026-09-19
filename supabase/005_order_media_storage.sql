@@ -25,7 +25,8 @@ set public = excluded.public,
 
 create or replace function public.crm_can_access_order_media(
   p_object_name text,
-  p_write boolean default false
+  p_write boolean default false,
+  p_delete boolean default false
 )
 returns boolean
 language plpgsql
@@ -53,6 +54,10 @@ begin
   v_order_id := nullif(split_part(p_object_name, '/', 2), '');
 
   if v_path_workshop is null or v_path_workshop <> v_workshop::text or v_order_id is null then
+    return false;
+  end if;
+
+  if p_delete and v_role not in ('owner', 'partner', 'advisor') then
     return false;
   end if;
 
@@ -89,8 +94,8 @@ begin
 end;
 $$;
 
-revoke all on function public.crm_can_access_order_media(text, boolean) from public;
-grant execute on function public.crm_can_access_order_media(text, boolean) to authenticated;
+revoke all on function public.crm_can_access_order_media(text, boolean, boolean) from public;
+grant execute on function public.crm_can_access_order_media(text, boolean, boolean) to authenticated;
 
 drop policy if exists "order_media_select" on storage.objects;
 create policy "order_media_select"
@@ -99,7 +104,7 @@ for select
 to authenticated
 using (
   bucket_id = 'order-media'
-  and public.crm_can_access_order_media(name, false)
+  and public.crm_can_access_order_media(name, false, false)
 );
 
 drop policy if exists "order_media_insert" on storage.objects;
@@ -109,7 +114,7 @@ for insert
 to authenticated
 with check (
   bucket_id = 'order-media'
-  and public.crm_can_access_order_media(name, true)
+  and public.crm_can_access_order_media(name, true, false)
 );
 
 drop policy if exists "order_media_delete" on storage.objects;
@@ -119,7 +124,7 @@ for delete
 to authenticated
 using (
   bucket_id = 'order-media'
-  and public.crm_can_access_order_media(name, true)
+  and public.crm_can_access_order_media(name, true, true)
 );
 
 -- Механик может добавлять медиа только к назначенному ему заказу.
@@ -131,9 +136,8 @@ create or replace function public.crm_merge_mechanic_orders(
 )
 returns jsonb
 language sql
-immutable
 set search_path = public
-as $$
+as $
   select coalesce(
     jsonb_agg(
       case
@@ -141,12 +145,27 @@ as $$
         else
           jsonb_set(
             jsonb_set(
-              case
-                when current_order.item ->> 'status' in ('запись', 'диагностика')
-                     and incoming.item ->> 'status' = 'в работе'
-                  then jsonb_set(current_order.item, '{status}', '"в работе"'::jsonb, true)
-                else current_order.item
-              end,
+              jsonb_set(
+                case
+                  when current_order.item ->> 'status' in ('запись', 'диагностика')
+                       and incoming.item ->> 'status' = 'в работе'
+                    then jsonb_set(current_order.item, '{status}', '"в работе"'::jsonb, true)
+                  else current_order.item
+                end,
+                '{timeline}',
+                case
+                  when current_order.item ->> 'status' in ('запись', 'диагностика')
+                       and incoming.item ->> 'status' = 'в работе'
+                    then coalesce(current_order.item -> 'timeline', '[]'::jsonb)
+                      || jsonb_build_array(jsonb_build_object(
+                        'status', 'в работе',
+                        'at', now(),
+                        'actor', p_display
+                      ))
+                  else coalesce(current_order.item -> 'timeline', '[]'::jsonb)
+                end,
+                true
+              ),
               '{works}',
               coalesce((
                 select jsonb_agg(
@@ -176,7 +195,9 @@ as $$
               ), '[]'::jsonb),
               true
             ),
-            '{media}',
+            true
+          ),
+          '{media}',
             coalesce(incoming.item -> 'media', current_order.item -> 'media', '[]'::jsonb),
             true
           )
