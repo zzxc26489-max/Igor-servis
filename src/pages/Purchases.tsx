@@ -11,7 +11,7 @@ import {
 import { useAppStore } from "../store/AppStore";
 import { Button, Card, EmptyState, Metric, Page, TopBar } from "../components/ui";
 import { formatMoney } from "../lib/format";
-import { incomingStockItems, needsPurchaseItems, remainingPurchaseQty, toBuyQty } from "../lib/lowStock";
+import { incomingStockItems, needsPurchaseItems, remainingPurchaseQty } from "../lib/lowStock";
 import { reservedByItem } from "../lib/stock";
 import { nowISO, todayISO, toISODate } from "../lib/date";
 import { createId } from "../lib/id";
@@ -68,7 +68,7 @@ export default function Purchases() {
 
   async function markOrdered(item: StockItem) {
     const inReserve = reserved.get(item.id) ?? 0;
-    const qty = item.onOrderQty ?? toBuyQty(item, inReserve);
+    const qty = (item.onOrderQty ?? 0) + remainingPurchaseQty(item, inReserve);
     const ok = await confirm({
       title: "Заказать у поставщика",
       question: "Позиция исчезнет из списка «Нужно заказать» и появится в ожидаемых поставках.",
