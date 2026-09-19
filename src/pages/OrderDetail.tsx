@@ -27,6 +27,7 @@ import { effectiveWorkStatus, WORK_STATUS_LABEL, workSessionMinutes } from "../l
 import OrderMediaPanel from "../components/OrderMediaPanel";
 import ClientOrderDocument from "../components/ClientOrderDocument";
 import { orderActivity } from "../lib/orderActivity";
+import { autoLiftEnd, autoLiftSchedulePatch, isSlotFree, orderDay, toMinutes } from "../lib/lift";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
 const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "История", "Документы"] as const;
@@ -105,6 +106,11 @@ export default function OrderDetail() {
   const [intakePromisedAt, setIntakePromisedAt] = useState(order?.promisedAt ? order.promisedAt.slice(0, 16) : "");
   const [intakeMileage, setIntakeMileage] = useState("");
   const [mechanicComment, setMechanicComment] = useState(order?.mechanicComment ?? "");
+  const [liftScheduleOpen, setLiftScheduleOpen] = useState(false);
+  const [liftScheduleLiftId, setLiftScheduleLiftId] = useState(order?.liftId ? String(order.liftId) : "");
+  const [liftScheduleDate, setLiftScheduleDate] = useState(order ? orderDay(order) : "");
+  const [liftScheduleStart, setLiftScheduleStart] = useState(order?.scheduledStart ?? "");
+  const [liftScheduleEnd, setLiftScheduleEnd] = useState(order?.scheduledEnd ?? "");
   const loadedIntakeOrderRef = useRef<string | null>(null);
 
   const client = order ? clients.find((c) => c.id === order.clientId) : undefined;
@@ -123,6 +129,10 @@ export default function OrderDetail() {
     setIntakeMileage(vehicle?.mileage ? String(vehicle.mileage) : "");
     setMechanicComment(order.mechanicComment ?? "");
     setPaymentEmployee(order.advisor ?? "");
+    setLiftScheduleLiftId(order.liftId ? String(order.liftId) : "");
+    setLiftScheduleDate(orderDay(order));
+    setLiftScheduleStart(order.scheduledStart ?? "");
+    setLiftScheduleEnd(order.scheduledEnd ?? "");
   }, [order, vehicle?.mileage]);
 
   if (!order) {
@@ -204,9 +214,24 @@ export default function OrderDetail() {
     const newWork: OrderLineWork = { id: createId("work"), ...work };
     const nextWorks = [...order.works, newWork];
     const target = Number(targetTotal);
-    updateOrder(order.id, { works: settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(nextWorks, target) : nextWorks });
+    const pricedWorks = settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(nextWorks, target) : nextWorks;
+    const liftPatch = autoLiftSchedulePatch(order, pricedWorks);
+    updateOrder(order.id, { works: pricedWorks, ...liftPatch });
     setAddingWork(false);
-    showToast(`Добавлена работа «${work.name}»`);
+
+    if (liftPatch.scheduledEnd && liftPatch.scheduledEnd !== order.scheduledEnd) {
+      const overlaps = order.liftId
+        ? !isSlotFree(orders, order.liftId, orderDay(order), order.scheduledStart ?? "", liftPatch.scheduledEnd, order.id)
+        : false;
+      showToast(
+        overlaps
+          ? `Работа добавлена. Подъёмник продлён до ${liftPatch.scheduledEnd}; проверьте пересечение в расписании.`
+          : `Добавлена работа «${work.name}». Подъёмник занят до ${liftPatch.scheduledEnd}.`,
+        overlaps ? "error" : undefined,
+      );
+    } else {
+      showToast(`Добавлена работа «${work.name}»`);
+    }
   }
 
   function handleRemoveWork(workId: string) {
@@ -217,8 +242,86 @@ export default function OrderDetail() {
     }
     const nextWorks = order.works.filter((w) => w.id !== workId);
     const target = Number(targetTotal);
-    updateOrder(order.id, { works: settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(nextWorks, target) : nextWorks });
-    showToast("Работа удалена", "error");
+    const pricedWorks = settings.autoPriceAdjustment && target > 0 ? adjustWorkPrices(nextWorks, target) : nextWorks;
+    const liftPatch = autoLiftSchedulePatch(order, pricedWorks);
+    updateOrder(order.id, { works: pricedWorks, ...liftPatch });
+    showToast(
+      liftPatch.scheduledEnd && liftPatch.scheduledEnd !== order.scheduledEnd
+        ? `Работа удалена. Время подъёмника пересчитано до ${liftPatch.scheduledEnd}.`
+        : "Работа удалена",
+      "error",
+    );
+  }
+
+  function openLiftScheduleEditor() {
+    setLiftScheduleLiftId(order.liftId ? String(order.liftId) : "");
+    setLiftScheduleDate(orderDay(order));
+    setLiftScheduleStart(order.scheduledStart ?? "");
+    setLiftScheduleEnd(order.scheduledEnd ?? "");
+    setLiftScheduleOpen(true);
+  }
+
+  function setLiftScheduleNow() {
+    const now = new Date();
+    const minutes = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 15) * 15;
+    const start = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+    const endMinutes = Math.min(23 * 60 + 59, minutes + Math.max(60, orderNorm || 60));
+    const end = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
+    setLiftScheduleDate(new Date().toISOString().slice(0, 10));
+    setLiftScheduleStart(start);
+    setLiftScheduleEnd(end);
+  }
+
+  function handleSaveLiftSchedule() {
+    if (!liftScheduleLiftId) {
+      updateOrder(order.id, {
+        liftId: undefined,
+        plannedAt: liftScheduleDate || order.plannedAt,
+        scheduledStart: undefined,
+        scheduledEnd: undefined,
+        liftScheduleManual: true,
+      });
+      setLiftScheduleOpen(false);
+      showToast("Подъёмник снят с заказа");
+      return;
+    }
+
+    if (!liftScheduleDate || !liftScheduleStart || !liftScheduleEnd) {
+      showToast("Укажите дату, начало и окончание занятости", "error");
+      return;
+    }
+    if (toMinutes(liftScheduleEnd) <= toMinutes(liftScheduleStart)) {
+      showToast("Окончание должно быть позже начала", "error");
+      return;
+    }
+
+    const nextLiftId = Number(liftScheduleLiftId);
+    if (!isSlotFree(orders, nextLiftId, liftScheduleDate, liftScheduleStart, liftScheduleEnd, order.id)) {
+      showToast("Этот интервал пересекается с другой машиной на подъёмнике", "error");
+      return;
+    }
+
+    updateOrder(order.id, {
+      liftId: nextLiftId,
+      plannedAt: liftScheduleDate,
+      scheduledStart: liftScheduleStart,
+      scheduledEnd: liftScheduleEnd,
+      liftScheduleManual: true,
+    });
+    setLiftScheduleOpen(false);
+    showToast("Подъёмник и время обновлены");
+  }
+
+  function handleAutoLiftSchedule() {
+    if (!order.liftId || !order.scheduledStart) {
+      showToast("Сначала назначьте подъёмник и время начала", "error");
+      return;
+    }
+    const scheduledEnd = autoLiftEnd({ ...order, liftScheduleManual: false });
+    if (!scheduledEnd) return;
+    updateOrder(order.id, { scheduledEnd, liftScheduleManual: false });
+    setLiftScheduleEnd(scheduledEnd);
+    showToast(`Время снова считается по нормативам: до ${scheduledEnd}`);
   }
 
   async function handleAddPart(itemId: string, qty: number, price: number) {
@@ -731,8 +834,16 @@ export default function OrderDetail() {
           <InfoCell icon={<IconTool size={18} />} tone="#f5f0ff" color="#6656b8" label="Подъёмник">
             <div className="truncate text-sm font-semibold">{lift?.name ?? "Не назначен"}</div>
             <div className="muted truncate text-xs">
-              {order.scheduledStart ? `${order.scheduledStart}–${order.scheduledEnd ?? "…"}` : "Время не задано"}
+              {order.scheduledStart ? `${orderDay(order)} · ${order.scheduledStart}–${order.scheduledEnd ?? "…"}` : "Время не задано"}
+              {order.liftScheduleManual ? " · вручную" : order.liftId ? " · по нормативам" : ""}
             </div>
+            <button
+              type="button"
+              onClick={openLiftScheduleEditor}
+              className="mt-2 text-xs font-semibold text-[var(--accent)] hover:underline"
+            >
+              {order.liftId ? "Изменить подъёмник и время" : "Поставить на подъёмник"}
+            </button>
           </InfoCell>
           <InfoCell icon={<IconStopwatch size={18} />} tone="#f0f4f1" color="var(--text)" label="Время на подъёмнике">
             <div className="truncate text-sm font-semibold">
@@ -1220,6 +1331,67 @@ export default function OrderDetail() {
           <span className="shrink-0 text-sm font-semibold" style={{ color: "var(--accent)" }}>Заказ оплачен</span>
         )}
       </div>
+
+      {liftScheduleOpen && (
+        <Modal
+          title={order.liftId ? "Подъёмник и занятость" : "Поставить машину на подъёмник"}
+          subtitle="Это внутреннее расписание сервиса — клиенту эти данные не печатаются."
+          onClose={() => setLiftScheduleOpen(false)}
+        >
+          <div className="space-y-4 p-4">
+            <label className="block text-sm">
+              <span className="muted mb-1 block">Подъёмник</span>
+              <div className="field-control">
+                <select value={liftScheduleLiftId} onChange={(event) => setLiftScheduleLiftId(event.target.value)}>
+                  <option value="">Не назначен</option>
+                  {lifts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </div>
+            </label>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <label className="block text-sm">
+                <span className="muted mb-1 block">Дата</span>
+                <div className="field-control">
+                  <input type="date" value={liftScheduleDate} onChange={(event) => setLiftScheduleDate(event.target.value)} />
+                </div>
+              </label>
+              <label className="block text-sm">
+                <span className="muted mb-1 block">С</span>
+                <div className="field-control">
+                  <input type="time" step={900} value={liftScheduleStart} onChange={(event) => setLiftScheduleStart(event.target.value)} />
+                </div>
+              </label>
+              <label className="block text-sm">
+                <span className="muted mb-1 block">До</span>
+                <div className="field-control">
+                  <input type="time" step={900} value={liftScheduleEnd} onChange={(event) => setLiftScheduleEnd(event.target.value)} />
+                </div>
+              </label>
+            </div>
+
+            <div className="rounded-lg border p-3 text-xs" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
+              <b className="block text-sm">Норматив работ: {orderNorm > 0 ? formatDuration(orderNorm) : "не задан"}</b>
+              <span className="muted">
+                После ручного сохранения CRM не будет менять этот интервал при добавлении услуг. Кнопкой «По нормативам» можно вернуть автоматический расчёт.
+              </span>
+            </div>
+
+            <div className="flex flex-wrap justify-between gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={setLiftScheduleNow}>Поставить сейчас</Button>
+                {order.liftId && order.scheduledStart && (
+                  <Button variant="secondary" onClick={handleAutoLiftSchedule}>По нормативам</Button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => setLiftScheduleOpen(false)}>Отмена</Button>
+                <Button onClick={handleSaveLiftSchedule}>Сохранить</Button>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {addingWork && <AddWork onClose={() => setAddingWork(false)} onSubmit={handleAddWork} />}
       {addingPart && (
