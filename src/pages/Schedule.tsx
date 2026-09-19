@@ -38,7 +38,6 @@ function conflictingOrderIds(orders: Order[]) {
 
   for (let index = 0; index < timed.length; index += 1) {
     const current = timed[index];
-    const currentStart = toMinutes(current.scheduledStart!);
     const currentEnd = orderEndMinutes(current);
     if (currentEnd === null) continue;
 
