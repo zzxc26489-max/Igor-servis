@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { IconEdit, IconPlus, IconSearch, IconTool, IconTrash } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
@@ -21,6 +21,9 @@ export default function Services() {
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
   const [norm, setNorm] = useState("");
+  const submitRef = useRef(false);
+  const deleteRef = useRef<string | null>(null);
+  const createOperationRef = useRef<{ fingerprint: string; id: string } | null>(null);
 
   const allCategories = useMemo(
     () => Array.from(new Set(services.map((service) => service.category))).sort((a, b) => a.localeCompare(b, "ru")),
@@ -59,8 +62,9 @@ export default function Services() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitRef.current) return;
     const cleanName = name.trim();
     const cleanCategory = category.trim();
     const numericPrice = Number(price);
@@ -68,17 +72,43 @@ export default function Services() {
       showToast("Заполните название, категорию и цену", "error");
       return;
     }
-    if (editingId) {
-      updateService(editingId, { name: cleanName, category: cleanCategory, price: numericPrice, normMinutes: Number(norm) || undefined });
-      showToast("Услуга обновлена");
-    } else {
-      addService({ id: createId("sv"), name: cleanName, category: cleanCategory, price: numericPrice, normMinutes: Number(norm) || undefined });
-      showToast("Услуга добавлена");
+    const payload = {
+      name: cleanName,
+      category: cleanCategory,
+      price: numericPrice,
+      normMinutes: Number(norm) || undefined,
+    };
+
+    submitRef.current = true;
+    try {
+      if (editingId) {
+        const error = await updateService(editingId, payload);
+        if (error) {
+          showToast(error, "error");
+          return;
+        }
+        showToast("Услуга обновлена");
+      } else {
+        const fingerprint = JSON.stringify(payload);
+        if (!createOperationRef.current || createOperationRef.current.fingerprint !== fingerprint) {
+          createOperationRef.current = { fingerprint, id: createId("sv") };
+        }
+        const error = await addService({ id: createOperationRef.current.id, ...payload });
+        if (error) {
+          showToast(error, "error");
+          return;
+        }
+        createOperationRef.current = null;
+        showToast("Услуга добавлена");
+      }
+      resetForm();
+    } finally {
+      submitRef.current = false;
     }
-    resetForm();
   }
 
   async function handleDelete(id: string, serviceName: string) {
+    if (deleteRef.current === id) return;
     const service = services.find((item) => item.id === id);
     const ok = await confirm({
       title: "Удалить услугу",
@@ -92,9 +122,18 @@ export default function Services() {
       danger: true,
     });
     if (!ok) return;
-    deleteService(id);
-    if (editingId === id) resetForm();
-    showToast("Услуга удалена", "error");
+    deleteRef.current = id;
+    try {
+      const error = await deleteService(id);
+      if (error) {
+        showToast(error, "error");
+        return;
+      }
+      if (editingId === id) resetForm();
+      showToast("Услуга удалена");
+    } finally {
+      deleteRef.current = null;
+    }
   }
 
   return (

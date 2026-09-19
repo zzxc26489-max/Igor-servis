@@ -46,9 +46,11 @@ import {
   restoreCloudBackup,
   returnCloudStockSupplier,
   reserveCloudStockPart,
+  saveCloudService,
   saveCloudState,
   saveCloudVehicle,
   setCloudOrderStatus,
+  updateCloudClient,
   type CloudAuditInfo,
   type CloudBackupInfo,
   type CloudRole,
@@ -300,7 +302,7 @@ interface AppStoreValue extends DB {
   updateOrder: (id: string, patch: Partial<Order>) => void;
   deleteOrder: (id: string) => string | null;
   addClient: (client: Client) => void;
-  updateClient: (id: string, patch: Partial<Client>) => void;
+  updateClient: (id: string, patch: Partial<Client>) => Promise<string | null>;
   addVehicle: (vehicle: Vehicle) => Promise<string | null>;
   updateVehicle: (id: string, patch: Partial<Vehicle>) => Promise<string | null>;
   deleteVehicle: (id: string) => Promise<string | null>;
@@ -311,9 +313,9 @@ interface AppStoreValue extends DB {
   updateCompany: (patch: Partial<CompanyInfo>) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   updateEmployee: (id: string, patch: Partial<Employee>) => void;
-  addService: (service: Service) => void;
-  updateService: (id: string, patch: Partial<Service>) => void;
-  deleteService: (id: string) => void;
+  addService: (service: Service) => Promise<string | null>;
+  updateService: (id: string, patch: Partial<Service>) => Promise<string | null>;
+  deleteService: (id: string) => Promise<string | null>;
   /** Смена статуса заказа: при выдаче списывает запчасти, при откате возвращает. */
   setOrderStatus: (id: string, status: OrderStatus, operationId?: string) => Promise<string | null>;
   /** Старт/пауза/завершение конкретной работы механика. */
@@ -856,11 +858,38 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ...prev,
           clients: [...prev.clients, { ...client, code: client.code ?? nextCode(CODE_PREFIX.client, prev.clients.map((item) => item.code)) }],
         })),
-      updateClient: (id, patch) =>
+      updateClient: async (id, patch) => {
+        const current = dbRef.current.clients.find((item) => item.id === id);
+        if (!current) return "Клиент не найден";
+        const client = { ...current, ...patch, id };
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Изменение клиента нужно подтвердить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальную базу: ${syncError}`;
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await updateCloudClient(session, client);
+            applyConfirmedServerState(result);
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось сохранить клиента";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
+        const phoneDigits = client.phone.replace(/\D/g, "");
+        const duplicate = dbRef.current.clients.find(
+          (item) => item.id !== id && item.phone.replace(/\D/g, "") === phoneDigits,
+        );
+        if (duplicate) return `Такой телефон уже указан у клиента ${duplicate.name}`;
         setDB((prev) => ({
           ...prev,
-          clients: prev.clients.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-        })),
+          clients: prev.clients.map((item) => item.id === id ? client : item),
+        }));
+        return null;
+      },
       addVehicle: async (vehicle) => {
         if (cloudConfigured && session) {
           if (!navigator.onLine) return "Нет связи с сервером. Автомобиль нужно сохранить онлайн, чтобы исключить дубли госномера/VIN.";
@@ -1177,13 +1206,88 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             employee.id === id ? { ...employee, ...patch } : employee,
           ),
         })),
-      addService: (service) => setDB((prev) => ({ ...prev, services: [...prev.services, service] })),
-      updateService: (id, patch) =>
+      addService: async (service) => {
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Услугу нужно сохранить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальный прайс: ${syncError}`;
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await saveCloudService(session, service);
+            applyConfirmedServerState(result);
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось добавить услугу";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+        const duplicate = dbRef.current.services.find(
+          (item) =>
+            item.name.trim().toLocaleLowerCase("ru-RU") === service.name.trim().toLocaleLowerCase("ru-RU")
+            && item.category.trim().toLocaleLowerCase("ru-RU") === service.category.trim().toLocaleLowerCase("ru-RU"),
+        );
+        if (duplicate) return "Такая услуга уже есть в этой категории";
+        setDB((prev) => ({ ...prev, services: [...prev.services, service] }));
+        return null;
+      },
+      updateService: async (id, patch) => {
+        const current = dbRef.current.services.find((item) => item.id === id);
+        if (!current) return "Услуга уже удалена или не найдена";
+        const service = { ...current, ...patch, id };
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Изменение услуги нужно подтвердить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальный прайс: ${syncError}`;
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await saveCloudService(session, service);
+            applyConfirmedServerState(result);
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось обновить услугу";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
+        const duplicate = dbRef.current.services.find(
+          (item) =>
+            item.id !== id
+            && item.name.trim().toLocaleLowerCase("ru-RU") === service.name.trim().toLocaleLowerCase("ru-RU")
+            && item.category.trim().toLocaleLowerCase("ru-RU") === service.category.trim().toLocaleLowerCase("ru-RU"),
+        );
+        if (duplicate) return "Такая услуга уже есть в этой категории";
         setDB((prev) => ({
           ...prev,
-          services: prev.services.map((service) => (service.id === id ? { ...service, ...patch } : service)),
-        })),
-      deleteService: (id) => setDB((prev) => ({ ...prev, services: prev.services.filter((service) => service.id !== id) })),
+          services: prev.services.map((item) => item.id === id ? service : item),
+        }));
+        return null;
+      },
+      deleteService: async (id) => {
+        const current = dbRef.current.services.find((item) => item.id === id);
+        if (!current) return null;
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Удаление услуги нужно подтвердить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальный прайс: ${syncError}`;
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await saveCloudService(session, current, true);
+            applyConfirmedServerState(result);
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось удалить услугу";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
+        setDB((prev) => ({ ...prev, services: prev.services.filter((item) => item.id !== id) }));
+        return null;
+      },
       setWorkLineStatus: (orderId, workId, status) => {
         let error: string | null = null;
         setDB((prev) => {

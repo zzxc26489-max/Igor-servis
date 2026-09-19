@@ -178,6 +178,10 @@ export type CloudOrderStatusResult =
   | { ok: true; revision: number; updatedAt?: string; data: unknown }
   | { ok: false; orderConflict: true; revision: number; message: string; data: unknown; updatedAt?: string };
 
+export type CloudReferenceResult =
+  | { ok: true; revision: number; updatedAt?: string; data: unknown }
+  | { ok: false; referenceConflict: true; revision: number; message: string; data: unknown; updatedAt?: string };
+
 const rawUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "");
 const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
 
@@ -524,6 +528,32 @@ export async function setCloudOrderStatus(
     },
     session.access_token,
   ) as Promise<CloudOrderStatusResult>;
+}
+
+export async function updateCloudClient(
+  session: CloudSession,
+  client: unknown,
+): Promise<CloudReferenceResult> {
+  return requestMutation(
+    "/rest/v1/rpc/crm_update_client",
+    { method: "POST", body: JSON.stringify({ p_client: client }) },
+    session.access_token,
+  ) as Promise<CloudReferenceResult>;
+}
+
+export async function saveCloudService(
+  session: CloudSession,
+  service: unknown,
+  deleteService = false,
+): Promise<CloudReferenceResult> {
+  return requestMutation(
+    "/rest/v1/rpc/crm_save_service",
+    {
+      method: "POST",
+      body: JSON.stringify({ p_service: service, p_delete: deleteService }),
+    },
+    session.access_token,
+  ) as Promise<CloudReferenceResult>;
 }
 
 export async function createCloudBackup(session: CloudSession): Promise<{ ok: true; createdAt: string }> {

@@ -134,3 +134,17 @@ test("idempotent order status migration prevents repeated stock issue and return
   assert.match(sql, /'latestMigration', 16/);
   assert.match(sql, /idempotent-order-status/);
 });
+
+
+test("idempotent client and service CRUD migration rejects duplicates and no-ops repeats", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "017_idempotent_reference_crud.sql"), "utf8");
+  assert.match(sql, /create or replace function public\.crm_update_client/);
+  assert.match(sql, /create or replace function public\.crm_save_service/);
+  assert.match(sql, /for update/g);
+  assert.match(sql, /Такой телефон уже указан у другого клиента/);
+  assert.match(sql, /Такая услуга уже есть в этой категории/);
+  assert.match(sql, /if v_saved = v_existing then/);
+  assert.match(sql, /if v_existing is null then[\s\S]*'ok', true/);
+  assert.match(sql, /'latestMigration', 17/);
+  assert.match(sql, /idempotent-reference-crud/);
+});
