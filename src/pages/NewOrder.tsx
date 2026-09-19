@@ -26,8 +26,9 @@ import {
   normalizeVin,
   type PlateKind,
 } from "../lib/formats";
-import { CODE_PREFIX, useAppStore } from "../store/AppStore";
-import { createId, nextCode } from "../lib/id";
+import { useAppStore } from "../store/AppStore";
+import { createId } from "../lib/id";
+import type { Client, Order, Vehicle } from "../types";
 import { todayISO } from "../lib/date";
 import { SLOT_MINUTES, fromMinutes, isSlotFree, liftState, toMinutes } from "../lib/lift";
 import { findClientByPhone, findVehicleByPlate, findVehicleByVin } from "../lib/dataIntegrity";
@@ -38,7 +39,7 @@ export default function NewOrder() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const confirm = useConfirm();
-  const { clients, vehicles, lifts, orders, company, setDB } = useAppStore();
+  const { clients, vehicles, lifts, orders, company, createOrderEntry } = useAppStore();
   const [searchParams] = useSearchParams();
   const presetClient = clients.find((item) => item.id === searchParams.get("clientId"));
   const presetVehicle = vehicles.find(
@@ -217,7 +218,7 @@ export default function NewOrder() {
       title: "Создать заказ-наряд",
       question: "Запись появится в расписании и в списке заказ-нарядов.",
       summary: [
-        { label: "Номер", value: orderNumber },
+        { label: "Номер", value: `${orderNumber}${orders.some((item) => item.number === orderNumber) ? " (будет уточнён)" : ""}` },
         { label: "Клиент", value: `${clientName.trim()}${existingClientId ? "" : " (новый)"}` },
         { label: "Телефон", value: phone.trim() },
         { label: "Автомобиль", value: `${make.trim()} ${model.trim()} · ${normalizedPlate}${existingVehicleId ? "" : " (новый)"}` },
@@ -230,64 +231,58 @@ export default function NewOrder() {
     });
     if (!ok) return;
 
-    setDB((previous) => ({
-      ...previous,
-      clients: existingClientId
-        ? previous.clients.map((client) => client.id === clientId ? {
-            ...client,
-            name: clientName.trim(),
-            phone: phone.trim(),
-          } : client)
-        : [...previous.clients, {
-            id: clientId,
-            code: nextCode(CODE_PREFIX.client, previous.clients.map((item) => item.code)),
-            name: clientName.trim(),
-            phone: phone.trim(),
-            createdAt: todayISO(),
-          }],
-      vehicles: existingVehicleId
-        ? previous.vehicles.map((vehicle) => vehicle.id === vehicleId ? {
-            ...vehicle,
-            make: make.trim(),
-            model: model.trim(),
-            plate: normalizedPlate,
-            vin: normalizedVin || vehicle.vin,
-            mileage: mileage ? Number(mileage) : vehicle.mileage,
-          } : vehicle)
-        : [...previous.vehicles, {
-            id: vehicleId,
-            code: nextCode(CODE_PREFIX.vehicle, previous.vehicles.map((item) => item.code)),
-            clientId,
-            make: make.trim(),
-            model: model.trim(),
-            plate: normalizedPlate,
-            vin: normalizedVin || undefined,
-            mileage: mileage ? Number(mileage) : undefined,
-          }],
-      orders: [...previous.orders, {
-        id: orderId,
-        number: orderNumber,
-        clientId,
-        vehicleId,
-        liftId: chosenLift,
-        status: "запись",
-        createdAt: new Date().toISOString(),
-        plannedAt: date,
-        works: [],
-        parts: [],
-        paid: 0,
-        complaint: complaint.trim() || undefined,
-        mileageAtIntake: mileage ? Number(mileage) : undefined,
-        scheduledStart: time,
-        scheduledEnd: endTime,
-        workDayStart: company.openTime,
-        workDayEnd: company.closeTime,
-        workDayEstimated: false,
-      }],
-    }));
+    const clientRecord: Client = {
+      id: clientId,
+      name: clientName.trim(),
+      phone: phone.trim(),
+      createdAt: existingClientId ? selectedClient?.createdAt : todayISO(),
+    };
+    const vehicleRecord: Vehicle = {
+      id: vehicleId,
+      clientId,
+      make: make.trim(),
+      model: model.trim(),
+      plate: normalizedPlate,
+      vin: normalizedVin || undefined,
+      mileage: mileage ? Number(mileage) : undefined,
+    };
+    const orderRecord: Order = {
+      id: orderId,
+      number: orderNumber,
+      clientId,
+      vehicleId,
+      liftId: chosenLift,
+      status: "запись",
+      createdAt: new Date().toISOString(),
+      plannedAt: date,
+      works: [],
+      parts: [],
+      paid: 0,
+      complaint: complaint.trim() || undefined,
+      mileageAtIntake: mileage ? Number(mileage) : undefined,
+      scheduledStart: time,
+      scheduledEnd: endTime,
+      workDayStart: company.openTime,
+      workDayEnd: company.closeTime,
+      workDayEstimated: false,
+    };
 
-    showToast(`Заказ-наряд ${orderNumber} создан`);
-    navigate(`/orders/${orderId}`);
+    const result = await createOrderEntry({
+      client: clientRecord,
+      vehicle: vehicleRecord,
+      order: orderRecord,
+      existingClientId: existingClientId || undefined,
+      existingVehicleId: existingVehicleId || undefined,
+    });
+    if (result.error) {
+      setError(result.error);
+      showToast(result.error, "error");
+      return;
+    }
+
+    const savedNumber = result.orderNumber ?? orderNumber;
+    showToast(`Заказ-наряд ${savedNumber} создан`);
+    navigate(`/orders/${result.orderId}`);
   }
 
   return (
