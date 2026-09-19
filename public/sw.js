@@ -1,5 +1,18 @@
-const CACHE = "igor-servis-shell-v1";
+const CACHE = "igor-servis-shell-v2";
 const APP_SHELL = ["/Igor-servis/", "/Igor-servis/index.html", "/Igor-servis/manifest.webmanifest", "/Igor-servis/favicon.svg"];
+
+function cacheableStaticRequest(request, url) {
+  if (url.origin !== self.location.origin) return false;
+  if (!url.pathname.startsWith("/Igor-servis/")) return false;
+  return (
+    request.destination === "script" ||
+    request.destination === "style" ||
+    request.destination === "image" ||
+    request.destination === "font" ||
+    url.pathname === "/Igor-servis/manifest.webmanifest" ||
+    url.pathname === "/Igor-servis/favicon.svg"
+  );
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
@@ -23,8 +36,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put("/Igor-servis/index.html", copy));
+          if (response.ok && response.type === "basic") {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put("/Igor-servis/index.html", copy));
+          }
           return response;
         })
         .catch(() => caches.match("/Igor-servis/index.html")),
@@ -32,11 +47,15 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (!cacheableStaticRequest(request, url)) return;
+
   event.respondWith(
     caches.match(request).then((cached) => {
       const network = fetch(request)
         .then((response) => {
-          if (response.ok) caches.open(CACHE).then((cache) => cache.put(request, response.clone()));
+          if (response.ok && response.type === "basic") {
+            caches.open(CACHE).then((cache) => cache.put(request, response.clone()));
+          }
           return response;
         })
         .catch(() => cached);
