@@ -1840,7 +1840,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [backupCloud, cloud, cloudConfigured, db, listAudit, listBackups, loadFromCloud, pushCloudState, restoreBackup, session, setDB, uploadLocalToCloud],
+    [applyConfirmedServerState, backupCloud, cloud, cloudConfigured, db, listAudit, listBackups, loadFromCloud, pushCloudState, restoreBackup, session, setDB, uploadLocalToCloud],
   );
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
