@@ -143,6 +143,12 @@ export function liftLabel(state: LiftState) {
   return "Свободен";
 }
 
+/** Короткая подпись для узкой липкой колонки на телефоне. */
+export function compactLiftLabel(state: LiftState) {
+  if (!state.isToday) return state.orders.length ? "зап." : "своб.";
+  return state.busyNow ? "занят" : "своб.";
+}
+
 /**
  * Ближайший день и час, когда подъёмник реально свободен. Ищем вперёд, а не
  * просто «завтра»: завтра стандартные 10:00 тоже могут быть заняты.

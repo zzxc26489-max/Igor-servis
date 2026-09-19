@@ -40,13 +40,14 @@ export function mechanicWorkloadLabel(load: MechanicWorkload) {
 }
 
 
-/** Только сотрудники с явной ролью механика могут получать ремонтные работы. */
+/** Ремонт выполняют штатные механики и владельцы сервиса — Игорь и Юра тоже работают с машинами. */
 export function isMechanicEmployee(employee: Employee) {
-  return employee.role.toLocaleLowerCase("ru-RU").includes("механик");
+  const role = employee.role.toLocaleLowerCase("ru-RU");
+  return role.includes("механик") || role.includes("владелец");
 }
 
 /**
- * Кандидаты на работу: только механики, сначала наименее загруженные.
+ * Кандидаты на работу: механики и владельцы, сначала наименее загруженные.
  * keepName сохраняет текущего исполнителя в списке при редактировании старых данных.
  */
 export function mechanicCandidates(employees: Employee[], orders: Order[], keepName?: string) {
