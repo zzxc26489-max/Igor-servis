@@ -832,14 +832,38 @@ export default function OrderDetail() {
                           <td>
                             {w.name}
                             <div className="muted text-xs">
-                              {w.executor ? `Исполнитель: ${w.executor}` : ""}
+                              {w.executor ? `Исполнитель: ${w.executor}` : "Исполнитель не назначен"}
                               {w.executor && w.normMinutes ? " · " : ""}
                               {w.normMinutes ? `норматив ${formatDuration(w.normMinutes * w.qty)}` : ""}
                               {w.executor ? ` · ${WORK_STATUS_LABEL[effectiveWorkStatus(w)]}` : ""}
                               {workSessionMinutes(w) > 0 ? ` · факт ${formatDuration(workSessionMinutes(w))}` : ""}
                             </div>
                           </td>
-                          <td className="text-right tabular-nums">{w.qty}</td>
+                          <td className="text-right tabular-nums">
+                            {w.qty}
+                            <div className="mt-1 print:hidden">
+                              <select
+                                value={w.executor ?? ""}
+                                onChange={(event) => {
+                                  if (order.status === "выдан") {
+                                    showToast("Сначала верните автомобиль в работу", "error");
+                                    return;
+                                  }
+                                  const executor = event.target.value || undefined;
+                                  updateOrder(order.id, {
+                                    works: order.works.map((item) => item.id === w.id ? { ...item, executor } : item),
+                                  });
+                                  showToast(executor ? `Исполнитель: ${executor}` : "Исполнитель снят");
+                                }}
+                                className="max-w-36 rounded-md border bg-white px-2 py-1 text-xs"
+                                style={{ borderColor: w.executor ? "var(--border)" : "var(--warning)" }}
+                                aria-label={`Исполнитель работы ${w.name}`}
+                              >
+                                <option value="">Без механика</option>
+                                {employees.map((employee) => <option key={employee.id} value={employee.name}>{employee.name}</option>)}
+                              </select>
+                            </div>
+                          </td>
                           <td className="whitespace-nowrap text-right tabular-nums">{formatMoney(w.price * w.qty)}</td>
                           <td className="text-right print:hidden">
                             <RowMenu
