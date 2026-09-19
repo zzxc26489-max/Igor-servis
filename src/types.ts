@@ -50,6 +50,45 @@ export interface Employee {
   lastPaidAt?: string;
 }
 
+export type ReviewPlatform = "yandex" | "2gis" | "google" | "other";
+export type ReviewCaseStatus = "new" | "contacted" | "resolving" | "resolved" | "updated";
+
+export interface ClientReview {
+  id: string;
+  platform: ReviewPlatform;
+  rating: number;
+  text: string;
+  createdAt: string;
+  sourceUrl?: string;
+  orderId?: string;
+  vehicleId?: string;
+  status: ReviewCaseStatus;
+  resolution?: string;
+  updatedAt?: string;
+}
+
+export type ClientCommunicationType =
+  | "call"
+  | "whatsapp"
+  | "sms"
+  | "review_request"
+  | "review"
+  | "appointment_reminder"
+  | "service_reminder"
+  | "followup"
+  | "other";
+
+export interface ClientCommunication {
+  id: string;
+  at: string;
+  type: ClientCommunicationType;
+  summary: string;
+  direction?: "in" | "out";
+  orderId?: string;
+  vehicleId?: string;
+  actor?: string;
+}
+
 export interface Client {
   id: string;
   code?: string;
@@ -63,6 +102,8 @@ export interface Client {
   createdAt?: string;
   notes?: string;
   isRegular?: boolean;
+  reviews?: ClientReview[];
+  communications?: ClientCommunication[];
 }
 
 export interface Vehicle {
@@ -136,6 +177,8 @@ export interface StatusEvent {
   estimated?: boolean;
 }
 
+export type OrderPartProgress = "ordered" | "in_transit" | "arrived" | "installed";
+
 export interface OrderLinePart {
   id: string;
   name: string;
@@ -148,6 +191,7 @@ export interface OrderLinePart {
   /** true — цену восстановили из текущего склада, а не знаем точно на дату продажи. */
   purchasePriceEstimated?: boolean;
   availability: "in_stock" | "reserved" | "ordered";
+  progressStatus?: OrderPartProgress;
 }
 
 export interface OrderConsumable {
@@ -174,6 +218,38 @@ export interface OrderMedia {
   storagePath?: string;
   /** Локальный запасной вариант для фото, когда Supabase не подключён. */
   localDataUrl?: string;
+}
+
+export type InspectionStatus = "ok" | "watch" | "urgent";
+
+export interface InspectionItem {
+  id: string;
+  label: string;
+  status?: InspectionStatus;
+  note?: string;
+  checkedAt?: string;
+  checkedBy?: string;
+}
+
+export interface DeferredRecommendation {
+  id: string;
+  title: string;
+  createdAt: string;
+  dueDate?: string;
+  dueMileage?: number;
+  status: "open" | "done" | "dismissed";
+  note?: string;
+  closedAt?: string;
+}
+
+export interface WorkApproval {
+  id: string;
+  title: string;
+  amount?: number;
+  requestedAt: string;
+  status: "pending" | "approved" | "declined";
+  respondedAt?: string;
+  note?: string;
 }
 
 export interface Order {
@@ -226,6 +302,12 @@ export interface Order {
   /** Рекомендации клиенту после диагностики или ремонта. Показываются в заказ-наряде и истории авто. */
   recommendations?: string;
   guaranteeMonths?: number;
+  /** Цифровой осмотр автомобиля: зелёный / наблюдать / срочно. */
+  inspection?: InspectionItem[];
+  /** Работы, которые клиент решил отложить на следующий визит. */
+  deferredRecommendations?: DeferredRecommendation[];
+  /** Дополнительные работы, согласованные или отклонённые клиентом. */
+  approvals?: WorkApproval[];
 }
 
 export interface Service {
