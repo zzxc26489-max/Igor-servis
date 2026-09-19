@@ -230,9 +230,17 @@ export default function Dashboard() {
                             : kind === "deadline" && deadline
                               ? <b className="text-sm" style={{ color }}>{promiseLabel(deadline.minutesLeft)}</b>
                               : kind === "mechanic"
-                                ? <b className="text-sm" style={{ color: "var(--warning)" }}>{withoutMechanic} без исполнителя</b>
+                                ? <b className="text-sm" style={{ color: "var(--warning)" }}>
+                                    {withoutMechanic} {plural(withoutMechanic, "работа", "работы", "работ")} без исполнителя
+                                  </b>
                                 : <span className="muted text-xs">{order.scheduledStart ?? order.number}</span>}
-                        {client && <a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)]"><IconPhone size={16} /> Позвонить</a>}
+                        {kind === "mechanic" ? (
+                          <Link to={`/orders/${order.id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)]">
+                            Назначить механика
+                          </Link>
+                        ) : client ? (
+                          <a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)]"><IconPhone size={16} /> Позвонить</a>
+                        ) : null}
                       </div>
                     </div>
                   );
