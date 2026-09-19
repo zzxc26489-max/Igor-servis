@@ -101,6 +101,7 @@ export default function OrderDetail() {
   const [intakeDefects, setIntakeDefects] = useState(order?.defects ?? "");
   const [intakeRecommendations, setIntakeRecommendations] = useState(order?.recommendations ?? "");
   const [intakeGuarantee, setIntakeGuarantee] = useState(order?.guaranteeMonths ? String(order.guaranteeMonths) : "");
+  const [intakePromisedAt, setIntakePromisedAt] = useState(order?.promisedAt ? order.promisedAt.slice(0, 16) : "");
   const [intakeMileage, setIntakeMileage] = useState("");
   const [mechanicComment, setMechanicComment] = useState(order?.mechanicComment ?? "");
   const loadedIntakeOrderRef = useRef<string | null>(null);
@@ -117,6 +118,7 @@ export default function OrderDetail() {
     setIntakeDefects(order.defects ?? "");
     setIntakeRecommendations(order.recommendations ?? "");
     setIntakeGuarantee(order.guaranteeMonths ? String(order.guaranteeMonths) : "");
+    setIntakePromisedAt(order.promisedAt ? order.promisedAt.slice(0, 16) : "");
     setIntakeMileage(vehicle?.mileage ? String(vehicle.mileage) : "");
     setMechanicComment(order.mechanicComment ?? "");
     setPaymentEmployee(order.advisor ?? "");
@@ -424,6 +426,7 @@ export default function OrderDetail() {
       defects: intakeDefects.trim(),
       recommendations: intakeRecommendations.trim(),
       guaranteeMonths,
+      promisedAt: intakePromisedAt ? new Date(intakePromisedAt).toISOString() : undefined,
       mechanicComment: mechanicComment.trim(),
     });
     const mileage = Number(intakeMileage.replace(/\D/g, ""));
@@ -973,6 +976,13 @@ export default function OrderDetail() {
                       <textarea rows={3} value={mechanicComment} onChange={(e) => setMechanicComment(e.target.value)} placeholder="Например: клиент просил позвонить после разбора, болт прикипел, нужен повторный контроль" />
                     </div>
                     <span className="muted mt-1 block text-xs">Внутренняя заметка: клиенту и в заказ-наряде не показывается.</span>
+                  </label>
+                  <label className="block text-sm">
+                    <span className="muted mb-1 block">Обещано клиенту к</span>
+                    <div className="field-control">
+                      <input type="datetime-local" value={intakePromisedAt} onChange={(e) => setIntakePromisedAt(e.target.value)} />
+                    </div>
+                    <span className="muted mt-1 block text-xs">Только для внутреннего контроля. В клиентском заказ-наряде не печатается.</span>
                   </label>
                   <label className="block text-sm">
                     <span className="muted mb-1 block">Гарантия на работы, месяцев</span>
