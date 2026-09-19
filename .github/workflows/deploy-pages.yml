@@ -13,6 +13,7 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+# Pages may publish in explicit local-only mode when both Supabase vars are empty.
 env:
   VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
   VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
