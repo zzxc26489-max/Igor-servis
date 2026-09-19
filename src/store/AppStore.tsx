@@ -49,7 +49,8 @@ import {
   type CloudBackupInfo,
   type CloudRole,
 } from "../lib/cloud";
-import { mergeConcurrentState } from "../lib/stateMerge";
+import { mergeConcurrentStateDetailed } from "../lib/stateMerge";
+import { hasLocalChanges, SERVER_POLL_MS, shouldApplyServerRevision, shouldSurfaceServerLoadError } from "../lib/serverSyncPolicy";
 import { useAuth } from "../auth/AuthContext";
 import { LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
 import { isValidQuantity, normalizeQuantity } from "../lib/quantity";
@@ -278,6 +279,8 @@ export interface CloudSyncInfo {
   revision?: number;
   lastSyncedAt?: string;
   error?: string;
+  conflictCount?: number;
+  lastConflictAt?: string;
 }
 
 interface AppStoreValue extends DB {
@@ -362,6 +365,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const cloudSaveTimerRef = useRef<number | null>(null);
   const cloudRetryTimerRef = useRef<number | null>(null);
   const cloudLoadingKeyRef = useRef<string | null>(null);
+  const cloudLoadRequestRef = useRef(0);
   const [cloud, setCloud] = useState<CloudSyncInfo>({
     configured: cloudConfigured,
     status: cloudConfigured ? "loading" : "local",
@@ -397,8 +401,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   }, [cloudConfigured, db]);
 
   const applyCloudSnapshot = useCallback((snapshot: Awaited<ReturnType<typeof loadCloudState>>) => {
-    if (!session) return;
-    cloudRevisionRef.current = snapshot.revision;
+    if (!session) return false;
+
+    // Главное правило опроса: ревизия на устройстве никогда не движется назад.
+    // Поздний ответ старого запроса просто игнорируем.
+    if (!shouldApplyServerRevision({
+      currentRevision: cloudRevisionRef.current,
+      incomingRevision: snapshot.revision,
+    })) return false;
+
     const meta = {
       configured: true,
       workshopId: snapshot.workshopId,
@@ -409,47 +420,113 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     } satisfies Partial<CloudSyncInfo>;
 
     if (snapshot.empty) {
+      // Пустой сервер допустим только до первой серверной ревизии.
+      if (cloudRevisionRef.current > 0) return false;
+      cloudRevisionRef.current = snapshot.revision;
       cloudBaseRef.current = migrate(dbRef.current);
-      setCloud({ ...meta, status: "needs_upload" } as CloudSyncInfo);
-      return;
+      setCloud((prev) => ({ ...prev, ...meta, status: "needs_upload", error: undefined } as CloudSyncInfo));
+      return true;
     }
 
     const remote = migrate(snapshot.data as DB);
     const cached = readCloudBase<DB>(session.user.id);
     const base = cloudBaseRef.current ?? (cached ? migrate(cached.base) : null);
     const local = migrate(dbRef.current);
-    const hasUnsavedLocal = Boolean(base && JSON.stringify(local) !== JSON.stringify(base));
-    const next = hasUnsavedLocal && base
-      ? migrate(
-          mergeConcurrentState(
-            base as unknown as Record<string, unknown>,
-            local as unknown as Record<string, unknown>,
-            remote as unknown as Record<string, unknown>,
-          ) as unknown as DB,
-        )
-      : remote;
+    const hasUnsavedLocal = hasLocalChanges(base, local);
 
+    let next = remote;
+    let conflicts = 0;
+    if (hasUnsavedLocal && base) {
+      const merged = mergeConcurrentStateDetailed(
+        base as unknown as Record<string, unknown>,
+        local as unknown as Record<string, unknown>,
+        remote as unknown as Record<string, unknown>,
+      );
+      next = migrate(merged.value as unknown as DB);
+      conflicts = merged.conflicts.length;
+    }
+
+    cloudRevisionRef.current = snapshot.revision;
     cloudBaseRef.current = remote;
     writeCloudBase(session.user.id, snapshot.revision, remote);
-    // Серверная база успешно загружена — общий локальный ключ больше не нужен
-    // и не сможет раскрыть данные следующему пользователю этого браузера.
     localStorage.removeItem(STORAGE_KEY);
     rawSetDB(next);
-    setCloud({ ...meta, status: "ready", lastSyncedAt: new Date().toISOString() } as CloudSyncInfo);
+    setCloud((prev) => ({
+      ...prev,
+      ...meta,
+      status: "ready",
+      lastSyncedAt: new Date().toISOString(),
+      error: undefined,
+      conflictCount: conflicts || prev.conflictCount,
+      lastConflictAt: conflicts ? new Date().toISOString() : prev.lastConflictAt,
+    } as CloudSyncInfo));
+    return true;
+  }, [session]);
+
+  const applyConfirmedServerState = useCallback((
+    result: { revision: number; data: unknown; updatedAt?: string },
+  ) => {
+    if (!session) return false;
+    if (!shouldApplyServerRevision({
+      currentRevision: cloudRevisionRef.current,
+      incomingRevision: result.revision,
+    })) return false;
+
+    const remote = migrate(result.data as DB);
+    const base = cloudBaseRef.current;
+    const local = migrate(dbRef.current);
+
+    let next = remote;
+    let conflicts = 0;
+    if (base && JSON.stringify(local) !== JSON.stringify(base)) {
+      const merged = mergeConcurrentStateDetailed(
+        base as unknown as Record<string, unknown>,
+        local as unknown as Record<string, unknown>,
+        remote as unknown as Record<string, unknown>,
+      );
+      next = migrate(merged.value as unknown as DB);
+      conflicts = merged.conflicts.length;
+    }
+
+    cloudRevisionRef.current = result.revision;
+    cloudBaseRef.current = remote;
+    writeCloudBase(session.user.id, result.revision, remote);
+    rawSetDB(next);
+    setCloud((prev) => ({
+      ...prev,
+      status: "ready",
+      revision: result.revision,
+      lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+      error: undefined,
+      conflictCount: conflicts ? (prev.conflictCount ?? 0) + conflicts : prev.conflictCount,
+      lastConflictAt: conflicts ? new Date().toISOString() : prev.lastConflictAt,
+    }));
+    return true;
   }, [session]);
 
   const loadFromCloud = useCallback(async (showLoading = true) => {
     if (!cloudConfigured || !session) return "Серверная база не подключена";
+    const requestId = ++cloudLoadRequestRef.current;
     try {
       if (showLoading) {
         setCloud((prev) => ({ ...prev, configured: true, status: "loading", error: undefined }));
       }
       const snapshot = await loadCloudState(session);
+      // Более старый запрос не должен менять интерфейс после более нового ответа.
+      if (!shouldApplyServerRevision({
+        currentRevision: cloudRevisionRef.current,
+        incomingRevision: snapshot.revision,
+        requestId,
+        latestRequestId: cloudLoadRequestRef.current,
+      })) return null;
       applyCloudSnapshot(snapshot);
       return null;
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Не удалось загрузить общую базу";
-      setCloud((prev) => ({ ...prev, configured: true, status: "error", error: message }));
+      // Ошибка старого запроса не должна перекрыть состояние более свежей синхронизации.
+      if (shouldSurfaceServerLoadError(requestId, cloudLoadRequestRef.current)) {
+        setCloud((prev) => ({ ...prev, configured: true, status: "error", error: message }));
+      }
       return message;
     }
   }, [applyCloudSnapshot, cloudConfigured, session]);
@@ -457,6 +534,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!cloudConfigured || !session) {
       cloudLoadingKeyRef.current = null;
+      cloudLoadRequestRef.current += 1;
       cloudBaseRef.current = null;
       cloudRevisionRef.current = 0;
       setCloud({ configured: cloudConfigured, status: cloudConfigured ? "loading" : "local" });
@@ -479,6 +557,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
         const result = await saveCloudState(session, cloudRevisionRef.current, nextCandidate);
         if (result.ok) {
+          if (!shouldApplyServerRevision({
+            currentRevision: cloudRevisionRef.current,
+            incomingRevision: result.revision,
+          })) return null;
           cloudRevisionRef.current = result.revision;
           cloudBaseRef.current = nextCandidate;
           writeCloudBase(session.user.id, result.revision, nextCandidate);
@@ -494,20 +576,26 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
         const remote = migrate(result.data as DB);
         const base = cloudBaseRef.current ?? remote;
-        const merged = migrate(
-          mergeConcurrentState(
-            base as unknown as Record<string, unknown>,
-            nextCandidate as unknown as Record<string, unknown>,
-            remote as unknown as Record<string, unknown>,
-          ) as unknown as DB,
+        const mergeResult = mergeConcurrentStateDetailed(
+          base as unknown as Record<string, unknown>,
+          nextCandidate as unknown as Record<string, unknown>,
+          remote as unknown as Record<string, unknown>,
         );
-        cloudRevisionRef.current = result.revision;
+        const merged = migrate(mergeResult.value as unknown as DB);
+        cloudRevisionRef.current = Math.max(cloudRevisionRef.current, result.revision);
         cloudBaseRef.current = remote;
         writeCloudBase(session.user.id, result.revision, remote);
         rawSetDB(merged);
+        if (mergeResult.conflicts.length) {
+          setCloud((prev) => ({
+            ...prev,
+            conflictCount: (prev.conflictCount ?? 0) + mergeResult.conflicts.length,
+            lastConflictAt: new Date().toISOString(),
+          }));
+        }
 
         if (nextAttempt >= 2) {
-          const message = "Одновременно изменились одни и те же данные. Обновите страницу и проверьте последние изменения.";
+          const message = "Не удалось автоматически подтвердить все изменения после нескольких серверных ревизий. Обновите данные перед повторной правкой.";
           setCloud((prev) => ({ ...prev, status: "error", revision: result.revision, error: message }));
           return message;
         }
@@ -553,7 +641,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     const interval = window.setInterval(() => {
       if (document.visibilityState !== "visible" || cloud.status === "saving") return;
       void loadFromCloud(false);
-    }, 45_000);
+    }, SERVER_POLL_MS);
     return () => window.clearInterval(interval);
   }, [cloud.status, cloudConfigured, loadFromCloud, session]);
 
@@ -676,18 +764,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
               existingVehicleId: input.existingVehicleId,
             });
 
-            const remote = migrate(result.data as DB);
-            cloudRevisionRef.current = result.revision;
-            cloudBaseRef.current = remote;
-            writeCloudBase(session.user.id, result.revision, remote);
-            rawSetDB(remote);
-            setCloud((prev) => ({
-              ...prev,
-              status: "ready",
-              revision: result.revision,
-              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
-              error: undefined,
-            }));
+            applyConfirmedServerState(result);
 
             return result.ok
               ? { error: null, orderId: result.orderId, orderNumber: result.orderNumber }
@@ -786,18 +863,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           try {
             setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
             const result = await saveCloudVehicle(session, vehicle, true);
-            const remote = migrate(result.data as DB);
-            cloudRevisionRef.current = result.revision;
-            cloudBaseRef.current = remote;
-            writeCloudBase(session.user.id, result.revision, remote);
-            rawSetDB(remote);
-            setCloud((prev) => ({
-              ...prev,
-              status: "ready",
-              revision: result.revision,
-              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
-              error: undefined,
-            }));
+            applyConfirmedServerState(result);
             return result.ok ? null : result.message;
           } catch (cause) {
             const message = cause instanceof Error ? cause.message : "Не удалось сохранить автомобиль";
@@ -832,18 +898,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           try {
             setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
             const result = await saveCloudVehicle(session, vehicle, false);
-            const remote = migrate(result.data as DB);
-            cloudRevisionRef.current = result.revision;
-            cloudBaseRef.current = remote;
-            writeCloudBase(session.user.id, result.revision, remote);
-            rawSetDB(remote);
-            setCloud((prev) => ({
-              ...prev,
-              status: "ready",
-              revision: result.revision,
-              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
-              error: undefined,
-            }));
+            applyConfirmedServerState(result);
             return result.ok ? null : result.message;
           } catch (cause) {
             const message = cause instanceof Error ? cause.message : "Не удалось обновить автомобиль";
@@ -876,18 +931,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           try {
             setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
             const result = await deleteCloudVehicle(session, id);
-            const remote = migrate(result.data as DB);
-            cloudRevisionRef.current = result.revision;
-            cloudBaseRef.current = remote;
-            writeCloudBase(session.user.id, result.revision, remote);
-            rawSetDB(remote);
-            setCloud((prev) => ({
-              ...prev,
-              status: "ready",
-              revision: result.revision,
-              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
-              error: undefined,
-            }));
+            applyConfirmedServerState(result);
             return result.ok ? null : result.message;
           } catch (cause) {
             const message = cause instanceof Error ? cause.message : "Не удалось удалить автомобиль";
@@ -981,18 +1025,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
               note: input.note,
             });
 
-            const remote = migrate(result.data as DB);
-            cloudRevisionRef.current = result.revision;
-            cloudBaseRef.current = remote;
-            writeCloudBase(session.user.id, result.revision, remote);
-            rawSetDB(remote);
-            setCloud((prev) => ({
-              ...prev,
-              status: "ready",
-              revision: result.revision,
-              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
-              error: undefined,
-            }));
+            applyConfirmedServerState(result);
             return result.ok ? null : result.message;
           } catch (cause) {
             const message = cause instanceof Error ? cause.message : "Не удалось подтвердить приёмку";
@@ -1331,31 +1364,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
               movementId,
             });
 
-            const remote = migrate(result.data as DB);
-            cloudRevisionRef.current = result.revision;
-            cloudBaseRef.current = remote;
-            writeCloudBase(session.user.id, result.revision, remote);
-            rawSetDB(remote);
-
-            if (!result.ok) {
-              setCloud((prev) => ({
-                ...prev,
-                status: "ready",
-                revision: result.revision,
-                lastSyncedAt: new Date().toISOString(),
-                error: undefined,
-              }));
-              return result.message;
-            }
-
-            setCloud((prev) => ({
-              ...prev,
-              status: "ready",
-              revision: result.revision,
-              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
-              error: undefined,
-            }));
-            return null;
+            applyConfirmedServerState(result);
+            return result.ok ? null : result.message;
           } catch (cause) {
             const message = cause instanceof Error ? cause.message : "Не удалось подтвердить резерв на сервере";
             setCloud((prev) => ({ ...prev, status: "error", error: message }));
@@ -1460,18 +1470,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           try {
             setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
             const result = await applyCloudOrderPayment(session, orderId, "payment", normalized, employee);
-            const remote = migrate(result.data as DB);
-            cloudRevisionRef.current = result.revision;
-            cloudBaseRef.current = remote;
-            writeCloudBase(session.user.id, result.revision, remote);
-            rawSetDB(remote);
-            setCloud((prev) => ({
-              ...prev,
-              status: "ready",
-              revision: result.revision,
-              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
-              error: undefined,
-            }));
+            applyConfirmedServerState(result);
             return result.ok ? null : result.message;
           } catch (cause) {
             const message = cause instanceof Error ? cause.message : "Не удалось подтвердить оплату";
@@ -1523,18 +1522,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           try {
             setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
             const result = await applyCloudOrderPayment(session, orderId, "refund", entry, employee);
-            const remote = migrate(result.data as DB);
-            cloudRevisionRef.current = result.revision;
-            cloudBaseRef.current = remote;
-            writeCloudBase(session.user.id, result.revision, remote);
-            rawSetDB(remote);
-            setCloud((prev) => ({
-              ...prev,
-              status: "ready",
-              revision: result.revision,
-              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
-              error: undefined,
-            }));
+            applyConfirmedServerState(result);
             return result.ok ? null : result.message;
           } catch (cause) {
             const message = cause instanceof Error ? cause.message : "Не удалось подтвердить возврат";
@@ -1601,18 +1589,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
               expenseCode,
             });
 
-            const remote = migrate(result.data as DB);
-            cloudRevisionRef.current = result.revision;
-            cloudBaseRef.current = remote;
-            writeCloudBase(session.user.id, result.revision, remote);
-            rawSetDB(remote);
-            setCloud((prev) => ({
-              ...prev,
-              status: "ready",
-              revision: result.revision,
-              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
-              error: undefined,
-            }));
+            applyConfirmedServerState(result);
             return result.ok ? null : result.message;
           } catch (cause) {
             const message = cause instanceof Error ? cause.message : "Не удалось подтвердить возврат поставщику";
@@ -1764,18 +1741,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           try {
             setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
             const result = await openCloudCashShift(session, shiftId, amount, openedBy);
-            const remote = migrate(result.data as DB);
-            cloudRevisionRef.current = result.revision;
-            cloudBaseRef.current = remote;
-            writeCloudBase(session.user.id, result.revision, remote);
-            rawSetDB(remote);
-            setCloud((prev) => ({
-              ...prev,
-              status: "ready",
-              revision: result.revision,
-              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
-              error: undefined,
-            }));
+            applyConfirmedServerState(result);
             return result.ok ? null : result.message;
           } catch (cause) {
             const message = cause instanceof Error ? cause.message : "Не удалось открыть кассовую смену";
@@ -1811,18 +1777,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           try {
             setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
             const result = await closeCloudCashShift(session, shiftId, counted, closedBy, comment);
-            const remote = migrate(result.data as DB);
-            cloudRevisionRef.current = result.revision;
-            cloudBaseRef.current = remote;
-            writeCloudBase(session.user.id, result.revision, remote);
-            rawSetDB(remote);
-            setCloud((prev) => ({
-              ...prev,
-              status: "ready",
-              revision: result.revision,
-              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
-              error: undefined,
-            }));
+            applyConfirmedServerState(result);
             return result.ok ? null : result.message;
           } catch (cause) {
             const message = cause instanceof Error ? cause.message : "Не удалось закрыть кассовую смену";
@@ -1884,7 +1839,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [backupCloud, cloud, cloudConfigured, db, listAudit, listBackups, loadFromCloud, pushCloudState, restoreBackup, session, setDB, uploadLocalToCloud],
+    [applyConfirmedServerState, backupCloud, cloud, cloudConfigured, db, listAudit, listBackups, loadFromCloud, pushCloudState, restoreBackup, session, setDB, uploadLocalToCloud],
   );
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;

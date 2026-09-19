@@ -1,3 +1,5 @@
+import { createSerialQueue } from "./serialQueue";
+
 export type CloudRole = "owner" | "partner" | "advisor" | "parts" | "mechanic" | "accountant";
 
 export interface CloudUser {
@@ -188,6 +190,17 @@ async function request(path: string, init: RequestInit = {}, accessToken?: strin
   return response.json();
 }
 
+const enqueueMutation = createSerialQueue();
+
+/**
+ * Все серверные мутации из одного браузера идут строго по очереди.
+ * Опрос/чтение не блокируются; межустройственные гонки закрывают серверные
+ * ревизии и атомарные RPC.
+ */
+function requestMutation(path: string, init: RequestInit = {}, accessToken?: string) {
+  return enqueueMutation(() => request(path, init, accessToken));
+}
+
 function normalizeSession(payload: Record<string, unknown>): CloudSession {
   const expiresIn = Number(payload.expires_in ?? 3600);
   const expiresAt = Number(payload.expires_at ?? Math.floor(Date.now() / 1000) + expiresIn);
@@ -233,7 +246,7 @@ export async function saveCloudState(
   expectedRevision: number,
   data: unknown,
 ): Promise<CloudSaveResult> {
-  return request(
+  return requestMutation(
     "/rest/v1/rpc/crm_save_state",
     {
       method: "POST",
@@ -247,7 +260,7 @@ export async function createCloudOrder(
   session: CloudSession,
   input: CloudOrderCreateInput,
 ): Promise<CloudOrderCreateResult> {
-  return request(
+  return requestMutation(
     "/rest/v1/rpc/crm_create_order",
     {
       method: "POST",
@@ -268,7 +281,7 @@ export async function saveCloudVehicle(
   vehicle: unknown,
   create: boolean,
 ): Promise<CloudVehicleResult> {
-  return request(
+  return requestMutation(
     "/rest/v1/rpc/crm_save_vehicle",
     {
       method: "POST",
@@ -282,7 +295,7 @@ export async function deleteCloudVehicle(
   session: CloudSession,
   vehicleId: string,
 ): Promise<CloudVehicleResult> {
-  return request(
+  return requestMutation(
     "/rest/v1/rpc/crm_delete_vehicle",
     {
       method: "POST",
@@ -296,7 +309,7 @@ export async function reserveCloudStockPart(
   session: CloudSession,
   input: CloudStockReserveInput,
 ): Promise<CloudStockReserveResult> {
-  return request(
+  return requestMutation(
     "/rest/v1/rpc/crm_reserve_stock_part",
     {
       method: "POST",
@@ -320,7 +333,7 @@ export async function applyCloudOrderPayment(
   entries: CloudPaymentEntry[],
   employee?: string,
 ): Promise<CloudPaymentResult> {
-  return request(
+  return requestMutation(
     "/rest/v1/rpc/crm_apply_order_payment",
     {
       method: "POST",
@@ -341,7 +354,7 @@ export async function openCloudCashShift(
   openingCash: number,
   openedBy?: string,
 ): Promise<CloudCashShiftResult> {
-  return request(
+  return requestMutation(
     "/rest/v1/rpc/crm_open_cash_shift",
     {
       method: "POST",
@@ -362,7 +375,7 @@ export async function closeCloudCashShift(
   closedBy?: string,
   comment?: string,
 ): Promise<CloudCashShiftResult> {
-  return request(
+  return requestMutation(
     "/rest/v1/rpc/crm_close_cash_shift",
     {
       method: "POST",
@@ -381,7 +394,7 @@ export async function receiveCloudStock(
   session: CloudSession,
   input: CloudStockReceiveInput,
 ): Promise<CloudStockMutationResult> {
-  return request(
+  return requestMutation(
     "/rest/v1/rpc/crm_receive_stock",
     {
       method: "POST",
@@ -406,7 +419,7 @@ export async function returnCloudStockSupplier(
   session: CloudSession,
   input: CloudStockSupplierReturnInput,
 ): Promise<CloudStockMutationResult> {
-  return request(
+  return requestMutation(
     "/rest/v1/rpc/crm_return_stock_supplier",
     {
       method: "POST",
@@ -427,7 +440,7 @@ export async function returnCloudStockSupplier(
 }
 
 export async function createCloudBackup(session: CloudSession): Promise<{ ok: true; createdAt: string }> {
-  return request(
+  return requestMutation(
     "/rest/v1/rpc/crm_backup_now",
     { method: "POST", body: "{}" },
     session.access_token,
@@ -465,7 +478,7 @@ export async function restoreCloudBackup(
   session: CloudSession,
   backupId: string,
 ): Promise<{ ok: true; revision: number; updatedAt?: string }> {
-  return request(
+  return requestMutation(
     "/rest/v1/rpc/crm_restore_backup",
     { method: "POST", body: JSON.stringify({ p_backup_id: backupId }) },
     session.access_token,

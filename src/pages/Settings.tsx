@@ -468,6 +468,12 @@ export default function Settings() {
                 {cloud.lastSyncedAt && (
                   <div className="mt-1 flex justify-between gap-3"><span className="muted">Последняя синхронизация</span><span>{new Date(cloud.lastSyncedAt).toLocaleString("ru-RU")}</span></div>
                 )}
+                {(cloud.conflictCount ?? 0) > 0 && (
+                  <div className="mt-1 flex justify-between gap-3">
+                    <span className="muted">Конфликты синхронизации</span>
+                    <span>{cloud.conflictCount}{cloud.lastConflictAt ? ` · ${new Date(cloud.lastConflictAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
+                  </div>
+                )}
                 {cloud.error && <p className="mt-2 text-sm" style={{ color: "var(--danger)" }}>{cloud.error}</p>}
               </div>
             )}
