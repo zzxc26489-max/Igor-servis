@@ -60,6 +60,7 @@ import { completeWorksForReady, issueBlockers, orderedParts } from "../lib/order
 import { createBackupJson, inspectBackupJson } from "../lib/backup";
 import { employeeWorkPercent } from "../lib/payroll";
 import { APP_VERSION, DB_VERSION } from "../data/version";
+import { hasLocalChanges, SERVER_POLL_MS, shouldApplyServerRevision } from "../lib/syncPolicy";
 
 const STORAGE_KEY = LOCAL_DB_KEY;
 
@@ -432,7 +433,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     const cached = readCloudBase<DB>(session.user.id);
     const base = cloudBaseRef.current ?? (cached ? migrate(cached.base) : null);
     const local = migrate(dbRef.current);
-    const hasUnsavedLocal = Boolean(base && JSON.stringify(local) !== JSON.stringify(base));
+    const hasUnsavedLocal = hasLocalChanges(base, local);
 
     let next = remote;
     let conflicts = 0;
@@ -641,7 +642,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     const interval = window.setInterval(() => {
       if (document.visibilityState !== "visible" || cloud.status === "saving") return;
       void loadFromCloud(false);
-    }, 45_000);
+    }, SERVER_POLL_MS);
     return () => window.clearInterval(interval);
   }, [cloud.status, cloudConfigured, loadFromCloud, session]);
 
