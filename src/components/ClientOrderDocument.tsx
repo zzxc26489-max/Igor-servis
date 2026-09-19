@@ -1,4 +1,4 @@
-import { formatDateTime, formatMoney } from "../lib/format";
+import { formatDate, formatMoney } from "../lib/format";
 import { recordedForOrder } from "../lib/payments";
 import defaultLogo from "../assets/logo.jpg";
 import type { Client, CompanyInfo, Order, Payment, Vehicle } from "../types";
@@ -40,14 +40,19 @@ export default function ClientOrderDocument({
           <div className="min-w-0">
             <h2 className="text-lg font-bold">{company.name}</h2>
             {company.address && <p className="mt-1 text-sm">{company.address}</p>}
-            {(company.phone || company.phone2) && <p className="text-sm">Тел.: {[company.phone, company.phone2].filter(Boolean).join(" · ")}</p>}
+            {(company.phone || company.phone2) && (
+              <div className="text-sm">
+                {company.phone && <div>{company.phoneLabel ? `${company.phoneLabel}: ` : "Тел.: "}{company.phone}</div>}
+                {company.phone2 && <div>{company.phone2Label ? `${company.phone2Label}: ` : "Тел.: "}{company.phone2}</div>}
+              </div>
+            )}
             {company.inn && <p className="text-sm">ИНН: {company.inn}</p>}
           </div>
         </div>
         <div className="shrink-0 text-right">
           <h1 className="text-xl font-bold">Заказ-наряд</h1>
           <p className="mt-1 text-sm">№ {number}</p>
-          <p className="text-sm">от {formatDateTime(order.createdAt)}</p>
+          <p className="text-sm">от {formatDate(order.createdAt)}</p>
         </div>
       </header>
 

@@ -2,10 +2,10 @@ export const company = {
   name: "THE SERVICE AND UMC",
   shortName: "The Service and UMC",
   address: "ул. Андреевка, вл. 42Г, Зеленоград (гараж №563–564)",
-  // Настоящий номер вводится в настройках. Держать здесь маску нельзя:
-  // она не проходит проверку телефона и блокировала сохранение настроек.
-  phone: "",
-  phone2: "",
+  phone: "+7 (916) 809-25-27",
+  phoneLabel: "Игорь",
+  phone2: "+7 (991) 970-77-99",
+  phone2Label: "Юра",
   openTime: "10:00",
   closeTime: "20:00",
   inn: "",
