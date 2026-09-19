@@ -9,7 +9,7 @@ CRM умеет работать в двух режимах:
 
 Создайте обычный Supabase project. В SQL Editor выполните файл:
 
-`supabase/001_crm_cloud.sql`, затем `supabase/002_role_security_admin_tools.sql`, затем `supabase/003_cash_shifts.sql`, затем `supabase/004_mechanic_accountant_roles.sql`, затем `supabase/005_order_media_storage.sql`
+`supabase/001_crm_cloud.sql`, затем `supabase/002_role_security_admin_tools.sql`, затем `supabase/003_cash_shifts.sql`, затем `supabase/004_mechanic_accountant_roles.sql`, затем `supabase/005_order_media_storage.sql`, затем `supabase/006_security_hardening.sql`, затем `supabase/007_atomic_stock_reservation.sql`
 
 ## 2. Создайте пользователей
 
@@ -125,3 +125,15 @@ Dashboard сотрудникам.
 - файлы не кладутся внутрь общего JSON-снимка: в заказе хранится только метадата и путь;
 - максимальный размер одного файла — 25 МБ;
 - без Supabase локально можно сохранять только сжатые фото; видео требует серверное хранилище.
+
+
+## Усиление безопасности и атомарный резерв склада
+
+После `005_order_media_storage.sql` обязательно выполните:
+
+1. `supabase/006_security_hardening.sql`
+2. `supabase/007_atomic_stock_reservation.sql`
+
+Миграция `006` усиливает серверные ограничения ролей и доступ к фото/видео заказов.
+
+Миграция `007` добавляет серверную операцию резерва запчасти. Она блокирует строку общей базы на время проверки остатка, поэтому два пользователя не смогут одновременно зарезервировать одну последнюю единицу. В облачном режиме резерв требует связи с сервером; без интернета CRM не подтверждает критичную складскую операцию, чтобы не создать скрытый двойной резерв.
