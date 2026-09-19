@@ -203,3 +203,32 @@ export async function downloadCloudOrderMedia(session: CloudSession, storagePath
 export async function deleteCloudOrderMedia(session: CloudSession, storagePath: string) {
   await storageRequest(storagePath, { method: "DELETE" }, session);
 }
+
+
+export async function createCloudOrderMediaSignedUrl(
+  session: CloudSession,
+  storagePath: string,
+  expiresIn = 3600,
+) {
+  if (!cloudConfigured) throw new Error("Серверная база не настроена");
+  const headers = new Headers();
+  headers.set("apikey", anonKey);
+  headers.set("Authorization", `Bearer ${session.access_token}`);
+  headers.set("Content-Type", "application/json");
+  const response = await fetch(
+    `${rawUrl}/storage/v1/object/sign/order-media/${storageObjectPath(storagePath)}`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ expiresIn }),
+    },
+  );
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: string; error?: string } | null;
+    throw new Error(body?.message || body?.error || `Ошибка хранилища: ${response.status}`);
+  }
+  const payload = await response.json() as { signedURL?: string; signedUrl?: string };
+  const signedPath = payload.signedURL || payload.signedUrl;
+  if (!signedPath) throw new Error("Сервер не вернул ссылку на файл");
+  return signedPath.startsWith("http") ? signedPath : `${rawUrl}/storage/v1${signedPath}`;
+}
