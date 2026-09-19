@@ -239,6 +239,7 @@ export default function OrderDetail() {
   }
 
   function openReassignWork(work: OrderLineWork) {
+    if (!order) return;
     if (order.status === "выдан") {
       showToast("Сначала верните автомобиль в работу", "error");
       return;
@@ -249,7 +250,7 @@ export default function OrderDetail() {
   }
 
   function handleReassignWork() {
-    if (!reassignWorkId) return;
+    if (!order || !reassignWorkId) return;
     const target = order.works.find((work) => work.id === reassignWorkId);
     if (!target) return;
 
