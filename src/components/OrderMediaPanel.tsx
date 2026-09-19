@@ -148,7 +148,7 @@ export default function OrderMediaPanel({
             }
           }
         }
-        errors.push(saveError);
+        errors.unshift(saveError);
       } else {
         setNote("");
         showToast(`Добавлено файлов: ${added.length}`);
