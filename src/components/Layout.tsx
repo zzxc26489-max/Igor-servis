@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
   IconCalendarEvent, IconChartBar, IconChevronDown, IconClipboardList, IconCoin,
@@ -87,6 +88,7 @@ function SidebarContent({
   cloudConnected,
   onNavigate,
   onSignOut,
+  brandLogo,
 }: {
   badges: { orders: number; purchases: number };
   role?: CloudRole;
@@ -94,11 +96,12 @@ function SidebarContent({
   cloudConnected?: boolean;
   onNavigate?: () => void;
   onSignOut?: () => void;
+  brandLogo: string;
 }) {
   return (
     <>
       <div className="flex items-center gap-2.5 px-3 py-4">
-        <img src={logo} alt="" className="h-10 w-10 shrink-0 rounded-xl bg-white object-cover ring-1 ring-white/10" />
+        <img src={brandLogo} alt="" className="h-10 w-10 shrink-0 rounded-xl bg-white object-contain p-0.5 ring-1 ring-white/10" />
         <div className="min-w-0">
           <div className="truncate text-[15px] font-bold uppercase leading-tight tracking-[0.01em] text-white">
             The Service
@@ -166,9 +169,30 @@ function SidebarContent({
 }
 
 export default function Layout() {
-  const { orders, stock, cloud } = useAppStore();
+  const { orders, stock, cloud, company } = useAppStore();
   const { session, signOut } = useAuth();
   const { open, setOpen } = useMobileMenu();
+
+  const brandLogo = company.logoDataUrl || logo;
+
+  useEffect(() => {
+    let icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!icon) {
+      icon = document.createElement("link");
+      icon.rel = "icon";
+      document.head.appendChild(icon);
+    }
+    icon.removeAttribute("type");
+    icon.href = brandLogo;
+
+    let appleIcon = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+    if (!appleIcon) {
+      appleIcon = document.createElement("link");
+      appleIcon.rel = "apple-touch-icon";
+      document.head.appendChild(appleIcon);
+    }
+    appleIcon.href = brandLogo;
+  }, [brandLogo]);
 
   const badges = {
     orders: orders.filter((order) => order.status !== "выдан").length,
@@ -186,6 +210,7 @@ export default function Layout() {
           role={cloud.role}
           displayName={cloud.displayName}
           cloudConnected={Boolean(session)}
+          brandLogo={brandLogo}
           onSignOut={() => void signOut()}
         />
       </aside>
@@ -209,6 +234,7 @@ export default function Layout() {
               role={cloud.role}
               displayName={cloud.displayName}
               cloudConnected={Boolean(session)}
+              brandLogo={brandLogo}
               onNavigate={() => setOpen(false)}
               onSignOut={() => void signOut()}
             />
