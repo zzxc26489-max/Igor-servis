@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   IconArrowBackUp, IconArrowLeft, IconCalendarTime, IconCar, IconCheck, IconClipboardText,
-  IconBrandWhatsapp, IconFileDescription, IconMessage, IconNotes, IconStopwatch, IconTool, IconTrash, IconUser,
+  IconBrandWhatsapp, IconFileDescription, IconHistory, IconMessage, IconNotes, IconStopwatch, IconTool, IconTrash, IconUser,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
@@ -26,9 +26,10 @@ import type { OrderConsumable, OrderLinePart, OrderLineWork, OrderStatus, Paymen
 import { effectiveWorkStatus, WORK_STATUS_LABEL, workSessionMinutes } from "../lib/workSessions";
 import OrderMediaPanel from "../components/OrderMediaPanel";
 import ClientOrderDocument from "../components/ClientOrderDocument";
+import { orderActivity } from "../lib/orderActivity";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
-const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "Документы"] as const;
+const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "История", "Документы"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function OrderDetail() {
@@ -1073,6 +1074,51 @@ export default function OrderDetail() {
                   )}
                 </Card>
               </>
+            )}
+
+            {tab === "История" && (
+              <Card className="overflow-hidden p-0 print:hidden">
+                <div className="border-b p-4" style={{ borderColor: "var(--border)" }}>
+                  <h2 className="panel-title flex items-center gap-2"><IconHistory size={18} /> История заказа</h2>
+                  <p className="muted mt-1 text-xs">Статусы, работа механиков, оплаты и медиа — в одной хронологии.</p>
+                </div>
+                {orderActivity(order, payments).length === 0 ? (
+                  <p className="muted p-4 text-sm">Событий по заказу пока нет.</p>
+                ) : (
+                  <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                    {orderActivity(order, payments).map((item) => (
+                      <div key={item.id} className="flex gap-3 px-4 py-3">
+                        <span
+                          className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{
+                            background:
+                              item.kind === "payment" ? "var(--accent)"
+                                : item.kind === "work" ? "#3978c9"
+                                  : item.kind === "media" ? "#6656b8"
+                                    : item.kind === "status" ? "var(--warning)"
+                                      : "var(--text-muted)",
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                            <b className="text-sm">{item.title}</b>
+                            <span className="muted shrink-0 text-xs">{formatDateTime(item.at)}</span>
+                          </div>
+                          {(item.detail || item.actor || item.estimated) && (
+                            <p className="muted mt-1 text-xs">
+                              {item.detail}
+                              {item.detail && item.actor ? " · " : ""}
+                              {item.actor ? item.actor : ""}
+                              {(item.detail || item.actor) && item.estimated ? " · " : ""}
+                              {item.estimated ? "дата восстановлена" : ""}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
             )}
 
             {tab === "Документы" && (

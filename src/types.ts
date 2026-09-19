@@ -109,6 +109,8 @@ export interface OrderLineWork {
 export interface StatusEvent {
   status: OrderStatus;
   at: string;
+  /** Кто выполнил переход статуса. Для старых записей может отсутствовать. */
+  actor?: string;
   /** Отметка восстановлена по плану старого заказа, а не замерена. */
   estimated?: boolean;
 }

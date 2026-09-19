@@ -792,7 +792,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             return prev;
           }
 
-          const transition = transitionWorkSessions(work, status, nowISO());
+          const now = nowISO();
+          const transition = transitionWorkSessions(work, status, now);
           const works = order.works.map((item) =>
             item.id === workId ? { ...item, ...transition } : item,
           );
@@ -801,10 +802,27 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
               ? "в работе"
               : order.status;
 
+          let timeline = order.timeline?.length ? [...order.timeline] : backfillTimeline(order);
+          if (nextOrderStatus !== order.status) {
+            const last = timeline[timeline.length - 1];
+            if (last?.status !== order.status) {
+              timeline.push({
+                status: order.status,
+                at: last?.at ?? order.createdAt,
+                actor: cloud.displayName || order.advisor || undefined,
+              });
+            }
+            timeline.push({
+              status: nextOrderStatus,
+              at: now,
+              actor: cloud.displayName || work.executor || order.advisor || undefined,
+            });
+          }
+
           return {
             ...prev,
             orders: prev.orders.map((item) =>
-              item.id === orderId ? { ...item, works, status: nextOrderStatus } : item,
+              item.id === orderId ? { ...item, works, status: nextOrderStatus, timeline } : item,
             ),
           };
         });
@@ -825,9 +843,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           const last = history[history.length - 1];
           // Если текущего статуса в истории нет, дописываем его: иначе отрезок
           // «на подъёмнике» не откроется и время потеряется.
+          const actor = cloud.displayName || order.advisor || undefined;
           const timeline = last?.status === order.status
-            ? [...history, { status, at: now }]
-            : [...history, { status: order.status, at: last?.at ?? order.createdAt }, { status, at: now }];
+            ? [...history, { status, at: now, actor }]
+            : [
+                ...history,
+                { status: order.status, at: last?.at ?? order.createdAt, actor },
+                { status, at: now, actor },
+              ];
           const patch: Partial<Order> = { status, timeline };
           if (status === "готово" && !order.completedAt) patch.completedAt = now;
           if (status !== "готово" && status !== "выдан") patch.completedAt = undefined;
