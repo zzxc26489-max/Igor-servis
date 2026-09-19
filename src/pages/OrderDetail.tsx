@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   IconArrowBackUp, IconArrowLeft, IconCalendarTime, IconCar, IconCheck, IconClipboardText,
-  IconBrandWhatsapp, IconFileDescription, IconMessage, IconNotes, IconPrinter, IconStopwatch, IconTool, IconTrash, IconUser,
+  IconBrandWhatsapp, IconFileDescription, IconMessage, IconNotes, IconStopwatch, IconTool, IconTrash, IconUser,
 } from "@tabler/icons-react";
 import { formatWorkHours } from "../lib/workday";
 import { useAppStore } from "../store/AppStore";
@@ -1062,12 +1062,11 @@ export default function OrderDetail() {
               <Card className="print:hidden">
                 <h2 className="panel-title mb-3">Документы по заказу</h2>
                 <div className="flex flex-wrap gap-2">
-                  <Link to={`/orders/${order.id}/act`}>
-                    <Button variant="secondary"><IconFileDescription size={18} /> Акт выполненных работ</Button>
+                  <Link to={`/orders/${order.id}/print`}>
+                    <Button variant="secondary"><IconFileDescription size={18} /> Заказ-наряд для клиента</Button>
                   </Link>
-                  <Button variant="secondary" onClick={() => window.print()}><IconPrinter size={18} /> Печать заказ-наряда</Button>
                 </div>
-                <p className="muted mt-3 text-sm">Акт печатается в альбомной ориентации и старается уместиться на один лист.</p>
+                <p className="muted mt-3 text-sm">В клиентской версии нет внутренних данных сервиса: подъёмника, рабочего времени, себестоимости, наценки и служебных комментариев.</p>
                 <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--border)" }}>
                   {order.status === "выдан" || paid > 0 ? (
                     <p className="muted text-sm">
@@ -1152,7 +1151,7 @@ export default function OrderDetail() {
         >
           <div className="space-y-3 p-4">
             <p className="muted text-sm">
-              Сумма выбранных расходников распределится внутри стоимости работ. В акте останутся обычные работы без строк «медная смазка», «жидкий ключ» и т. п.
+              Сумма выбранных расходников распределится внутри стоимости работ. В клиентском заказ-наряде останутся обычные работы без строк «медная смазка», «жидкий ключ» и т. п.
             </p>
             <div className="space-y-2">
               {CONSUMABLE_PRESETS.map((item) => (
