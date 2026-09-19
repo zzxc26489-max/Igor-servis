@@ -224,6 +224,10 @@ export default function Finance() {
 
   async function handleCloseShift() {
     if (!currentShift || !currentShiftSummary) return;
+    if (!countedCash.trim()) {
+      showToast("Укажите фактический остаток наличных", "error");
+      return;
+    }
     const counted = Number(countedCash);
     if (!Number.isFinite(counted) || counted < 0) {
       showToast("Укажите фактический остаток наличных", "error");
