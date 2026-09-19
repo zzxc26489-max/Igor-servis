@@ -101,7 +101,7 @@ export function PlateField({
                 onKindChange(item);
                 onChange(normalizePlate(value, item));
               }}
-              className="rounded-md px-2 py-0.5 text-[11px] font-semibold transition"
+              className="min-h-9 rounded-md px-2.5 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               style={{
                 background: kind === item ? "white" : "transparent",
                 color: kind === item ? "var(--text)" : "var(--text-muted)",

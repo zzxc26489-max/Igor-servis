@@ -215,7 +215,7 @@ export default function StockReceive({
       onClose={onClose}
       wide
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4 p-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Артикул *">
             <div className="flex gap-2">
