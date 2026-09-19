@@ -153,6 +153,7 @@ npm run build
 16. `supabase/016_idempotent_order_status.sql`
 17. `supabase/017_idempotent_reference_crud.sql`
 18. `supabase/018_idempotent_order_delete_release.sql`
+19. `supabase/019_review_fixes.sql`
 
 
 ## Что ещё осталось перед боевым запуском
