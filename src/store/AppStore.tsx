@@ -34,6 +34,7 @@ import {
   listCloudBackups,
   loadCloudState,
   restoreCloudBackup,
+  reserveCloudStockPart,
   saveCloudState,
   type CloudAuditInfo,
   type CloudBackupInfo,
@@ -274,7 +275,7 @@ interface AppStoreValue extends DB {
   /** Старт/пауза/завершение конкретной работы механика. */
   setWorkLineStatus: (orderId: string, workId: string, status: WorkLineStatus) => string | null;
   /** Добавить запчасть со склада в заказ (резерв, без списания остатка). */
-  reservePart: (orderId: string, itemId: string, qty: number, price: number) => string | null;
+  reservePart: (orderId: string, itemId: string, qty: number, price: number) => Promise<string | null>;
   /** Убрать запчасть из заказа и снять резерв. Выданный заказ менять нельзя. */
   releasePart: (orderId: string, partId: string) => string | null;
   /** Принять одну или несколько частей оплаты; суммарно не больше долга. */
@@ -913,64 +914,124 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return error;
       },
-      reservePart: (orderId, itemId, qty, price) => {
-        let error: string | null = null;
+      reservePart: async (orderId, itemId, qty, price) => {
+        const current = dbRef.current;
+        const order = current.orders.find((entry) => entry.id === orderId);
+        const item = current.stock.find((entry) => entry.id === itemId);
+        if (!order || !item) return "Позиция не найдена";
+        if (order.status === "выдан") {
+          return "Выданный заказ нельзя изменять. Сначала верните автомобиль в работу.";
+        }
+
+        const normalizedQty = normalizeQuantity(qty);
+        if (!isValidQuantity(normalizedQty)) return "Количество должно быть больше нуля";
+        if (!Number.isFinite(price) || price <= 0 || price > 10_000_000) {
+          return "Цена должна быть больше нуля и не более 10 млн ₽";
+        }
+
+        const reserved = reservedByItem(current.orders, current.stock).get(item.id) ?? 0;
+        const available = item.qty - reserved;
+        if (normalizedQty > available + 0.0001) {
+          return `Свободно только ${available} ${item.unit}: ${reserved} уже в резерве`;
+        }
+
+        const partId = createId("part");
+        const movementId = createId("mv");
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) {
+            return "Нет связи с сервером. Для резерва запчасти нужно подключение к интернету, чтобы исключить двойной резерв.";
+          }
+
+          // Сначала отправляем накопившиеся изменения, чтобы атомарный резерв
+          // применялся к самой свежей версии общей базы.
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальный склад: ${syncError}`;
+
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await reserveCloudStockPart(session, {
+              orderId,
+              itemId,
+              qty: normalizedQty,
+              price,
+              partId,
+              movementId,
+            });
+
+            const remote = migrate(result.data as DB);
+            cloudRevisionRef.current = result.revision;
+            cloudBaseRef.current = remote;
+            writeCloudBase(session.user.id, result.revision, remote);
+            rawSetDB(remote);
+
+            if (!result.ok) {
+              setCloud((prev) => ({
+                ...prev,
+                status: "ready",
+                revision: result.revision,
+                lastSyncedAt: new Date().toISOString(),
+                error: undefined,
+              }));
+              return result.message;
+            }
+
+            setCloud((prev) => ({
+              ...prev,
+              status: "ready",
+              revision: result.revision,
+              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+              error: undefined,
+            }));
+            return null;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось подтвердить резерв на сервере";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return `Резерв не создан: ${message}`;
+          }
+        }
+
+        // Локальный режим без Supabase сохраняет прежнее поведение.
         setDB((prev) => {
-          const order = prev.orders.find((item) => item.id === orderId);
-          const item = prev.stock.find((entry) => entry.id === itemId);
-          if (!order || !item) {
-            error = "Позиция не найдена";
-            return prev;
-          }
-          if (order.status === "выдан") {
-            error = "Выданный заказ нельзя изменять. Сначала верните автомобиль в работу.";
-            return prev;
-          }
-          const normalizedQty = normalizeQuantity(qty);
-          if (!isValidQuantity(normalizedQty)) {
-            error = "Количество должно быть больше нуля";
-            return prev;
-          }
-          if (!Number.isFinite(price) || price <= 0 || price > 10_000_000) {
-            error = "Цена должна быть больше нуля и не более 10 млн ₽";
-            return prev;
-          }
-          const reserved = reservedByItem(prev.orders, prev.stock).get(item.id) ?? 0;
-          const available = item.qty - reserved;
-          if (normalizedQty > available + 0.0001) {
-            error = `Свободно только ${available} ${item.unit}: ${reserved} уже в резерве`;
-            return prev;
-          }
+          const currentOrder = prev.orders.find((entry) => entry.id === orderId);
+          const currentItem = prev.stock.find((entry) => entry.id === itemId);
+          if (!currentOrder || !currentItem) return prev;
+
+          const currentReserved = reservedByItem(prev.orders, prev.stock).get(currentItem.id) ?? 0;
+          if (normalizedQty > currentItem.qty - currentReserved + 0.0001) return prev;
+
           const part = {
-            id: createId("part"),
-            name: item.name,
-            sku: item.sku,
+            id: partId,
+            name: currentItem.name,
+            sku: currentItem.sku,
             qty: normalizedQty,
-            unit: item.unit,
+            unit: currentItem.unit,
             price,
-            purchasePrice: item.purchasePrice,
+            purchasePrice: currentItem.purchasePrice,
             purchasePriceEstimated: false,
             availability: "reserved" as const,
           };
           return {
             ...prev,
-            orders: prev.orders.map((entry) => (entry.id === orderId ? { ...entry, parts: [...entry.parts, part] } : entry)),
+            orders: prev.orders.map((entry) =>
+              entry.id === orderId ? { ...entry, parts: [...entry.parts, part] } : entry,
+            ),
             stockMovements: [
               {
-                id: createId("mv"),
+                id: movementId,
                 date: nowISO(),
-                itemId: item.id,
+                itemId: currentItem.id,
                 operation: "Резерв" as const,
                 qty: normalizedQty,
-                from: item.cell,
-                employee: order.advisor || "—",
-                note: `Заказ-наряд ${order.number}`,
+                from: currentItem.cell,
+                employee: currentOrder.advisor || "—",
+                note: `Заказ-наряд ${currentOrder.number}`,
               },
               ...prev.stockMovements,
             ],
           };
         });
-        return error;
+        return null;
       },
       releasePart: (orderId, partId) => {
         let error: string | null = null;
@@ -1282,7 +1343,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [backupCloud, cloud, db, listAudit, listBackups, loadFromCloud, restoreBackup, setDB, uploadLocalToCloud],
+    [backupCloud, cloud, db, listAudit, listBackups, loadFromCloud, pushCloudState, restoreBackup, session, setDB, uploadLocalToCloud],
   );
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
