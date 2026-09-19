@@ -27,3 +27,11 @@ export function shouldApplyServerRevision(input: ServerRevisionDecisionInput) {
 export function shouldSurfaceServerLoadError(requestId: number, latestRequestId: number) {
   return requestId === latestRequestId;
 }
+
+
+export const SERVER_POLL_MS = 45_000;
+
+/** Есть ли локальные изменения относительно последней подтверждённой серверной базы. */
+export function hasLocalChanges<T>(base: T | null, local: T) {
+  return Boolean(base && JSON.stringify(base) !== JSON.stringify(local));
+}
