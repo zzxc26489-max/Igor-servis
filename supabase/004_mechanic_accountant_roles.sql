@@ -339,6 +339,7 @@ begin
       'lifts', coalesce(p_data -> 'lifts', v_current.data -> 'lifts'),
       'clients', coalesce(p_data -> 'clients', v_current.data -> 'clients'),
       'vehicles', coalesce(p_data -> 'vehicles', v_current.data -> 'vehicles'),
+      'stock', coalesce(p_data -> 'stock', v_current.data -> 'stock'),
       'stockMovements', coalesce(p_data -> 'stockMovements', v_current.data -> 'stockMovements'),
       'orders', coalesce(p_data -> 'orders', v_current.data -> 'orders'),
       'payments', coalesce(p_data -> 'payments', v_current.data -> 'payments')
