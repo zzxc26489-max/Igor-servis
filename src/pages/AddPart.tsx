@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { IconMapPin, IconSearch } from "@tabler/icons-react";
+import { IconMapPin, IconScan, IconSearch } from "@tabler/icons-react";
 import { Button, Modal } from "../components/ui";
 import { useAppStore } from "../store/AppStore";
 import { formatMoney } from "../lib/format";
@@ -8,6 +8,8 @@ import { clientPrice, margin } from "../lib/price";
 import { reservedByItem } from "../lib/stock";
 import { formatQuantity, isValidQuantity, parseQuantity } from "../lib/quantity";
 import type { StockItem, Vehicle } from "../types";
+import BarcodeScanner from "../components/BarcodeScanner";
+import { useToast } from "../components/Toast";
 
 /**
  * Подбор запчасти для заказ-наряда: сначала выбираем позицию поиском и
@@ -26,6 +28,7 @@ export default function AddPart({
   vehicle?: Vehicle;
 }) {
   const { stock, orders, settings } = useAppStore();
+  const { showToast } = useToast();
   const reserved = useMemo(() => reservedByItem(orders, stock), [orders, stock]);
 
   const [query, setQuery] = useState("");
@@ -33,6 +36,7 @@ export default function AddPart({
   const [selected, setSelected] = useState<StockItem | null>(null);
   const [qty, setQty] = useState("1");
   const [price, setPrice] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const categories = useMemo(
     () => ["all", ...Array.from(new Set(stock.map((item) => item.category))).sort()],
@@ -47,7 +51,7 @@ export default function AddPart({
       .filter((item) => {
         if (category !== "all" && item.category !== category) return false;
         if (!term) return true;
-        return `${item.name} ${item.sku} ${item.brand ?? ""} ${item.cell ?? ""} ${(item.crossNumbers ?? []).join(" ")} ${(item.oeNumbers ?? []).join(" ")} ${(item.fitments ?? []).join(" ")}`
+        return `${item.name} ${item.sku} ${item.barcode ?? ""} ${item.brand ?? ""} ${item.cell ?? ""} ${(item.crossNumbers ?? []).join(" ")} ${(item.oeNumbers ?? []).join(" ")} ${(item.fitments ?? []).join(" ")}`
           .toLocaleLowerCase("ru-RU")
           .includes(term);
       })
@@ -81,17 +85,29 @@ export default function AddPart({
       {!selected ? (
         <div className="flex min-h-0 flex-col">
           <div className="space-y-2 border-b p-4" style={{ borderColor: "var(--border)" }}>
-            <div className="relative">
-              <IconSearch className="pointer-events-none absolute left-3 top-3" size={18} color="var(--text-muted)" />
-              <input
-                autoFocus
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Название, артикул, OE/кросс-номер, авто или ячейка"
-                aria-label="Поиск запчасти"
-                className="w-full rounded-lg border py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[var(--accent)]"
-                style={{ borderColor: "var(--border)" }}
-              />
+            <div className="flex gap-2">
+              <div className="relative min-w-0 flex-1">
+                <IconSearch className="pointer-events-none absolute left-3 top-3" size={18} color="var(--text-muted)" />
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Название, артикул, штрихкод, OE/кросс-номер, авто или ячейка"
+                  aria-label="Поиск запчасти"
+                  className="w-full rounded-lg border py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[var(--accent)]"
+                  style={{ borderColor: "var(--border)" }}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setScannerOpen(true)}
+                title="Сканировать штрихкод камерой телефона"
+                aria-label="Сканировать штрихкод"
+              >
+                <IconScan size={18} />
+                <span className="hidden sm:inline">Сканировать</span>
+              </Button>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {categories.map((item) => (
@@ -229,5 +245,30 @@ export default function AddPart({
         </div>
       )}
     </Modal>
+    {scannerOpen && (
+      <BarcodeScanner
+        title="Найти запчасть по штрихкоду"
+        onClose={() => setScannerOpen(false)}
+        onDetected={(value) => {
+          const code = value.trim().toLowerCase();
+          const exact = stock.find((item) => item.barcode?.trim().toLowerCase() === code);
+          if (!exact) {
+            setQuery(value);
+            setCategory("all");
+            showToast("Такого штрихкода на складе нет", "error");
+            return;
+          }
+          if (available(exact) <= 0) {
+            setQuery(value);
+            setCategory("all");
+            showToast(`${exact.name}: свободного остатка нет`, "error");
+            return;
+          }
+          pick(exact);
+          showToast(`Найдена позиция: ${exact.name}`);
+        }}
+      />
+    )}
+    </>
   );
 }
