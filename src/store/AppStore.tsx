@@ -35,6 +35,7 @@ import {
   closeCloudCashShift,
   createCloudBackup,
   deleteCloudVehicle,
+  deleteCloudOrderMedia,
   confirmCloudSupplierRefund,
   createCloudOrder,
   deleteCloudOrder,
@@ -937,8 +938,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           if (syncError) return `Не удалось подтвердить актуальный заказ: ${syncError}`;
           try {
             setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const mediaPaths = (current.media ?? [])
+              .map((item) => item.storagePath)
+              .filter((path): path is string => Boolean(path));
             const result = await deleteCloudOrder(session, id);
             applyConfirmedServerState(result);
+            if (result.ok && mediaPaths.length) {
+              void Promise.allSettled(mediaPaths.map((path) => deleteCloudOrderMedia(session, path)));
+            }
             return result.ok ? null : result.message;
           } catch (cause) {
             const message = cause instanceof Error ? cause.message : "Не удалось удалить заказ";
