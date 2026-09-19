@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   IconArrowBackUp, IconBriefcase, IconChartBar, IconChevronLeft,
@@ -51,6 +51,9 @@ export default function Finance() {
   const [openingCash, setOpeningCash] = useState("0");
   const [countedCash, setCountedCash] = useState("");
   const [shiftComment, setShiftComment] = useState("");
+  const expenseSubmitRef = useRef(false);
+  const refundSubmitRef = useRef<string | null>(null);
+  const expenseOperationRef = useRef<{ fingerprint: string; id: string } | null>(null);
 
   const range = useMemo(() => getRange(period, offset), [period, offset]);
 
@@ -102,6 +105,7 @@ export default function Finance() {
   );
 
   async function handleConfirmRefund(expenseId: string) {
+    if (refundSubmitRef.current === expenseId) return;
     const expense = expenses.find((item) => item.id === expenseId);
     if (!expense) return;
     const method = refundMethods[expenseId];
@@ -126,13 +130,18 @@ export default function Finance() {
       confirmLabel: "Деньги пришли",
     });
     if (!ok) return;
-    const refundError = confirmRefund(expenseId, method);
-    if (refundError) {
-      showToast(refundError, "error");
-      return;
+    refundSubmitRef.current = expenseId;
+    try {
+      const refundError = await confirmRefund(expenseId, method, `supplier-refund-${expenseId}`);
+      if (refundError) {
+        showToast(refundError, "error");
+        return;
+      }
+      setRefundMethods((prev) => ({ ...prev, [expenseId]: "" }));
+      showToast(`Возврат подтверждён: ${formatMoney(expense.amount)}`);
+    } finally {
+      refundSubmitRef.current = null;
     }
-    setRefundMethods((prev) => ({ ...prev, [expenseId]: "" }));
-    showToast(`Возврат подтверждён: ${formatMoney(expense.amount)}`);
   }
   const operations = useMemo(() => buildOperations(range, orders, expenses, payments), [expenses, orders, payments, range]);
   const periodExpenses = useMemo(
@@ -163,6 +172,7 @@ export default function Finance() {
 
   async function handleAddExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (expenseSubmitRef.current) return;
     const value = Number(amount);
     if (!description.trim()) {
       showToast("Опишите, за что расход", "error");
@@ -193,22 +203,40 @@ export default function Finance() {
       confirmLabel: "Добавить расход",
     });
     if (!ok) return;
-    const expenseError = addExpense({
-      id: createId("ex"),
-      date: todayISO(),
+
+    const fingerprint = JSON.stringify({
       category,
       description: description.trim(),
       amount: value,
       counterparty: counterparty.trim() || "—",
-      status: "Оплачено",
       paymentMethod: expenseMethod,
     });
-    if (expenseError) {
-      showToast(expenseError, "error");
-      return;
+    if (!expenseOperationRef.current || expenseOperationRef.current.fingerprint !== fingerprint) {
+      expenseOperationRef.current = { fingerprint, id: createId("ex") };
     }
-    showToast(`Расход добавлен: ${formatMoney(value)}`);
-    resetExpenseForm();
+
+    expenseSubmitRef.current = true;
+    try {
+      const expenseError = await addExpense({
+        id: expenseOperationRef.current.id,
+        date: todayISO(),
+        category,
+        description: description.trim(),
+        amount: value,
+        counterparty: counterparty.trim() || "—",
+        status: "Оплачено",
+        paymentMethod: expenseMethod,
+      });
+      if (expenseError) {
+        showToast(expenseError, "error");
+        return;
+      }
+      expenseOperationRef.current = null;
+      showToast(`Расход добавлен: ${formatMoney(value)}`);
+      resetExpenseForm();
+    } finally {
+      expenseSubmitRef.current = false;
+    }
   }
 
   async function handleOpenShift() {
