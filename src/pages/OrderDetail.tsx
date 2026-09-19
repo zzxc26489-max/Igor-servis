@@ -65,6 +65,8 @@ export default function OrderDetail() {
 
   const [tab, setTab] = useState<Tab>("Работы и запчасти");
   const activeTabRef = useRef<HTMLButtonElement | null>(null);
+  const statusSubmitRef = useRef(false);
+  const statusOperationRef = useRef<{ fingerprint: string; id: string } | null>(null);
 
   // Подтягиваем активную вкладку в видимую часть только при её смене, и не
   // при первом показе: иначе страница сама прокручивалась к вкладкам.
@@ -585,6 +587,28 @@ export default function OrderDetail() {
     showToast("Приёмка сохранена");
   }
 
+  async function applyStatusChange(next: OrderStatus) {
+    if (!order) return "Заказ-наряд не найден";
+    if (statusSubmitRef.current) return "Изменение статуса уже выполняется";
+
+    const fingerprint = `${order.id}:${order.status}->${next}`;
+    if (!statusOperationRef.current || statusOperationRef.current.fingerprint !== fingerprint) {
+      statusOperationRef.current = {
+        fingerprint,
+        id: `status-${crypto.randomUUID()}`,
+      };
+    }
+
+    statusSubmitRef.current = true;
+    try {
+      const error = await setOrderStatus(order.id, next, statusOperationRef.current.id);
+      if (!error) statusOperationRef.current = null;
+      return error;
+    } finally {
+      statusSubmitRef.current = false;
+    }
+  }
+
   async function handleChangeStatus(next: OrderStatus) {
     if (!order || next === order.status) return;
     if (next === "готово" && order.status !== "готово" && order.status !== "выдан") {
@@ -646,7 +670,7 @@ export default function OrderDetail() {
       confirmLabel: issuing && debt > 0 ? "Выдать с долгом" : issuing ? "Выдать" : "Изменить статус",
     });
     if (!ok) return;
-    const statusError = setOrderStatus(order.id, next);
+    const statusError = await applyStatusChange(next);
     if (statusError) {
       showToast(statusError, "error");
       return;
@@ -654,7 +678,7 @@ export default function OrderDetail() {
     showToast(`Статус изменён: «${next}»`);
   }
 
-  function finishWithConsumables() {
+  async function finishWithConsumables() {
     if (!order) return;
     const alreadyApplied = new Set((order.consumables ?? []).map((item) => item.key));
     const chosen = CONSUMABLE_PRESETS.filter(
@@ -685,7 +709,7 @@ export default function OrderDetail() {
       });
     }
 
-    const statusError = setOrderStatus(order.id, "готово");
+    const statusError = await applyStatusChange("готово");
     if (statusError) {
       showToast(statusError, "error");
       return;

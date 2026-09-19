@@ -48,6 +48,7 @@ import {
   reserveCloudStockPart,
   saveCloudState,
   saveCloudVehicle,
+  setCloudOrderStatus,
   type CloudAuditInfo,
   type CloudBackupInfo,
   type CloudRole,
@@ -314,7 +315,7 @@ interface AppStoreValue extends DB {
   updateService: (id: string, patch: Partial<Service>) => void;
   deleteService: (id: string) => void;
   /** Смена статуса заказа: при выдаче списывает запчасти, при откате возвращает. */
-  setOrderStatus: (id: string, status: OrderStatus) => string | null;
+  setOrderStatus: (id: string, status: OrderStatus, operationId?: string) => Promise<string | null>;
   /** Старт/пауза/завершение конкретной работы механика. */
   setWorkLineStatus: (orderId: string, workId: string, status: WorkLineStatus) => string | null;
   /** Добавить запчасть со склада в заказ (резерв, без списания остатка). */
@@ -392,7 +393,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const setDB = useCallback<React.Dispatch<React.SetStateAction<DB>>>((value) => {
     rawSetDB((prev) => {
       const next = typeof value === "function" ? (value as (state: DB) => DB)(prev) : value;
-      return next.demo ? { ...next, demo: false } : next;
+      const normalized = next.demo ? { ...next, demo: false } : next;
+      dbRef.current = normalized;
+      return normalized;
     });
   }, []);
 
@@ -1239,7 +1242,36 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return error;
       },
-      setOrderStatus: (id, status) => {
+      setOrderStatus: async (id, status, operationId) => {
+        const currentOrder = dbRef.current.orders.find((item) => item.id === id);
+        if (!currentOrder) return "Заказ-наряд не найден";
+        if (currentOrder.status === status) return null;
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) {
+            return "Нет связи с сервером. Смену статуса нужно подтвердить онлайн, чтобы исключить двойное списание склада.";
+          }
+
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальный заказ: ${syncError}`;
+
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await setCloudOrderStatus(
+              session,
+              id,
+              status,
+              operationId ?? `status-${createId("op")}`,
+            );
+            applyConfirmedServerState(result);
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось изменить статус";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
         let error: string | null = null;
         setDB((prev) => {
           const order = prev.orders.find((item) => item.id === id);

@@ -120,3 +120,17 @@ test("idempotent financial mutations migration deduplicates money operations", (
   assert.match(sql, /'latestMigration', 15/);
   assert.match(sql, /idempotent-financial-mutations/);
 });
+
+
+test("idempotent order status migration prevents repeated stock issue and return", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "016_idempotent_order_status.sql"), "utf8");
+  assert.match(sql, /create or replace function public\.crm_set_order_status/);
+  assert.match(sql, /for update/);
+  assert.match(sql, /if v_old_status = p_status then/);
+  assert.match(sql, /if v_was_issued <> v_will_issue then/);
+  assert.match(sql, /p_operation_id \|\| ':'/);
+  assert.match(sql, /Не все работы завершены/);
+  assert.match(sql, /По заказу есть переплата/);
+  assert.match(sql, /'latestMigration', 16/);
+  assert.match(sql, /idempotent-order-status/);
+});
