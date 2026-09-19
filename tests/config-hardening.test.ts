@@ -88,3 +88,48 @@ test("service worker only caches static same-origin assets", () => {
   assert.match(sw, /response\.type === "basic"/);
   assert.match(sw, /if \(!cacheableStaticRequest\(request, url\)\) return;[\s\S]*event\.respondWith\([\s\S]*caches\.match\(request\)/);
 });
+
+
+test("lazy route failures never become a blank screen", () => {
+  const app = readFileSync(join(process.cwd(), "src", "App.tsx"), "utf8");
+  const main = readFileSync(join(process.cwd(), "src", "main.tsx"), "utf8");
+  const boundary = readFileSync(join(process.cwd(), "src", "components", "AppErrorBoundary.tsx"), "utf8");
+  assert.match(app, /<AppErrorBoundary>/);
+  assert.match(main, /vite:preloadError/);
+  assert.match(boundary, /window\.location\.reload\(\)/);
+});
+
+test("production build requires explicit Supabase configuration", () => {
+  const config = readFileSync(join(process.cwd(), "vite.config.ts"), "utf8");
+  assert.match(config, /mode === 'production'/);
+  assert.match(config, /valid HTTPS VITE_SUPABASE_URL/);
+  assert.match(config, /VITE_SUPABASE_ANON_KEY/);
+});
+
+test("blocked Web Storage cannot crash AuthProvider initialization", () => {
+  const auth = readFileSync(join(process.cwd(), "src", "auth", "AuthContext.tsx"), "utf8");
+  assert.match(auth, /function clearStoredSession\(\)[\s\S]*try \{[\s\S]*sessionStorage\.removeItem/);
+  assert.match(auth, /function readSession\(\)[\s\S]*catch \{[\s\S]*return null/);
+  assert.doesNotMatch(auth, /catch \{\s*clearStoredSession\(\);\s*return null;/);
+});
+
+test("needs_upload database survives a reload until initial cloud upload", () => {
+  const store = readFileSync(join(process.cwd(), "src", "store", "AppStore.tsx"), "utf8");
+  assert.match(store, /cloudConfigured && cloud\.status !== "needs_upload"\) return;[\s\S]*localStorage\.setItem\(STORAGE_KEY/);
+  assert.match(store, /uploadLocalToCloud[\s\S]*localStorage\.removeItem\(STORAGE_KEY\)/);
+});
+
+test("media operations rebase on latest state and require server confirmation", () => {
+  const store = readFileSync(join(process.cwd(), "src", "store", "AppStore.tsx"), "utf8");
+  assert.match(store, /appendOrderMedia: async[\s\S]*const latest = applyAdditions\(dbRef\.current\)/);
+  assert.match(store, /removeOrderMedia: async[\s\S]*const latest = applyRemoval\(dbRef\.current\)/);
+  assert.match(store, /additions\.some[\s\S]*await pushCloudState\(rebased\)/);
+  assert.match(store, /confirmedOrder\?\.media[\s\S]*await pushCloudState\(rebased\)/);
+});
+
+test("order deletion attempts storage cleanup and media rollback errors are surfaced first", () => {
+  const store = readFileSync(join(process.cwd(), "src", "store", "AppStore.tsx"), "utf8");
+  const panel = readFileSync(join(process.cwd(), "src", "components", "OrderMediaPanel.tsx"), "utf8");
+  assert.match(store, /Promise\.allSettled\(mediaPaths\.map\(\(path\) => deleteCloudOrderMedia/);
+  assert.match(panel, /errors\.unshift\(saveError\)/);
+});
