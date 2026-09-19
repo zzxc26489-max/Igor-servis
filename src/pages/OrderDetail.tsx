@@ -254,6 +254,7 @@ export default function OrderDetail() {
   }
 
   function openLiftScheduleEditor() {
+    if (!order) return;
     setLiftScheduleLiftId(order.liftId ? String(order.liftId) : "");
     setLiftScheduleDate(orderDay(order));
     setLiftScheduleStart(order.scheduledStart ?? "");
@@ -262,6 +263,7 @@ export default function OrderDetail() {
   }
 
   function setLiftScheduleNow() {
+    if (!order) return;
     const now = new Date();
     const minutes = Math.min(23 * 60 + 45, Math.ceil((now.getHours() * 60 + now.getMinutes()) / 15) * 15);
     const start = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
@@ -273,6 +275,7 @@ export default function OrderDetail() {
   }
 
   function handleSaveLiftSchedule() {
+    if (!order) return;
     if (!liftScheduleLiftId) {
       updateOrder(order.id, {
         liftId: undefined,
@@ -313,6 +316,7 @@ export default function OrderDetail() {
   }
 
   function handleAutoLiftSchedule() {
+    if (!order) return;
     if (!order.liftId || !order.scheduledStart) {
       showToast("Сначала назначьте подъёмник и время начала", "error");
       return;
