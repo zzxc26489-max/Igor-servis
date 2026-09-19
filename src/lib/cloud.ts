@@ -58,6 +58,17 @@ export interface CloudStockReserveInput {
   movementId: string;
 }
 
+export type CloudPaymentResult =
+  | { ok: true; revision: number; updatedAt?: string; data: unknown }
+  | { ok: false; paymentConflict: true; revision: number; message: string; data: unknown };
+
+export interface CloudPaymentEntry {
+  id: string;
+  amount: number;
+  method: "cash" | "terminal" | "transfer";
+}
+
+
 const rawUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "");
 const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
 
@@ -152,6 +163,28 @@ export async function reserveCloudStockPart(
     },
     session.access_token,
   ) as Promise<CloudStockReserveResult>;
+}
+
+export async function applyCloudOrderPayment(
+  session: CloudSession,
+  orderId: string,
+  kind: "payment" | "refund",
+  entries: CloudPaymentEntry[],
+  employee?: string,
+): Promise<CloudPaymentResult> {
+  return request(
+    "/rest/v1/rpc/crm_apply_order_payment",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_order_id: orderId,
+        p_kind: kind,
+        p_entries: entries,
+        p_employee: employee?.trim() || null,
+      }),
+    },
+    session.access_token,
+  ) as Promise<CloudPaymentResult>;
 }
 
 export async function createCloudBackup(session: CloudSession): Promise<{ ok: true; createdAt: string }> {
