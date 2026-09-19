@@ -93,11 +93,24 @@ export function parseScannedCode(input: string): ParsedScannedCode {
   }
 
   const labelled = raw.matchAll(
-    /(?:^|[\s;|,])(?:sku|article|art|part(?:[_\s-]?number)?|barcode|ean(?:13|8)?|upc|артикул|штрихкод|код)\s*[:=]\s*([^\s;|,]+)/giu,
+    /(?:^|[\s;|,])(?:sku|article|art|part(?:[_\s-]?number)?|barcode|ean(?:13|8)?|upc|code|артикул|штрихкод|код)\s*[:=]\s*([^\s;|,]+)/giu,
   );
   for (const match of labelled) {
     kind = kind === "plain" ? "labelled" : kind;
     pushUnique(candidates, match[1]);
+  }
+
+  // Частый компактный QR от поставщика: code=OX123 / sku:HU-816X.
+  if (kind === "plain") {
+    const compactPair = raw.match(/^([\p{L}\w-]{2,24})\s*[:=]\s*(.+)$/u);
+    if (compactPair) {
+      const key = compactPair[1].toLocaleLowerCase("ru-RU").replace(/[\s-]/g, "_");
+      const compactKey = key.replace(/_/g, "");
+      if (KEY_ALIASES.has(key) || KEY_ALIASES.has(compactKey)) {
+        kind = "labelled";
+        pushUnique(candidates, compactPair[2]);
+      }
+    }
   }
 
   if (candidates.length === 0 && raw.length <= 256) pushUnique(candidates, raw);
