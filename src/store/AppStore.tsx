@@ -303,6 +303,8 @@ interface AppStoreValue extends DB {
   setDB: React.Dispatch<React.SetStateAction<DB>>;
   createOrderEntry: (input: CreateOrderEntryInput) => Promise<CreateOrderEntryResult>;
   updateOrder: (id: string, patch: Partial<Order>) => void;
+  appendOrderMedia: (orderId: string, additions: NonNullable<Order["media"]>) => Promise<string | null>;
+  removeOrderMedia: (orderId: string, mediaId: string) => Promise<string | null>;
   deleteOrder: (id: string) => Promise<string | null>;
   addClient: (client: Client) => void;
   updateClient: (id: string, patch: Partial<Client>) => Promise<string | null>;
@@ -821,6 +823,67 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ...prev,
           orders: prev.orders.map((o) => (o.id === id ? { ...o, ...patch } : o)),
         })),
+      appendOrderMedia: async (orderId, additions) => {
+        if (!additions.length) return null;
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Фото и видео нужно сохранить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальный заказ: ${syncError}`;
+        }
+
+        const current = dbRef.current;
+        const order = current.orders.find((item) => item.id === orderId);
+        if (!order) return "Заказ-наряд не найден";
+
+        const existingIds = new Set((order.media ?? []).map((item) => item.id));
+        const nextMedia = [
+          ...(order.media ?? []),
+          ...additions.filter((item) => !existingIds.has(item.id)),
+        ];
+        const candidate: DB = {
+          ...current,
+          demo: current.demo ? false : current.demo,
+          orders: current.orders.map((item) => item.id === orderId ? { ...item, media: nextMedia } : item),
+        };
+        dbRef.current = candidate;
+        rawSetDB(candidate);
+
+        if (cloudConfigured && session) {
+          const saveError = await pushCloudState(candidate);
+          if (saveError) return `Файлы добавлены локально, но сервер пока не подтвердил изменение: ${saveError}`;
+        }
+        return null;
+      },
+      removeOrderMedia: async (orderId, mediaId) => {
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Удаление файла нужно подтвердить онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальный заказ: ${syncError}`;
+        }
+
+        const current = dbRef.current;
+        const order = current.orders.find((item) => item.id === orderId);
+        if (!order) return "Заказ-наряд не найден";
+        if (!(order.media ?? []).some((item) => item.id === mediaId)) return null;
+
+        const candidate: DB = {
+          ...current,
+          demo: current.demo ? false : current.demo,
+          orders: current.orders.map((item) =>
+            item.id === orderId
+              ? { ...item, media: (item.media ?? []).filter((entry) => entry.id !== mediaId) }
+              : item,
+          ),
+        };
+        dbRef.current = candidate;
+        rawSetDB(candidate);
+
+        if (cloudConfigured && session) {
+          const saveError = await pushCloudState(candidate);
+          if (saveError) return `Сервер не подтвердил удаление файла: ${saveError}`;
+        }
+        return null;
+      },
       deleteOrder: async (id) => {
         const current = dbRef.current.orders.find((item) => item.id === id);
         if (!current) return null;
@@ -2099,6 +2162,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         dbVersion: DB_VERSION,
       }),
       importDB: (json) => {
+        if (cloudConfigured && cloud.status !== "needs_upload") return false;
         const inspected = inspectBackupJson(json);
         if (!inspected) return false;
         try {
