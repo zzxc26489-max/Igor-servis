@@ -86,5 +86,5 @@ test("service worker only caches static same-origin assets", () => {
   assert.match(sw, /cacheableStaticRequest/);
   assert.match(sw, /request\.destination === "script"/);
   assert.match(sw, /response\.type === "basic"/);
-  assert.doesNotMatch(sw, /event\.respondWith\([\s\S]*caches\.match\(request\)[\s\S]*\);\s*\}\);\s*$/m);
+  assert.match(sw, /if \(!cacheableStaticRequest\(request, url\)\) return;[\s\S]*event\.respondWith\([\s\S]*caches\.match\(request\)/);
 });
