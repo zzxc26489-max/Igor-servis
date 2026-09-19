@@ -31,10 +31,12 @@ import { normalizeWorkDay, parseWorkHours, setWorkDay } from "../lib/workday";
 import { ensureLegacyPayments } from "../lib/payments";
 import {
   applyCloudOrderPayment,
+  closeCloudCashShift,
   createCloudBackup,
   listCloudAudit,
   listCloudBackups,
   loadCloudState,
+  openCloudCashShift,
   restoreCloudBackup,
   reserveCloudStockPart,
   saveCloudState,
@@ -272,8 +274,8 @@ interface AppStoreValue extends DB {
   deleteVehicle: (id: string) => void;
   addStockMovement: (m: StockMovement) => void;
   updateStockItem: (id: string, patch: Partial<StockItem>) => void;
-  receiveStock: (input: ReceiveStockInput) => void;
-  addExpense: (e: Expense) => void;
+  receiveStock: (input: ReceiveStockInput) => string | null;
+  addExpense: (e: Expense) => string | null;
   updateCompany: (patch: Partial<CompanyInfo>) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   updateEmployee: (id: string, patch: Partial<Employee>) => void;
@@ -304,13 +306,13 @@ interface AppStoreValue extends DB {
   /** Возврат запчасти поставщику: списывает со склада и заводит ожидание денег. */
   returnToSupplier: (input: ReturnToSupplierInput) => void;
   /** Деньги от поставщика пришли — возврат идёт в расчёты. */
-  confirmRefund: (expenseId: string, method: PaymentMethod) => void;
+  confirmRefund: (expenseId: string, method: PaymentMethod) => string | null;
   /** Выплата зарплаты сотруднику. */
-  payEmployee: (employeeId: string, amount: number, note?: string, method?: PaymentMethod, component?: PayrollComponent) => void;
+  payEmployee: (employeeId: string, amount: number, note?: string, method?: PaymentMethod, component?: PayrollComponent) => string | null;
   /** Открыть кассовую смену. */
-  openCashShift: (openingCash: number, openedBy: string) => string | null;
+  openCashShift: (openingCash: number, openedBy: string) => Promise<string | null>;
   /** Закрыть кассовую смену после пересчёта наличных. */
-  closeCashShift: (shiftId: string, countedCash: number, closedBy: string, comment?: string) => string | null;
+  closeCashShift: (shiftId: string, countedCash: number, closedBy: string, comment?: string) => Promise<string | null>;
   resetToSeed: () => void;
   /** Резервная копия: весь справочник одним JSON. */
   exportDB: () => string;
@@ -682,18 +684,30 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ...prev,
           stock: prev.stock.map((s) => (s.id === id ? { ...s, ...patch } : s)),
         })),
-      addExpense: (e) =>
+      addExpense: (e) => {
+        let error: string | null = null;
         setDB((prev) => {
           const shift = activeCashShift(prev.cashShifts);
+          if (e.paymentMethod === "cash" && !shift) {
+            error = "Для расхода наличными сначала откройте кассовую смену";
+            return prev;
+          }
           const expense = {
             ...e,
             code: e.code ?? nextCode(CODE_PREFIX.expense, prev.expenses.map((item) => item.code)),
             shiftId: e.shiftId ?? (e.paymentMethod && shift ? shift.id : undefined),
           };
           return { ...prev, expenses: [expense, ...prev.expenses] };
-        }),
-      receiveStock: (input) =>
+        });
+        return error;
+      },
+      receiveStock: (input) => {
+        let error: string | null = null;
         setDB((prev) => {
+          if (input.createExpense && input.expenseMethod === "cash" && !activeCashShift(prev.cashShifts)) {
+            error = "Для оплаты поставки наличными сначала откройте кассовую смену";
+            return prev;
+          }
           const stamp = Date.now();
           const now = nowISO();
           const receivedQty = normalizeQuantity(input.qty);
@@ -782,7 +796,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             : prev.expenses;
 
           return { ...prev, stock: nextStock, stockMovements: [movement, ...prev.stockMovements], expenses };
-        }),
+        });
+        return error;
+      },
       updateCompany: (patch) => setDB((prev) => ({ ...prev, company: { ...prev.company, ...patch } })),
       updateSettings: (patch) => setDB((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } })),
       updateEmployee: (id, patch) =>
@@ -1280,39 +1296,54 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             ],
           };
         }),
-      confirmRefund: (expenseId, method) =>
+      confirmRefund: (expenseId, method) => {
+        let error: string | null = null;
         setDB((prev) => {
           const shift = activeCashShift(prev.cashShifts);
+          if (method === "cash" && !shift) {
+            error = "Для возврата наличными сначала откройте кассовую смену";
+            return prev;
+          }
+          const expense = prev.expenses.find((item) => item.id === expenseId);
+          if (!expense || expense.source !== "supplier_refund" || expense.status === "Возвращено") {
+            error = "Возврат поставщика не найден или уже подтверждён";
+            return prev;
+          }
           return {
             ...prev,
-            expenses: prev.expenses.map((expense) =>
-              expense.id === expenseId && expense.source === "supplier_refund" && expense.status !== "Возвращено"
+            expenses: prev.expenses.map((item) =>
+              item.id === expenseId
                 ? {
-                    ...expense,
+                    ...item,
                     status: "Возвращено" as const,
                     refundConfirmedAt: nowISO(),
                     paymentMethod: method,
-                    shiftId: shift ? shift.id : undefined,
+                    shiftId: method === "cash" ? shift?.id : undefined,
                   }
-                : expense,
+                : item,
             ),
           };
-        }),
-      payEmployee: (employeeId, amount, note, method, component) =>
+        });
+        return error;
+      },
+      payEmployee: (employeeId, amount, note, method, component) => {
+        let error: string | null = null;
         setDB((prev) => {
+          const shift = activeCashShift(prev.cashShifts);
+          if (method === "cash" && !shift) {
+            error = "Для выплаты наличными сначала откройте кассовую смену";
+            return prev;
+          }
           const employee = prev.employees.find((item) => item.id === employeeId);
           if (!employee || amount <= 0) return prev;
           const now = nowISO();
           const resolvedComponent: PayrollComponent = component
             ?? (employee.payType === "salary" ? "salary" : "piecework");
           const isPiecework = resolvedComponent === "piecework";
-          const shift = activeCashShift(prev.cashShifts);
           return {
             ...prev,
             employees: prev.employees.map((item) => {
               if (item.id !== employeeId) return item;
-              // paid хранит погашенную сдельную часть. Для чистого оклада
-              // сохраняем старое поведение и используем его как общий итог выплат.
               const nextPaid = isPiecework || item.payType === "salary" ? item.paid + amount : item.paid;
               return { ...item, paid: nextPaid, lastPaidAt: now };
             }),
@@ -1326,31 +1357,58 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 amount,
                 counterparty: employee.name,
                 status: "Оплачено" as const,
-                // Сдельная часть уже учтена в начислении; оклад — самостоятельный расход.
                 source: isPiecework ? ("payroll" as const) : undefined,
                 paymentMethod: method,
-                shiftId: method && shift ? shift.id : undefined,
+                shiftId: method === "cash" ? shift?.id : undefined,
                 employeeId,
                 comment: note,
               },
               ...prev.expenses,
             ],
           };
-        }),
-      openCashShift: (openingCash, openedBy) => {
+        });
+        return error;
+      },
+      openCashShift: async (openingCash, openedBy) => {
+        const amount = Math.round(openingCash);
+        if (!Number.isFinite(amount) || amount < 0) return "Начальный остаток не может быть отрицательным";
+        const shiftId = createId("shift");
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Кассовую смену нужно открыть онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальную кассу: ${syncError}`;
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await openCloudCashShift(session, shiftId, amount, openedBy);
+            const remote = migrate(result.data as DB);
+            cloudRevisionRef.current = result.revision;
+            cloudBaseRef.current = remote;
+            writeCloudBase(session.user.id, result.revision, remote);
+            rawSetDB(remote);
+            setCloud((prev) => ({
+              ...prev,
+              status: "ready",
+              revision: result.revision,
+              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+              error: undefined,
+            }));
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось открыть кассовую смену";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
         let error: string | null = null;
         setDB((prev) => {
           if (activeCashShift(prev.cashShifts)) {
             error = "Кассовая смена уже открыта";
             return prev;
           }
-          const amount = Math.round(openingCash);
-          if (!Number.isFinite(amount) || amount < 0) {
-            error = "Начальный остаток не может быть отрицательным";
-            return prev;
-          }
           const shift: CashShift = {
-            id: createId("shift"),
+            id: shiftId,
             openedAt: nowISO(),
             openedBy: openedBy.trim() || "—",
             openingCash: amount,
@@ -1359,17 +1417,42 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return error;
       },
-      closeCashShift: (shiftId, countedCash, closedBy, comment) => {
+      closeCashShift: async (shiftId, countedCash, closedBy, comment) => {
+        const counted = Math.round(countedCash);
+        if (!Number.isFinite(counted) || counted < 0) return "Фактический остаток не может быть отрицательным";
+
+        if (cloudConfigured && session) {
+          if (!navigator.onLine) return "Нет связи с сервером. Кассовую смену нужно закрыть онлайн.";
+          const syncError = await pushCloudState(dbRef.current);
+          if (syncError) return `Не удалось подтвердить актуальную кассу: ${syncError}`;
+          try {
+            setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
+            const result = await closeCloudCashShift(session, shiftId, counted, closedBy, comment);
+            const remote = migrate(result.data as DB);
+            cloudRevisionRef.current = result.revision;
+            cloudBaseRef.current = remote;
+            writeCloudBase(session.user.id, result.revision, remote);
+            rawSetDB(remote);
+            setCloud((prev) => ({
+              ...prev,
+              status: "ready",
+              revision: result.revision,
+              lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+              error: undefined,
+            }));
+            return result.ok ? null : result.message;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : "Не удалось закрыть кассовую смену";
+            setCloud((prev) => ({ ...prev, status: "error", error: message }));
+            return message;
+          }
+        }
+
         let error: string | null = null;
         setDB((prev) => {
           const shift = prev.cashShifts.find((item) => item.id === shiftId);
           if (!shift || shift.closedAt) {
             error = "Открытая кассовая смена не найдена";
-            return prev;
-          }
-          const counted = Math.round(countedCash);
-          if (!Number.isFinite(counted) || counted < 0) {
-            error = "Фактический остаток не может быть отрицательным";
             return prev;
           }
           const summary = cashShiftSummary(shift, prev.payments, prev.expenses);

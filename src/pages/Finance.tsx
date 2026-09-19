@@ -126,7 +126,11 @@ export default function Finance() {
       confirmLabel: "Деньги пришли",
     });
     if (!ok) return;
-    confirmRefund(expenseId, method);
+    const refundError = confirmRefund(expenseId, method);
+    if (refundError) {
+      showToast(refundError, "error");
+      return;
+    }
     setRefundMethods((prev) => ({ ...prev, [expenseId]: "" }));
     showToast(`Возврат подтверждён: ${formatMoney(expense.amount)}`);
   }
@@ -189,7 +193,7 @@ export default function Finance() {
       confirmLabel: "Добавить расход",
     });
     if (!ok) return;
-    addExpense({
+    const expenseError = addExpense({
       id: createId("ex"),
       date: todayISO(),
       category,
@@ -199,13 +203,17 @@ export default function Finance() {
       status: "Оплачено",
       paymentMethod: expenseMethod,
     });
+    if (expenseError) {
+      showToast(expenseError, "error");
+      return;
+    }
     showToast(`Расход добавлен: ${formatMoney(value)}`);
     resetExpenseForm();
   }
 
-  function handleOpenShift() {
+  async function handleOpenShift() {
     const amount = Number(openingCash) || 0;
-    const error = openCashShift(amount, operatorName);
+    const error = await openCashShift(amount, operatorName);
     if (error) {
       showToast(error, "error");
       return;
@@ -214,7 +222,7 @@ export default function Finance() {
     showToast("Кассовая смена открыта");
   }
 
-  function handleCloseShift() {
+  async function handleCloseShift() {
     if (!currentShift || !currentShiftSummary) return;
     const counted = Number(countedCash);
     if (!Number.isFinite(counted) || counted < 0) {
@@ -226,7 +234,7 @@ export default function Finance() {
       showToast("При расхождении обязательно напишите причину", "error");
       return;
     }
-    const error = closeCashShift(currentShift.id, counted, operatorName, shiftComment);
+    const error = await closeCashShift(currentShift.id, counted, operatorName, shiftComment);
     if (error) {
       showToast(error, "error");
       return;
