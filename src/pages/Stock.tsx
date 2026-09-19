@@ -106,7 +106,7 @@ export default function Stock() {
       confirmLabel: "Оформить возврат",
     });
     if (!ok) return;
-    returnToSupplier({
+    const returnError = await returnToSupplier({
       itemId: item.id,
       qty,
       unitPrice: item.purchasePrice,
@@ -114,6 +114,10 @@ export default function Stock() {
       employee: employees[0]?.name ?? "—",
       reason,
     });
+    if (returnError) {
+      showToast(returnError, "error");
+      return;
+    }
     setReturnFor(null);
     showToast(`Возврат оформлен, ждём ${formatMoney(amount)} от поставщика`);
   }
