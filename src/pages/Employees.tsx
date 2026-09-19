@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { IconCash, IconCheck } from "@tabler/icons-react";
+import { IconCash, IconCheck, IconChevronDown, IconChevronUp } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { Button, Card, Modal, Page, TopBar } from "../components/ui";
 import { useConfirm } from "../components/Confirm";
 import { useToast } from "../components/Toast";
 import { formatDate, formatMoney, plural } from "../lib/format";
-import { computePayroll, payrollBalance } from "../lib/payroll";
+import { computePayroll, payrollBalance, payrollBreakdown } from "../lib/payroll";
 import { moneyInput } from "../lib/formats";
 import type { Employee, PaymentMethod } from "../types";
 import { paymentMethodLabel } from "../lib/payments";
@@ -22,6 +22,7 @@ export default function Employees() {
   const confirm = useConfirm();
   const { showToast } = useToast();
   const [payFor, setPayFor] = useState<string | null>(null);
+  const [detailsFor, setDetailsFor] = useState<string | null>(null);
 
   const employees = computePayroll(rawEmployees, orders);
   const totalAccrued = employees.reduce((sum, employee) => sum + employee.accrued, 0);
@@ -111,6 +112,56 @@ export default function Employees() {
                     <div className="flex justify-between"><span className="muted">Последняя выплата</span><span>{formatDate(employee.lastPaidAt)}</span></div>
                   )}
                 </div>
+
+                {sdelnaya && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setDetailsFor(detailsFor === employee.id ? null : employee.id)}
+                      className="mt-3 flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm font-semibold transition hover:bg-gray-50"
+                      style={{ borderColor: "var(--border)" }}
+                    >
+                      <span>Из чего начислено</span>
+                      {detailsFor === employee.id ? <IconChevronUp size={17} /> : <IconChevronDown size={17} />}
+                    </button>
+
+                    {detailsFor === employee.id && (() => {
+                      const rows = payrollBreakdown(employee, orders);
+                      return (
+                        <div className="mt-2 overflow-hidden rounded-lg border" style={{ borderColor: "var(--border)" }}>
+                          {rows.length === 0 ? (
+                            <p className="muted p-3 text-sm">По выданным заказам начислений пока нет.</p>
+                          ) : (
+                            <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                              {rows.map((row) => (
+                                <div key={row.orderId} className="p-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <b className="block text-sm">{row.orderNumber}</b>
+                                      <span className="muted text-xs">{formatDate(row.completedAt)}</span>
+                                    </div>
+                                    <div className="shrink-0 text-right">
+                                      <b className="block text-sm tabular-nums">{formatMoney(row.accrued)}</b>
+                                      <span className="muted text-xs">с {formatMoney(row.worksAmount)} работ</span>
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 space-y-1">
+                                    {row.works.map((work) => (
+                                      <div key={work.id} className="flex justify-between gap-3 text-xs">
+                                        <span className="muted truncate">{work.name}{work.qty !== 1 ? ` × ${work.qty}` : ""}</span>
+                                        <span className="shrink-0 tabular-nums">{formatMoney(work.amount)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
 
                 <Button
                   className="mt-3 w-full justify-center"
