@@ -2089,7 +2089,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         });
         return error;
       },
-      resetToSeed: () => rawSetDB(migrate(seedDB())),
+      resetToSeed: () => {
+        const next = migrate(seedDB());
+        dbRef.current = next;
+        rawSetDB(next);
+      },
       exportDB: () => createBackupJson(db as unknown as Record<string, unknown>, {
         appVersion: APP_VERSION,
         dbVersion: DB_VERSION,
@@ -2099,13 +2103,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         if (!inspected) return false;
         try {
           const parsed = inspected.data as Partial<DB>;
-          rawSetDB(migrate({
+          const next = migrate({
             ...seedDB(),
             demo: false,
             ...parsed,
             company: { ...companySeed, ...parsed.company },
             settings: { ...defaultSettings, ...parsed.settings },
-          }));
+          });
+          dbRef.current = next;
+          rawSetDB(next);
           return true;
         } catch {
           return false;
