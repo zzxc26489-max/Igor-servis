@@ -1263,7 +1263,8 @@ export default function OrderDetail() {
                             background:
                               item.kind === "payment" ? "var(--accent)"
                                 : item.kind === "work" ? "#3978c9"
-                                  : item.kind === "media" ? "#6656b8"
+                                  : item.kind === "assignment" ? "#9a6a12"
+                                    : item.kind === "media" ? "#6656b8"
                                     : item.kind === "status" ? "var(--warning)"
                                       : "var(--text-muted)",
                           }}
