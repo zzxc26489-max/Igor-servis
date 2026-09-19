@@ -49,6 +49,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Validate production Supabase configuration
+        run: |
+          test -n "$VITE_SUPABASE_URL" || { echo "VITE_SUPABASE_URL is not configured in repository variables"; exit 1; }
+          test -n "$VITE_SUPABASE_ANON_KEY" || { echo "VITE_SUPABASE_ANON_KEY is not configured in repository variables"; exit 1; }
+          case "$VITE_SUPABASE_URL" in
+            https://*) ;;
+            *) echo "VITE_SUPABASE_URL must use https://"; exit 1 ;;
+          esac
       - name: Dependency audit (non-blocking for Pages)
         continue-on-error: true
         run: npm audit --audit-level=high
