@@ -207,6 +207,7 @@ export interface ReceiveStockInput {
   itemId?: string;
   name: string;
   sku: string;
+  barcode?: string;
   brand?: string;
   category: string;
   unit: string;
@@ -226,6 +227,7 @@ export type CloudSyncStatus = "local" | "loading" | "needs_upload" | "ready" | "
 export interface CloudSyncInfo {
   configured: boolean;
   status: CloudSyncStatus;
+  workshopId?: string;
   workshopName?: string;
   role?: CloudRole;
   displayName?: string;
@@ -344,6 +346,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     cloudRevisionRef.current = snapshot.revision;
     const meta = {
       configured: true,
+      workshopId: snapshot.workshopId,
       workshopName: snapshot.workshopName,
       role: snapshot.role,
       displayName: snapshot.displayName,
@@ -681,6 +684,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                   ...item,
                   qty,
                   purchasePrice,
+                  barcode: input.barcode || item.barcode,
                   cell: input.cell || item.cell,
                   minQty: input.minQty || item.minQty,
                   supplier: input.supplier || item.supplier,
@@ -695,6 +699,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                   code: nextCode(CODE_PREFIX.stock, prev.stock.map((item) => item.code)),
                   name: input.name,
                   sku: input.sku,
+                  barcode: input.barcode,
                   brand: input.brand,
                   category: input.category,
                   qty: receivedQty,

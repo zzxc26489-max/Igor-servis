@@ -9,7 +9,7 @@ CRM умеет работать в двух режимах:
 
 Создайте обычный Supabase project. В SQL Editor выполните файл:
 
-`supabase/001_crm_cloud.sql`, затем `supabase/002_role_security_admin_tools.sql`, затем `supabase/003_cash_shifts.sql`, затем `supabase/004_mechanic_accountant_roles.sql`
+`supabase/001_crm_cloud.sql`, затем `supabase/002_role_security_admin_tools.sql`, затем `supabase/003_cash_shifts.sql`, затем `supabase/004_mechanic_accountant_roles.sql`, затем `supabase/005_order_media_storage.sql`
 
 ## 2. Создайте пользователей
 
@@ -114,3 +114,14 @@ Dashboard сотрудникам.
 - **accountant** открывает Финансы, Отчёты, Сотрудники и печатные документы, но не управляет ремонтом и складом.
 
 Для механика `display_name` в `crm_members` должен **точно совпадать** с именем исполнителя в CRM. Например: `Механик 1`.
+
+
+## Фото и видео заказов
+
+После выполнения `supabase/005_order_media_storage.sql` создаётся приватный bucket `order-media`.
+
+- приёмщик, владелец и партнёр могут добавлять фото/видео по заказам;
+- механик может добавлять и смотреть медиа только по заказам, где на его `display_name` назначена работа;
+- файлы не кладутся внутрь общего JSON-снимка: в заказе хранится только метадата и путь;
+- максимальный размер одного файла — 25 МБ;
+- без Supabase локально можно сохранять только сжатые фото; видео требует серверное хранилище.

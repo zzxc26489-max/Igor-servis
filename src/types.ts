@@ -132,6 +132,23 @@ export interface OrderConsumable {
   appliedAt: string;
 }
 
+export type OrderMediaKind = "intake" | "diagnostic" | "repair" | "result";
+
+export interface OrderMedia {
+  id: string;
+  kind: OrderMediaKind;
+  name: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+  uploadedBy: string;
+  note?: string;
+  /** Путь в приватном Supabase Storage bucket order-media. */
+  storagePath?: string;
+  /** Локальный запасной вариант для фото, когда Supabase не подключён. */
+  localDataUrl?: string;
+}
+
 export interface Order {
   id: string;
   number: string;
@@ -151,6 +168,8 @@ export interface Order {
   parts: OrderLinePart[];
   /** Внутренние расходники: смазки, очистители и аэрозоли. Не выводятся клиенту отдельной строкой. */
   consumables?: OrderConsumable[];
+  /** Фото и видео приёмки, диагностики, ремонта и результата. */
+  media?: OrderMedia[];
   discount?: number;
   paid?: number;
   notes?: string;
@@ -185,6 +204,8 @@ export interface StockItem {
   code?: string;
   name: string;
   sku: string;
+  /** Штрихкод EAN/UPC/Code128, если он есть на упаковке. */
+  barcode?: string;
   brand?: string;
   category: string;
   qty: number;
