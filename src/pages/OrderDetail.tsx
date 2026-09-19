@@ -23,7 +23,7 @@ import { CONSUMABLE_PRESETS } from "../data/consumables";
 import { formatQuantity, isValidQuantity } from "../lib/quantity";
 import { nowISO, todayISO } from "../lib/date";
 import type { OrderConsumable, OrderLinePart, OrderLineWork, OrderStatus, PaymentMethod } from "../types";
-import { effectiveWorkStatus, WORK_STATUS_LABEL, workSessionMinutes } from "../lib/workSessions";
+import { effectiveWorkStatus, reassignWork, WORK_STATUS_LABEL, workSessionMinutes } from "../lib/workSessions";
 import OrderMediaPanel from "../components/OrderMediaPanel";
 import ClientOrderDocument from "../components/ClientOrderDocument";
 import { orderActivity } from "../lib/orderActivity";
@@ -46,6 +46,7 @@ export default function OrderDetail() {
     settings,
     payments,
     employees,
+    cloud,
     updateOrder,
     deleteOrder,
     updateVehicle,
@@ -111,6 +112,9 @@ export default function OrderDetail() {
   const [liftScheduleDate, setLiftScheduleDate] = useState(order ? orderDay(order) : "");
   const [liftScheduleStart, setLiftScheduleStart] = useState(order?.scheduledStart ?? "");
   const [liftScheduleEnd, setLiftScheduleEnd] = useState(order?.scheduledEnd ?? "");
+  const [reassignWorkId, setReassignWorkId] = useState<string | null>(null);
+  const [reassignExecutor, setReassignExecutor] = useState("");
+  const [reassignReason, setReassignReason] = useState("");
   const loadedIntakeOrderRef = useRef<string | null>(null);
 
   const client = order ? clients.find((c) => c.id === order.clientId) : undefined;
@@ -232,6 +236,47 @@ export default function OrderDetail() {
     } else {
       showToast(`Добавлена работа «${work.name}»`);
     }
+  }
+
+  function openReassignWork(work: OrderLineWork) {
+    if (!order) return;
+    if (order.status === "выдан") {
+      showToast("Сначала верните автомобиль в работу", "error");
+      return;
+    }
+    setReassignWorkId(work.id);
+    setReassignExecutor(work.executor ?? "");
+    setReassignReason("");
+  }
+
+  function handleReassignWork() {
+    if (!order || !reassignWorkId) return;
+    const target = order.works.find((work) => work.id === reassignWorkId);
+    if (!target) return;
+
+    const nextExecutor = reassignExecutor || undefined;
+    if (target.executor === nextExecutor) {
+      setReassignWorkId(null);
+      return;
+    }
+
+    const reassigned = reassignWork(
+      target,
+      nextExecutor,
+      nowISO(),
+      cloud.displayName || order.advisor || undefined,
+      reassignReason,
+    );
+
+    updateOrder(order.id, {
+      works: order.works.map((work) => work.id === target.id ? reassigned : work),
+    });
+
+    setReassignWorkId(null);
+    setReassignReason("");
+    showToast(nextExecutor
+      ? `Работа «${target.name}» назначена: ${nextExecutor}`
+      : `Механик снят с работы «${target.name}»`);
   }
 
   function handleRemoveWork(workId: string) {
@@ -954,26 +999,14 @@ export default function OrderDetail() {
                               {workSessionMinutes(w) > 0 ? ` · факт ${formatDuration(workSessionMinutes(w))}` : ""}
                             </div>
                             <div className="mt-2 print:hidden">
-                              <select
-                                value={w.executor ?? ""}
-                                onChange={(event) => {
-                                  if (order.status === "выдан") {
-                                    showToast("Сначала верните автомобиль в работу", "error");
-                                    return;
-                                  }
-                                  const executor = event.target.value || undefined;
-                                  updateOrder(order.id, {
-                                    works: order.works.map((item) => item.id === w.id ? { ...item, executor } : item),
-                                  });
-                                  showToast(executor ? `Исполнитель: ${executor}` : "Исполнитель снят");
-                                }}
-                                className="max-w-full rounded-md border bg-white px-2 py-1 text-xs"
-                                style={{ borderColor: w.executor ? "var(--border)" : "var(--warning)" }}
-                                aria-label={`Исполнитель работы ${w.name}`}
+                              <button
+                                type="button"
+                                onClick={() => openReassignWork(w)}
+                                className="rounded-md border bg-white px-2.5 py-1.5 text-xs font-semibold transition hover:bg-gray-50"
+                                style={{ borderColor: w.executor ? "var(--border)" : "var(--warning)", color: w.executor ? "var(--text)" : "var(--warning)" }}
                               >
-                                <option value="">Без механика</option>
-                                {employees.map((employee) => <option key={employee.id} value={employee.name}>{employee.name}</option>)}
-                              </select>
+                                {w.executor ? "Сменить механика" : "Назначить механика"}
+                              </button>
                             </div>
                           </td>
                           <td className="text-right tabular-nums">{w.qty}</td>
@@ -1231,7 +1264,8 @@ export default function OrderDetail() {
                             background:
                               item.kind === "payment" ? "var(--accent)"
                                 : item.kind === "work" ? "#3978c9"
-                                  : item.kind === "media" ? "#6656b8"
+                                  : item.kind === "assignment" ? "#9a6a12"
+                                    : item.kind === "media" ? "#6656b8"
                                     : item.kind === "status" ? "var(--warning)"
                                       : "var(--text-muted)",
                           }}
@@ -1335,6 +1369,62 @@ export default function OrderDetail() {
           <span className="shrink-0 text-sm font-semibold" style={{ color: "var(--accent)" }}>Заказ оплачен</span>
         )}
       </div>
+
+      {reassignWorkId && (() => {
+        const work = order.works.find((item) => item.id === reassignWorkId);
+        if (!work) return null;
+        return (
+          <Modal
+            title={work.executor ? "Сменить механика" : "Назначить механика"}
+            subtitle={work.name}
+            onClose={() => setReassignWorkId(null)}
+          >
+            <div className="space-y-4 p-4">
+              {work.executor && (
+                <div className="rounded-lg border p-3 text-sm" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
+                  <span className="muted">Сейчас назначен</span>
+                  <b className="ml-2">{work.executor}</b>
+                  {effectiveWorkStatus(work) === "in_progress" && (
+                    <p className="mt-1 text-xs text-[var(--warning)]">
+                      Работа сейчас идёт. При смене механика текущая сессия будет закрыта, а работа перейдёт на паузу.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <label className="block text-sm">
+                <span className="muted mb-1 block">Новый исполнитель</span>
+                <div className="field-control">
+                  <select value={reassignExecutor} onChange={(event) => setReassignExecutor(event.target.value)}>
+                    <option value="">Без механика</option>
+                    {employees.map((employee) => (
+                      <option key={employee.id} value={employee.name}>{employee.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </label>
+
+              <label className="block text-sm">
+                <span className="muted mb-1 block">Причина смены</span>
+                <div className="field-control">
+                  <select value={reassignReason} onChange={(event) => setReassignReason(event.target.value)}>
+                    <option value="">Не указывать</option>
+                    <option value="Механик не смог выполнить работу">Механик не смог выполнить работу</option>
+                    <option value="Механик отказался от работы">Механик отказался от работы</option>
+                    <option value="Переназначено руководителем">Переназначено руководителем</option>
+                    <option value="Смена загрузки сервиса">Смена загрузки сервиса</option>
+                  </select>
+                </div>
+              </label>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => setReassignWorkId(null)}>Отмена</Button>
+                <Button onClick={handleReassignWork}>Сохранить</Button>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {liftScheduleOpen && (
         <Modal

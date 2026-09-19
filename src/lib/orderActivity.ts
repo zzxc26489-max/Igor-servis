@@ -2,7 +2,7 @@ import type { Order, Payment } from "../types.ts";
 import { paymentMethodLabel } from "./payments.ts";
 import { formatMoney } from "./format.ts";
 
-export type OrderActivityKind = "created" | "status" | "work" | "payment" | "media";
+export type OrderActivityKind = "created" | "status" | "work" | "assignment" | "payment" | "media";
 
 export interface OrderActivity {
   id: string;
@@ -37,6 +37,20 @@ export function orderActivity(order: Order, payments: Payment[]): OrderActivity[
   });
 
   order.works.forEach((work) => {
+    (work.assignmentHistory ?? []).forEach((event, index) => {
+      items.push({
+        id: `assignment-${work.id}-${index}-${event.at}`,
+        at: event.at,
+        kind: "assignment",
+        title: event.to ? `Назначен механик: ${event.to}` : "Механик снят с работы",
+        detail: [
+          event.from ? `был ${event.from}` : undefined,
+          event.reason,
+        ].filter(Boolean).join(" · ") || undefined,
+        actor: event.actor,
+      });
+    });
+
     const sessions = work.workSessions ?? [];
     sessions.forEach((session, index) => {
       items.push({
@@ -44,7 +58,7 @@ export function orderActivity(order: Order, payments: Payment[]): OrderActivity[
         at: session.startedAt,
         kind: "work",
         title: `Начата работа: ${work.name}`,
-        actor: work.executor,
+        actor: session.executor ?? work.executor,
       });
       if (session.endedAt) {
         const isLast = index === sessions.length - 1;
@@ -54,7 +68,7 @@ export function orderActivity(order: Order, payments: Payment[]): OrderActivity[
           at: session.endedAt,
           kind: "work",
           title: done ? `Выполнена работа: ${work.name}` : `Пауза в работе: ${work.name}`,
-          actor: work.executor,
+          actor: session.executor ?? work.executor,
         });
       }
     });

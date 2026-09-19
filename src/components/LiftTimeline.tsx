@@ -5,6 +5,7 @@ import { workDay, workHourScale } from "../lib/workday";
 import { todayISO } from "../lib/date";
 export { orderDay } from "../lib/lift";
 
+const LABEL_WIDTH = 156;
 
 const PALETTE = [
   { bg: "#e8f5ed", border: "#c9e6d5" },
@@ -25,10 +26,9 @@ export default function LiftTimeline({
   const { lifts, orders, clients, vehicles } = useAppStore();
   const day = date ?? todayISO();
   const scale = hours ?? workHourScale();
-  // Шкала заканчивается концом рабочего дня, а не «последний час плюс час».
   const startMinutes = toMinutes(scale[0]);
   const endMinutes = Math.max(toMinutes(scale[scale.length - 1]) + 60, toMinutes(workDay().end));
-  const span = endMinutes - startMinutes;
+  const span = Math.max(60, endMinutes - startMinutes);
 
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
@@ -41,36 +41,73 @@ export default function LiftTimeline({
 
   return (
     <div className="table-scroll">
-      <div className="min-w-[720px] px-4 pb-4">
-        <div className="relative flex border-b pb-2 text-xs muted" style={{ borderColor: "var(--border)" }}>
-          <div className="w-[132px] shrink-0" />
-          <div className="relative flex-1">
+      <div className="min-w-[820px] px-3 pb-4">
+        <div
+          className="grid"
+          style={{ gridTemplateColumns: `${LABEL_WIDTH}px minmax(0, 1fr)` }}
+        >
+          <div
+            className="h-12 border-b border-r"
+            style={{ borderColor: "#e6ebe8" }}
+          />
+          <div
+            className="relative h-12 border-b"
+            style={{ borderColor: "#e6ebe8" }}
+          >
             {scale.map((hour) => (
               <span
                 key={hour}
-                className="absolute -translate-x-1/2"
+                className="absolute top-1 -translate-x-1/2 whitespace-nowrap text-[11px] font-medium tabular-nums text-[var(--text-muted)]"
                 style={{ left: `${percent(toMinutes(hour))}%` }}
               >
                 {hour}
               </span>
             ))}
+
             {showNow && (
-              <span
-                className="absolute -translate-x-1/2 rounded px-1.5 py-0.5 text-[11px] font-semibold text-white"
-                style={{ left: `${percent(nowMinutes)}%`, background: "var(--sidebar-bg)" }}
-              >
-                {String(now.getHours()).padStart(2, "0")}:{String(now.getMinutes()).padStart(2, "0")}
-              </span>
+              <>
+                <span
+                  className="absolute top-0 z-30 -translate-x-1/2 rounded-md px-2 py-1 text-[11px] font-semibold tabular-nums text-white shadow-sm"
+                  style={{ left: `${percent(nowMinutes)}%`, background: "var(--sidebar-bg)" }}
+                >
+                  {String(now.getHours()).padStart(2, "0")}:{String(now.getMinutes()).padStart(2, "0")}
+                </span>
+                <span
+                  className="absolute bottom-0 top-7 z-20 w-px -translate-x-1/2"
+                  style={{ left: `${percent(nowMinutes)}%`, background: "var(--text)" }}
+                />
+              </>
             )}
           </div>
         </div>
 
-        <div className="relative mt-4">
+        <div className="relative">
+          <div
+            className="pointer-events-none absolute inset-y-0 right-0 z-0"
+            style={{ left: `${LABEL_WIDTH}px` }}
+          >
+            {scale.map((hour) => (
+              <span
+                key={hour}
+                className="absolute inset-y-0 w-px"
+                style={{
+                  left: `${percent(toMinutes(hour))}%`,
+                  background: "#eef2ef",
+                }}
+              />
+            ))}
+          </div>
+
           {showNow && (
             <div
-              className="pointer-events-none absolute top-0 z-20 w-px"
-              style={{ left: `calc(132px + ${percent(nowMinutes)}% * (100% - 132px) / 100%)`, bottom: 0, background: "var(--text)" }}
-            />
+              className="pointer-events-none absolute inset-y-0 right-0 z-30"
+              style={{ left: `${LABEL_WIDTH}px` }}
+            >
+              <span
+                className="absolute inset-y-0 w-px -translate-x-1/2"
+                style={{ left: `${percent(nowMinutes)}%`, background: "var(--text)" }}
+              />
+            </div>
           )}
 
           {lifts.map((lift) => {
@@ -79,22 +116,35 @@ export default function LiftTimeline({
             const busy = dayOrders.length > 0;
 
             return (
-              <div key={lift.id} className="flex min-h-[86px] items-stretch border-b last:border-b-0" style={{ borderColor: "var(--border)" }}>
-                <div className="flex w-[132px] shrink-0 flex-col justify-center pr-3">
-                  <b className="whitespace-nowrap text-[13px]">{lift.name}</b>
-                  <span className="mt-1 flex items-center gap-1.5 whitespace-nowrap text-[11px] muted">
-                    <i className="h-2 w-2 rounded-full" style={{ background: state.busyNow ? "var(--accent)" : state.orders.length ? "var(--warning)" : "var(--border)" }} />
+              <div
+                key={lift.id}
+                className="relative grid min-h-[96px] border-b last:border-b-0"
+                style={{
+                  gridTemplateColumns: `${LABEL_WIDTH}px minmax(0, 1fr)`,
+                  borderColor: "#e9eeeb",
+                }}
+              >
+                <div
+                  className="relative z-10 flex flex-col justify-center border-r bg-white py-4 pr-4"
+                  style={{ borderColor: "#e6ebe8" }}
+                >
+                  <b className="whitespace-nowrap text-[14px] leading-tight">{lift.name}</b>
+                  <span className="mt-2 flex items-center gap-2 whitespace-nowrap text-[12px] text-[var(--text-muted)]">
+                    <i
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{
+                        background: state.busyNow
+                          ? "var(--accent)"
+                          : state.orders.length
+                            ? "var(--warning)"
+                            : "#dfe5e1",
+                      }}
+                    />
                     {liftLabel(state)}
                   </span>
                 </div>
 
-                <div className="relative flex-1 py-2">
-                  <div className="absolute inset-0 flex">
-                    {scale.map((hour) => (
-                      <div key={hour} className="flex-1 border-l" style={{ borderColor: "#eef0ee" }} />
-                    ))}
-                  </div>
-
+                <div className="relative z-10 min-w-0 py-3">
                   {dayOrders.map((order, index) => {
                     const start = toMinutes(order.scheduledStart ?? scale[0]);
                     const end = toMinutes(order.scheduledEnd ?? scale[0]) || start + 60;
@@ -102,17 +152,26 @@ export default function LiftTimeline({
                     const vehicle = vehicles.find((item) => item.id === order.vehicleId);
                     const palette = PALETTE[index % PALETTE.length];
                     const left = Math.max(0, percent(start));
-                    const width = Math.min(100 - left, percent(end) - percent(start));
+                    const width = Math.max(0, Math.min(100 - left, percent(end) - percent(start)));
+
                     return (
                       <Link
                         key={order.id}
                         to={`/orders/${order.id}`}
-                        className="absolute inset-y-2 z-10 overflow-hidden rounded-lg border px-2.5 py-2 text-xs transition hover:-translate-y-0.5 hover:shadow-sm"
-                        style={{ left: `${left}%`, width: `${Math.max(width, 8)}%`, background: palette.bg, borderColor: palette.border }}
+                        className="absolute inset-y-3 z-10 overflow-hidden rounded-xl border px-3 py-2.5 text-xs shadow-[0_1px_2px_rgba(23,34,30,.04)] transition hover:-translate-y-0.5 hover:shadow-md"
+                        style={{
+                          left: `${left}%`,
+                          width: `${width}%`,
+                          background: palette.bg,
+                          borderColor: palette.border,
+                        }}
+                        title={`${vehicle ? `${vehicle.make} ${vehicle.model}` : client?.name ?? order.number} · ${order.scheduledStart}–${order.scheduledEnd}`}
                       >
-                        <b className="block truncate text-[13px]">{vehicle ? `${vehicle.make} ${vehicle.model}` : client?.name}</b>
-                        <span className="muted block truncate">
-                          {order.scheduledStart}-{order.scheduledEnd} | {order.works[0]?.name ?? "Осмотр"}
+                        <b className="block truncate text-[13px] leading-tight">
+                          {vehicle ? `${vehicle.make} ${vehicle.model}` : client?.name}
+                        </b>
+                        <span className="mt-1 block truncate text-[11px] text-[var(--text-muted)]">
+                          {order.scheduledStart}–{order.scheduledEnd} · {order.works[0]?.name ?? "Осмотр"}
                         </span>
                       </Link>
                     );
@@ -121,25 +180,26 @@ export default function LiftTimeline({
                   {state.freeSlots.length === 0 && (
                     <Link
                       to={bookingTarget(lift.id, day, state, orders, lift).to}
-                      className="absolute inset-y-2 right-0 z-0 flex w-[160px] items-center justify-center rounded-lg border border-dashed px-2 text-xs muted transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                      style={{ borderColor: "var(--border)" }}
+                      className="absolute inset-y-3 right-0 z-[1] flex w-[160px] items-center justify-center rounded-xl border border-dashed bg-white/70 px-2 text-xs text-[var(--text-muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                      style={{ borderColor: "#dfe5e1" }}
                     >
                       {bookingTarget(lift.id, day, state, orders, lift).label}
                     </Link>
                   )}
-                  {/* Показываем все окна, куда влезает час, а не только «после последней записи». */}
+
                   {state.freeSlots.map((slot) => {
                     const start = Math.max(startMinutes, toMinutes(slot.from));
                     const end = slot.to ? toMinutes(slot.to) : endMinutes;
                     if (end - start < 30) return null;
                     const left = Math.max(0, percent(start));
-                    const width = Math.min(100 - left, percent(end) - percent(start));
+                    const width = Math.max(0, Math.min(100 - left, percent(end) - percent(start)));
+
                     return (
                       <Link
                         key={slot.from}
                         to={bookingLink(lift.id, day, slot.from)}
-                        className="absolute inset-y-2 z-0 flex items-center justify-center overflow-hidden rounded-lg border border-dashed px-2 text-xs muted transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                        style={{ left: `${left}%`, width: `${width}%`, borderColor: "var(--border)" }}
+                        className="absolute inset-y-3 z-[1] flex items-center justify-center overflow-hidden rounded-xl border border-dashed bg-white/65 px-2 text-xs text-[var(--text-muted)] transition hover:border-[var(--accent)] hover:bg-white hover:text-[var(--accent)]"
+                        style={{ left: `${left}%`, width: `${width}%`, borderColor: "#dfe5e1" }}
                       >
                         <span className="truncate">{busy ? `+ ${slot.from}` : "+ Записать на подъёмник"}</span>
                       </Link>

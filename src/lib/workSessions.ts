@@ -24,7 +24,7 @@ export function transitionWorkSessions(
   if (current === status) return { workStatus: current, workSessions: sessions };
 
   if (status === "in_progress") {
-    if (!sessions.some((session) => !session.endedAt)) sessions.push({ startedAt: at });
+    if (!sessions.some((session) => !session.endedAt)) sessions.push({ startedAt: at, executor: work.executor });
     return { workStatus: status, workSessions: sessions };
   }
 
@@ -42,3 +42,41 @@ export const WORK_STATUS_LABEL: Record<WorkLineStatus, string> = {
   paused: "Пауза",
   done: "Выполнена",
 };
+
+
+export function reassignWork(
+  work: OrderLineWork,
+  executor: string | undefined,
+  at: string,
+  actor?: string,
+  reason?: string,
+): OrderLineWork {
+  const from = work.executor;
+  if (from === executor) return work;
+
+  const sessions = (work.workSessions ?? []).map((session) =>
+    !session.endedAt
+      ? { ...session, executor: session.executor ?? from, endedAt: at }
+      : { ...session, executor: session.executor ?? from },
+  );
+
+  const current = effectiveWorkStatus(work);
+  const workStatus: WorkLineStatus = current === "in_progress" ? "paused" : current;
+
+  return {
+    ...work,
+    executor,
+    workStatus,
+    workSessions: sessions,
+    assignmentHistory: [
+      ...(work.assignmentHistory ?? []),
+      {
+        from,
+        to: executor,
+        at,
+        actor,
+        reason: reason?.trim() || undefined,
+      },
+    ],
+  };
+}
