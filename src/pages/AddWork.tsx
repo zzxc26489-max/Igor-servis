@@ -5,6 +5,7 @@ import { useAppStore } from "../store/AppStore";
 import { formatMoney } from "../lib/format";
 import { isValidMoney, moneyInput } from "../lib/formats";
 import { formatDuration } from "../lib/worktime";
+import { mechanicWorkload, mechanicWorkloadLabel } from "../lib/mechanicWorkload";
 import type { Service } from "../types";
 
 export interface NewWork {
@@ -17,7 +18,7 @@ export interface NewWork {
 
 /** Подбор работы: поиск и категории вместо одного длинного списка. */
 export default function AddWork({ onClose, onSubmit }: { onClose: () => void; onSubmit: (work: NewWork) => void }) {
-  const { services, employees } = useAppStore();
+  const { services, employees, orders } = useAppStore();
 
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
@@ -176,10 +177,19 @@ export default function AddWork({ onClose, onSubmit }: { onClose: () => void; on
             <div className="field-control">
               <select value={executor} onChange={(event) => setExecutor(event.target.value)} aria-label="Исполнитель">
                 <option value="">Пока не назначен</option>
-                {employees.map((employee) => <option key={employee.id} value={employee.name}>{employee.name}</option>)}
+                {employees.map((employee) => {
+                  const load = mechanicWorkload(orders, employee.name);
+                  return (
+                    <option key={employee.id} value={employee.name}>
+                      {employee.name} · {mechanicWorkloadLabel(load)}
+                    </option>
+                  );
+                })}
               </select>
             </div>
-            <span className="muted mt-1 block text-xs">От исполнителя зависит зарплата и статистика по времени</span>
+            <span className="muted mt-1 block text-xs">
+              Видна текущая загрузка, чтобы не назначать работу вслепую. От исполнителя также зависит зарплата и статистика по времени.
+            </span>
           </label>
 
           <div className="flex items-center justify-between rounded-lg p-3 text-sm" style={{ background: "var(--bg)" }}>

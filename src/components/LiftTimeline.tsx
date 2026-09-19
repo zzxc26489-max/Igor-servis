@@ -47,7 +47,7 @@ export default function LiftTimeline({
           style={{ gridTemplateColumns: `${LABEL_WIDTH}px minmax(0, 1fr)` }}
         >
           <div
-            className="h-12 border-b border-r"
+            className="sticky left-0 z-40 h-12 border-b border-r bg-white"
             style={{ borderColor: "#e6ebe8" }}
           />
           <div
@@ -125,7 +125,7 @@ export default function LiftTimeline({
                 }}
               >
                 <div
-                  className="relative z-10 flex flex-col justify-center border-r bg-white py-4 pr-4"
+                  className="sticky left-0 z-20 flex flex-col justify-center border-r bg-white py-4 pr-4 shadow-[8px_0_12px_-12px_rgba(23,34,30,.45)]"
                   style={{ borderColor: "#e6ebe8" }}
                 >
                   <b className="whitespace-nowrap text-[14px] leading-tight">{lift.name}</b>

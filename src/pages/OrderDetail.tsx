@@ -28,6 +28,7 @@ import OrderMediaPanel from "../components/OrderMediaPanel";
 import ClientOrderDocument from "../components/ClientOrderDocument";
 import { orderActivity } from "../lib/orderActivity";
 import { autoLiftEnd, autoLiftSchedulePatch, isSlotFree, orderDay, toMinutes } from "../lib/lift";
+import { mechanicWorkload, mechanicWorkloadLabel } from "../lib/mechanicWorkload";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
 const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "История", "Документы"] as const;
@@ -1397,11 +1398,19 @@ export default function OrderDetail() {
                 <div className="field-control">
                   <select value={reassignExecutor} onChange={(event) => setReassignExecutor(event.target.value)}>
                     <option value="">Без механика</option>
-                    {employees.map((employee) => (
-                      <option key={employee.id} value={employee.name}>{employee.name}</option>
-                    ))}
+                    {employees.map((employee) => {
+                      const load = mechanicWorkload(orders, employee.name);
+                      return (
+                        <option key={employee.id} value={employee.name}>
+                          {employee.name} · {mechanicWorkloadLabel(load)}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
+                <span className="muted mt-1 block text-xs">
+                  Показывается текущая загрузка активными работами.
+                </span>
               </label>
 
               <label className="block text-sm">
