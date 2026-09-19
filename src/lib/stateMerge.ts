@@ -128,12 +128,13 @@ function mergeKeyedArray(
     );
   }
 
-  // Сохраняем порядок сервера; локальные новые элементы добавляем в конец.
-  const remoteOrder = remote.map((item) => item.id);
-  const localOnly = local
+  // Не дёргаем уже видимый пользователю порядок: сначала локальный список,
+  // затем действительно новые сущности, пришедшие с сервера.
+  const localOrder = local.map((item) => item.id);
+  const remoteOnly = remote
     .map((item) => item.id)
-    .filter((id) => !remoteOrder.includes(id));
-  return [...remoteOrder, ...localOnly]
+    .filter((id) => !localOrder.includes(id));
+  return [...localOrder, ...remoteOnly]
     .map((id) => mergedMap.get(id))
     .filter((item): item is KeyedItem => Boolean(item));
 }
