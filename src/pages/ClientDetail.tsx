@@ -373,6 +373,28 @@ export default function ClientDetail() {
           <Metric icon={<IconCoin size={18} />} tone="danger" label="Долг" value={formatMoney(stats.debt)} />
         </div>
 
+        <Card className="mb-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="panel-title flex items-center gap-2"><IconNotes size={18} /> История общения</h2>
+              <p className="muted mt-0.5 text-xs">Напоминания, просьбы об отзыве и другие контакты с клиентом.</p>
+            </div>
+            <Link to="/reputation"><Button size="sm" variant="secondary">Репутация</Button></Link>
+          </div>
+          <div className="mt-3 space-y-2">
+            {[...(client.communications ?? [])].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 8).map((entry) => (
+              <div key={entry.id} className="flex items-start justify-between gap-3 rounded-xl border p-2.5" style={{ borderColor: "var(--border)" }}>
+                <div>
+                  <div className="text-sm font-medium">{entry.summary}</div>
+                  <div className="muted text-xs">{formatDateTime(entry.at)}{entry.actor ? ` · ${entry.actor}` : ""}</div>
+                </div>
+                {entry.orderId && <Link to={`/orders/${entry.orderId}`} className="shrink-0 text-xs font-semibold text-[var(--accent)]">Заказ</Link>}
+              </div>
+            ))}
+            {(client.communications ?? []).length === 0 && <p className="muted text-sm">Контакты пока не фиксировались.</p>}
+          </div>
+        </Card>
+
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
           <Card className="lg:col-span-2">
             <div className="mb-3 flex items-start justify-between gap-2">
