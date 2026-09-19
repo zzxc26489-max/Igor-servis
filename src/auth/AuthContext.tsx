@@ -11,15 +11,30 @@ import { clearCloudDeviceData } from "../lib/cloudCache";
 const SESSION_KEY = "igor-servis-cloud-session-v1";
 
 function saveSession(session: CloudSession) {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  // Старые версии держали refresh-token в localStorage. После первого запуска
-  // на новой версии удаляем долговременную копию.
-  localStorage.removeItem(SESSION_KEY);
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  } catch {
+    // В restricted storage-контексте сессия продолжит жить только в React state.
+  }
+  try {
+    // Старые версии держали refresh-token в localStorage.
+    localStorage.removeItem(SESSION_KEY);
+  } catch {
+    // Storage может быть заблокирован браузером или контейнером.
+  }
 }
 
 function clearStoredSession() {
-  sessionStorage.removeItem(SESSION_KEY);
-  localStorage.removeItem(SESSION_KEY);
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch {
+    // ignore blocked storage
+  }
+  try {
+    localStorage.removeItem(SESSION_KEY);
+  } catch {
+    // ignore blocked storage
+  }
 }
 
 interface AuthContextValue {
@@ -44,7 +59,7 @@ function readSession(): CloudSession | null {
     saveSession(session);
     return session;
   } catch {
-    clearStoredSession();
+    // Если сам доступ к Web Storage запрещён, повторно его здесь не трогаем.
     return null;
   }
 }
