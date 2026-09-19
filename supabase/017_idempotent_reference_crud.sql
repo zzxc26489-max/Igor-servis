@@ -66,7 +66,18 @@ begin
     );
   end if;
 
-  v_saved := v_existing || (p_client - 'code' - 'createdAt');
+  -- p_client приходит как полный снимок формы. Отсутствующий optional-ключ
+  -- означает, что пользователь очистил поле, а не что старое значение надо сохранить.
+  v_saved :=
+    (v_existing
+      - 'phone2'
+      - 'email'
+      - 'birthday'
+      - 'source'
+      - 'discountPercent'
+      - 'notes'
+      - 'isRegular')
+    || (p_client - 'code' - 'createdAt');
 
   -- Повтор точно того же сохранения — успешный no-op без новой ревизии.
   if v_saved = v_existing then
@@ -191,7 +202,8 @@ begin
     if v_existing is null then
       v_services := coalesce(v_current.data -> 'services', '[]'::jsonb) || jsonb_build_array(v_saved);
     else
-      v_saved := v_existing || p_service;
+      -- Полный снимок услуги: отсутствие normMinutes означает очистку норматива.
+      v_saved := (v_existing - 'normMinutes') || p_service;
       if v_saved = v_existing then
         return jsonb_build_object(
           'ok', true,
