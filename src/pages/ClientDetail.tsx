@@ -593,9 +593,16 @@ export default function ClientDetail() {
                                     </div>
                                     <div className="muted mt-1 text-xs">
                                       {formatDateTime(historyOrder.issuedAt ?? historyOrder.completedAt ?? historyOrder.createdAt)}
+                                      {historyOrder.mileageAtIntake ? ` · ${historyOrder.mileageAtIntake.toLocaleString("ru-RU")} км` : ""}
                                       {" · "}
                                       {historyOrder.works.map((work) => work.name).join(", ") || "работы не указаны"}
                                     </div>
+                                    {historyOrder.diagnosis && (
+                                      <div className="mt-1 text-xs"><b>Диагностика:</b> {historyOrder.diagnosis}</div>
+                                    )}
+                                    {historyOrder.defects && (
+                                      <div className="muted mt-1 text-xs">Состояние: {historyOrder.defects}</div>
+                                    )}
                                     {historyOrder.parts.length > 0 && (
                                       <div className="muted mt-1 text-xs">
                                         Запчасти: {historyOrder.parts.map((part) => `${part.name} × ${part.qty}`).join(", ")}
