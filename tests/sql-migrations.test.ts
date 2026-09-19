@@ -198,3 +198,14 @@ test("orphan media remains administratively removable without allowing new orpha
   const sql = readFileSync(join(process.cwd(), "supabase", "020_security_hardening.sql"), "utf8");
   assert.match(sql, /if not v_order_exists then[\s\S]*v_role in \('owner', 'partner', 'advisor'\)[\s\S]*p_delete or \(not p_write and not p_delete\)/);
 });
+
+
+test("customer follow-up migration 021 only extends mechanic inspection access", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "021_customer_followup.sql"), "utf8");
+  assert.match(sql, /create or replace function public\.crm_merge_mechanic_inspection/);
+  assert.match(sql, /where work ->> 'executor' = p_display/);
+  assert.match(sql, /'\{inspection\}'/);
+  assert.match(sql, /public\.crm_merge_mechanic_orders/);
+  assert.match(sql, /'latestMigration', 21/);
+  assert.match(sql, /customer-followup-021/);
+});
