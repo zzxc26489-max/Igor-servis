@@ -181,6 +181,11 @@ export interface Order {
   notes?: string;
   scheduledStart?: string;
   scheduledEnd?: string;
+  /**
+   * true — интервал подъёмника задан вручную и не должен автоматически
+   * пересчитываться по нормативам добавленных/удалённых работ.
+   */
+  liftScheduleManual?: boolean;
   /** Внутренний срок, когда пообещали клиенту готовность. В печатный заказ-наряд не выводится. */
   promisedAt?: string;
   complaint?: string;

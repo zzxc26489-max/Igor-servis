@@ -1,11 +1,40 @@
-import type { Lift, Order } from "../types";
-import { shiftISODate, toISODate, todayISO } from "./date";
-import { minutesToTime, timeToMinutes, workDay } from "./workday";
+import type { Lift, Order } from "../types.ts";
+import { shiftISODate, toISODate, todayISO } from "./date.ts";
+import { minutesToTime, timeToMinutes, workDay } from "./workday.ts";
 
 export const toMinutes = timeToMinutes;
 export const fromMinutes = minutesToTime;
 /** Стандартная длительность записи — столько же ставит форма новой записи. */
 export const SLOT_MINUTES = 60;
+
+/** Суммарный норматив работ, который реально влияет на план занятости подъёмника. */
+export function worksLiftMinutes(works: Order["works"]) {
+  return works.reduce((sum, work) => {
+    const minutes = Number(work.normMinutes) || 0;
+    const qty = Number(work.qty) || 0;
+    return sum + Math.max(0, minutes) * Math.max(0, qty);
+  }, 0);
+}
+
+/**
+ * Автоматический конец интервала подъёмника.
+ * Минимум — один час, дальше растёт по сумме нормативов работ.
+ * Если нормативов пока нет, уже заданный конец не сокращаем.
+ */
+export function autoLiftEnd(order: Order, works: Order["works"] = order.works) {
+  if (!order.scheduledStart) return order.scheduledEnd;
+  const norm = worksLiftMinutes(works);
+  if (norm <= 0 && order.scheduledEnd) return order.scheduledEnd;
+  const minutes = Math.max(SLOT_MINUTES, norm);
+  return fromMinutes(toMinutes(order.scheduledStart) + minutes);
+}
+
+/** Патч для автосинхронизации интервала после изменения состава работ. */
+export function autoLiftSchedulePatch(order: Order, works: Order["works"] = order.works): Partial<Order> {
+  if (!order.liftId || !order.scheduledStart || order.liftScheduleManual) return {};
+  const scheduledEnd = autoLiftEnd(order, works);
+  return scheduledEnd ? { scheduledEnd } : {};
+}
 /** Время предлагаем кратным четверти часа: «записать с 15:31» неудобно. */
 const STEP_MINUTES = 15;
 
