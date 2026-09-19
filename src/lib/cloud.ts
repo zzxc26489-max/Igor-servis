@@ -174,6 +174,10 @@ export type CloudFinancialResult =
   | { ok: true; revision: number; updatedAt?: string; data: unknown }
   | { ok: false; financialConflict: true; revision: number; message: string; data: unknown; updatedAt?: string };
 
+export type CloudOrderStatusResult =
+  | { ok: true; revision: number; updatedAt?: string; data: unknown }
+  | { ok: false; orderConflict: true; revision: number; message: string; data: unknown; updatedAt?: string };
+
 const rawUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "");
 const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
 
@@ -500,6 +504,26 @@ export async function payCloudEmployee(
     },
     session.access_token,
   ) as Promise<CloudFinancialResult>;
+}
+
+export async function setCloudOrderStatus(
+  session: CloudSession,
+  orderId: string,
+  status: string,
+  operationId: string,
+): Promise<CloudOrderStatusResult> {
+  return requestMutation(
+    "/rest/v1/rpc/crm_set_order_status",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_order_id: orderId,
+        p_status: status,
+        p_operation_id: operationId,
+      }),
+    },
+    session.access_token,
+  ) as Promise<CloudOrderStatusResult>;
 }
 
 export async function createCloudBackup(session: CloudSession): Promise<{ ok: true; createdAt: string }> {
