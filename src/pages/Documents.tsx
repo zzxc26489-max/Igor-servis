@@ -38,7 +38,7 @@ export default function Documents() {
     <>
       <TopBar
         title="Документы"
-        subtitle="Клиентские заказ-наряды для печати и PDF"
+        subtitle="Заказ-наряды и акты выполненных работ для печати и PDF"
         actions={null}
       />
       <Page>
@@ -94,11 +94,18 @@ export default function Documents() {
                           {formatDateTime(order.createdAt)} · Итого {formatMoney(totals.due)}
                         </div>
                       </div>
-                      <Link to={`/orders/${order.id}/print`} className="sm:shrink-0">
-                        <Button variant="secondary" className="w-full sm:w-auto">
-                          <IconPrinter size={18} /> Открыть заказ-наряд
-                        </Button>
-                      </Link>
+                      <div className="flex flex-col gap-2 sm:shrink-0 sm:flex-row">
+                        <Link to={`/orders/${order.id}/print`}>
+                          <Button variant="secondary" className="w-full sm:w-auto">
+                            <IconPrinter size={18} /> Заказ-наряд
+                          </Button>
+                        </Link>
+                        <Link to={`/orders/${order.id}/act`}>
+                          <Button variant="secondary" className="w-full sm:w-auto">
+                            <IconPrinter size={18} /> Акт работ
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   </Card>
                 );

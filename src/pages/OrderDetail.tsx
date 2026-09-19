@@ -595,9 +595,14 @@ export default function OrderDetail() {
             {debt > 0 && (
               <Button className="mt-3 w-full justify-center" onClick={() => setPayOpen(true)}>Принять оплату</Button>
             )}
-            <Link to={`/orders/${order.id}/print`} className="mt-2 block">
-              <Button variant="secondary" className="w-full justify-center"><IconFileDescription size={18} /> Заказ-наряд для клиента</Button>
-            </Link>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+              <Link to={`/orders/${order.id}/print`} className="block">
+                <Button variant="secondary" className="w-full justify-center"><IconFileDescription size={18} /> Заказ-наряд</Button>
+              </Link>
+              <Link to={`/orders/${order.id}/act`} className="block">
+                <Button variant="secondary" className="w-full justify-center"><IconFileDescription size={18} /> Акт работ</Button>
+              </Link>
+            </div>
 
             {settings.autoPriceAdjustment && (
               <div className="mt-3 rounded-lg border bg-[#f7faf8] p-3" style={{ borderColor: "var(--border)" }}>
@@ -1046,7 +1051,10 @@ export default function OrderDetail() {
                 <h2 className="panel-title mb-3">Документы по заказу</h2>
                 <div className="flex flex-wrap gap-2">
                   <Link to={`/orders/${order.id}/print`}>
-                    <Button variant="secondary"><IconFileDescription size={18} /> Заказ-наряд для клиента</Button>
+                    <Button variant="secondary"><IconFileDescription size={18} /> Заказ-наряд</Button>
+                  </Link>
+                  <Link to={`/orders/${order.id}/act`}>
+                    <Button variant="secondary"><IconFileDescription size={18} /> Акт выполненных работ</Button>
                   </Link>
                 </div>
                 <p className="muted mt-3 text-sm">В клиентской версии нет внутренних данных сервиса: подъёмника, рабочего времени, себестоимости, наценки и служебных комментариев.</p>
@@ -1091,7 +1099,12 @@ export default function OrderDetail() {
           <div className="muted text-[11px] uppercase tracking-[.06em]">{debt < 0 ? "Переплата" : "К оплате"}</div>
           <div className="text-lg font-bold leading-tight tabular-nums">{formatMoney(Math.abs(debt))}</div>
         </div>
-        {debt > 0 ? (
+        {order.status === "готово" ? (
+          <div className="flex shrink-0 gap-2">
+            {debt > 0 && <Button variant="secondary" onClick={() => setPayOpen(true)}>Оплата</Button>}
+            <Button onClick={() => void handleChangeStatus("выдан")}><IconCheck size={18} /> Выдать</Button>
+          </div>
+        ) : debt > 0 ? (
           <Button className="shrink-0" onClick={() => setPayOpen(true)}>Принять оплату</Button>
         ) : (
           <span className="shrink-0 text-sm font-semibold" style={{ color: "var(--accent)" }}>Заказ оплачен</span>
