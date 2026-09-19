@@ -782,9 +782,6 @@ export default function OrderDetail() {
               setCashAmount("");
               setTerminalAmount("");
               setTransferAmount("");
-              setCashCommitted(0);
-              setTerminalCommitted(0);
-              setTransferCommitted(0);
               setPayOpen(true);
             }}>Принять оплату</Button>
             )}
@@ -1368,9 +1365,6 @@ export default function OrderDetail() {
               setCashAmount("");
               setTerminalAmount("");
               setTransferAmount("");
-              setCashCommitted(0);
-              setTerminalCommitted(0);
-              setTransferCommitted(0);
               setPayOpen(true);
             }}>Оплата</Button>}
             <Button onClick={() => void handleChangeStatus("выдан")}><IconCheck size={18} /> Выдать</Button>
@@ -1380,9 +1374,6 @@ export default function OrderDetail() {
               setCashAmount("");
               setTerminalAmount("");
               setTransferAmount("");
-              setCashCommitted(0);
-              setTerminalCommitted(0);
-              setTransferCommitted(0);
               setPayOpen(true);
             }}>Принять оплату</Button>
         ) : (
