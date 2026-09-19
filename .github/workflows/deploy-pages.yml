@@ -7,10 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  actions: write
-  pages: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: pages
@@ -22,6 +19,9 @@ env:
 
 jobs:
   sync-pages-branch:
+    permissions:
+      contents: write
+      actions: write
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
@@ -38,6 +38,8 @@ jobs:
         run: gh workflow run deploy-pages.yml --ref claude/igor-workshop-website-yrdani
 
   build:
+    permissions:
+      contents: read
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/claude/igor-workshop-website-yrdani'
     runs-on: ubuntu-latest
     steps:
@@ -58,6 +60,10 @@ jobs:
           path: dist
 
   deploy:
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/claude/igor-workshop-website-yrdani'
     needs: build
     runs-on: ubuntu-latest
