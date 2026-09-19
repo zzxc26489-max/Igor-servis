@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { IconMapPin, IconScan, IconSearch } from "@tabler/icons-react";
 import { Button, Modal } from "../components/ui";
 import { useAppStore } from "../store/AppStore";
@@ -44,7 +44,10 @@ export default function AddPart({
     [stock],
   );
 
-  const available = (item: StockItem) => item.qty - (reserved.get(item.id) ?? 0);
+  const available = useCallback(
+    (item: StockItem) => item.qty - (reserved.get(item.id) ?? 0),
+    [reserved],
+  );
 
   const found = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("ru-RU");

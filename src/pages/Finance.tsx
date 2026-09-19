@@ -11,7 +11,7 @@ import { useConfirm } from "../components/Confirm";
 import { isValidMoney, moneyInput } from "../lib/formats";
 import { Button, Card, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatMoney, plural } from "../lib/format";
-import { computePayroll } from "../lib/payroll";
+import { computePayroll, employeeSalaryAmount, employeeWorkPercent } from "../lib/payroll";
 import { paymentMethodLabel, paymentMethodSummary } from "../lib/payments";
 import { activeCashShift, cashShiftDifference, cashShiftSummary } from "../lib/cashShift";
 import type { PaymentMethod } from "../types";
@@ -896,7 +896,11 @@ export default function Finance() {
                   <span className="min-w-0">
                     <b className="block truncate text-sm">{employee.name}</b>
                     <span className="muted block text-xs">
-                      {employee.payType === "percent" ? `${employee.payValue}% от работ` : employee.payType === "salary" ? "Оклад" : "Оклад + %"}
+                      {employee.payType === "percent"
+                        ? `${employeeWorkPercent(employee)}% от работ`
+                        : employee.payType === "salary"
+                          ? `Оклад ${formatMoney(employeeSalaryAmount(employee))}`
+                          : `Оклад ${formatMoney(employeeSalaryAmount(employee))} + ${employeeWorkPercent(employee)}%`}
                     </span>
                   </span>
                 </span>

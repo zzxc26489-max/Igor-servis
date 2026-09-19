@@ -10,6 +10,7 @@ import type {
   Lift,
   Payment,
   PaymentMethod,
+  PayrollComponent,
   Order,
   OrderStatus,
   WorkLineStatus,
@@ -298,7 +299,7 @@ interface AppStoreValue extends DB {
   /** Деньги от поставщика пришли — возврат идёт в расчёты. */
   confirmRefund: (expenseId: string, method: PaymentMethod) => void;
   /** Выплата зарплаты сотруднику. */
-  payEmployee: (employeeId: string, amount: number, note?: string, method?: PaymentMethod) => void;
+  payEmployee: (employeeId: string, amount: number, note?: string, method?: PaymentMethod, component?: PayrollComponent) => void;
   /** Открыть кассовую смену. */
   openCashShift: (openingCash: number, openedBy: string) => string | null;
   /** Закрыть кассовую смену после пересчёта наличных. */
@@ -1244,30 +1245,36 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             ),
           };
         }),
-      payEmployee: (employeeId, amount, note, method) =>
+      payEmployee: (employeeId, amount, note, method, component) =>
         setDB((prev) => {
           const employee = prev.employees.find((item) => item.id === employeeId);
           if (!employee || amount <= 0) return prev;
           const now = nowISO();
-          const sdelnaya = employee.payType !== "salary";
+          const resolvedComponent: PayrollComponent = component
+            ?? (employee.payType === "salary" ? "salary" : "piecework");
+          const isPiecework = resolvedComponent === "piecework";
           const shift = activeCashShift(prev.cashShifts);
           return {
             ...prev,
-            employees: prev.employees.map((item) =>
-              item.id === employeeId ? { ...item, paid: item.paid + amount, lastPaidAt: now } : item,
-            ),
+            employees: prev.employees.map((item) => {
+              if (item.id !== employeeId) return item;
+              // paid хранит погашенную сдельную часть. Для чистого оклада
+              // сохраняем старое поведение и используем его как общий итог выплат.
+              const nextPaid = isPiecework || item.payType === "salary" ? item.paid + amount : item.paid;
+              return { ...item, paid: nextPaid, lastPaidAt: now };
+            }),
             expenses: [
               {
                 id: createId("exp"),
                 code: nextCode(CODE_PREFIX.expense, prev.expenses.map((entry) => entry.code)),
                 date: now.slice(0, 10),
                 category: "Зарплата",
-                description: `Выплата: ${employee.name}`,
+                description: isPiecework ? `Выплата %: ${employee.name}` : `Оклад: ${employee.name}`,
                 amount,
                 counterparty: employee.name,
                 status: "Оплачено" as const,
-                // Сдельная часть уже сидит в начислении, повторно в расходы не идёт.
-                source: sdelnaya ? ("payroll" as const) : undefined,
+                // Сдельная часть уже учтена в начислении; оклад — самостоятельный расход.
+                source: isPiecework ? ("payroll" as const) : undefined,
                 paymentMethod: method,
                 shiftId: method && shift ? shift.id : undefined,
                 employeeId,
@@ -1358,7 +1365,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [backupCloud, cloud, db, listAudit, listBackups, loadFromCloud, pushCloudState, restoreBackup, session, setDB, uploadLocalToCloud],
+    [backupCloud, cloud, cloudConfigured, db, listAudit, listBackups, loadFromCloud, pushCloudState, restoreBackup, session, setDB, uploadLocalToCloud],
   );
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;

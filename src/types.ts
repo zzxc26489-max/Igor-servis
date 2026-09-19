@@ -32,6 +32,8 @@ export interface Lift {
   status: LiftStatus;
 }
 
+export type PayrollComponent = "piecework" | "salary";
+
 export interface Employee {
   id: string;
   name: string;
@@ -41,6 +43,8 @@ export interface Employee {
   payValue: number;
   /** Процент сотрудника от выполненных работ. Для новых данных используется вместо payValue. */
   workPercent?: number;
+  /** Месячный оклад. Для старых salary-записей берётся из payValue. */
+  salaryAmount?: number;
   accrued: number;
   paid: number;
   lastPaidAt?: string;

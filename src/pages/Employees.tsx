@@ -5,16 +5,16 @@ import { Button, Card, Modal, Page, TopBar } from "../components/ui";
 import { useConfirm } from "../components/Confirm";
 import { useToast } from "../components/Toast";
 import { formatDate, formatMoney, plural } from "../lib/format";
-import { computePayroll, employeeWorkPercent, payrollBalance, payrollBreakdown } from "../lib/payroll";
+import { computePayroll, employeeSalaryAmount, employeeWorkPercent, payrollBalance, payrollBreakdown } from "../lib/payroll";
 import { moneyInput } from "../lib/formats";
-import type { Employee, PaymentMethod } from "../types";
+import type { Employee, PaymentMethod, PayrollComponent } from "../types";
 import { paymentMethodLabel } from "../lib/payments";
 import { activeCashShift } from "../lib/cashShift";
 
 function payLabel(employee: Employee) {
   if (employee.payType === "percent") return `${employeeWorkPercent(employee)}% от работ`;
-  if (employee.payType === "salary") return `Оклад ${formatMoney(employee.payValue)} в месяц`;
-  return `Оклад + ${employeeWorkPercent(employee)}% от работ`;
+  if (employee.payType === "salary") return `Оклад ${formatMoney(employeeSalaryAmount(employee))} в месяц`;
+  return `Оклад ${formatMoney(employeeSalaryAmount(employee))} + ${employeeWorkPercent(employee)}% от работ`;
 }
 
 export default function Employees() {
@@ -24,15 +24,17 @@ export default function Employees() {
   const [payFor, setPayFor] = useState<string | null>(null);
   const [detailsFor, setDetailsFor] = useState<string | null>(null);
   const [rateFor, setRateFor] = useState<string | null>(null);
+  const [termsFor, setTermsFor] = useState<string | null>(null);
 
   const employees = computePayroll(rawEmployees, orders);
   const totalAccrued = employees.reduce((sum, employee) => sum + employee.accrued, 0);
   const totalDue = employees.reduce((sum, employee) => sum + payrollBalance(employee), 0);
   const target = employees.find((employee) => employee.id === payFor) ?? null;
   const rateTarget = rawEmployees.find((employee) => employee.id === rateFor) ?? null;
+  const termsTarget = rawEmployees.find((employee) => employee.id === termsFor) ?? null;
   const canEditRates = !cloud.configured || cloud.role === "owner" || cloud.role === "partner";
 
-  async function handlePay(employee: Employee, amount: number, method: PaymentMethod) {
+  async function handlePay(employee: Employee, amount: number, method: PaymentMethod, component: PayrollComponent) {
     if (method === "cash" && !activeCashShift(cashShifts)) {
       showToast("Для выплаты наличными сначала откройте кассовую смену в Финансах → Касса", "error");
       return;
@@ -41,34 +43,36 @@ export default function Employees() {
       showToast("Сумма выплаты должна быть больше нуля", "error");
       return;
     }
-    const sdelnaya = employee.payType !== "salary";
+    const isPiecework = component === "piecework";
     const balance = payrollBalance(employee);
-    if (sdelnaya && amount > balance) {
-      showToast(`К выплате осталось ${formatMoney(balance)}`, "error");
+    if (isPiecework && amount > balance) {
+      showToast(`По проценту к выплате осталось ${formatMoney(balance)}`, "error");
       return;
     }
     const ok = await confirm({
       title: "Выплата зарплаты",
-      question: sdelnaya
-        ? "Выплата запишется как движение денег. Начисление уже учтено в прибыли, поэтому повторно расходы не вырастут."
-        : "Оклад запишется в расходы за сегодня и уменьшит прибыль периода.",
+      question: isPiecework
+        ? "Сдельная выплата запишется как движение денег. Начисление уже учтено в прибыли, поэтому повторно расходы не вырастут."
+        : "Оклад запишется отдельным расходом за сегодня и уменьшит прибыль периода.",
       summary: [
         { label: "Сотрудник", value: employee.name },
         { label: "Расчёт", value: payLabel(employee) },
         { label: "Способ выплаты", value: paymentMethodLabel(method) },
-        ...(sdelnaya
+        ...(isPiecework
           ? [
-              { label: "Начислено всего", value: formatMoney(employee.accrued) },
-              { label: "Уже выплачено", value: formatMoney(employee.paid) },
+              { label: "Начислено по работам", value: formatMoney(employee.accrued) },
+              { label: "Уже выплачено %", value: formatMoney(employee.paid) },
               { label: "Остаток после выплаты", value: formatMoney(balance - amount) },
             ]
-          : []),
+          : [
+              { label: "Месячный оклад", value: formatMoney(employeeSalaryAmount(employee)) },
+            ]),
         { label: "Выплачиваем", value: formatMoney(amount), total: true, tone: "accent" },
       ],
       confirmLabel: "Выплатить",
     });
     if (!ok) return;
-    payEmployee(employee.id, amount, undefined, method);
+    payEmployee(employee.id, amount, undefined, method, component);
     setPayFor(null);
     showToast(`Выплачено ${formatMoney(amount)} · ${employee.name}`);
   }
@@ -97,7 +101,10 @@ export default function Employees() {
                 </div>
 
                 <div className="mt-3 space-y-1 border-t pt-3 text-sm" style={{ borderColor: "var(--border)" }}>
-                  <div className="flex justify-between"><span className="muted">Расчёт</span><span className="text-right">{payLabel(employee)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="muted">Расчёт</span><span className="text-right">{payLabel(employee)}</span></div>
+                  {employee.payType !== "percent" && (
+                    <div className="flex justify-between"><span className="muted">Оклад</span><span className="tabular-nums">{formatMoney(employeeSalaryAmount(employee))}</span></div>
+                  )}
                   {sdelnaya && (
                     <>
                       <div className="flex justify-between"><span className="muted">Начислено</span><span className="tabular-nums">{formatMoney(employee.accrued)}</span></div>
@@ -115,6 +122,16 @@ export default function Employees() {
                     <div className="flex justify-between"><span className="muted">Последняя выплата</span><span>{formatDate(employee.lastPaidAt)}</span></div>
                   )}
                 </div>
+
+                {canEditRates && (
+                  <Button
+                    className="mt-3 w-full justify-center"
+                    variant="secondary"
+                    onClick={() => setTermsFor(employee.id)}
+                  >
+                    Условия зарплаты
+                  </Button>
+                )}
 
                 {sdelnaya && canEditRates && (
                   <Button
@@ -190,6 +207,18 @@ export default function Employees() {
         </div>
       </Page>
 
+      {termsTarget && (
+        <PayrollTermsDialog
+          employee={termsTarget}
+          onClose={() => setTermsFor(null)}
+          onSubmit={(patch) => {
+            updateEmployee(termsTarget.id, patch);
+            setTermsFor(null);
+            showToast(`Условия зарплаты обновлены: ${termsTarget.name}`);
+          }}
+        />
+      )}
+
       {rateTarget && (
         <WorkPercentDialog
           employee={rateTarget}
@@ -206,7 +235,7 @@ export default function Employees() {
         <PayDialog
           employee={target}
           onClose={() => setPayFor(null)}
-          onSubmit={(amount, method) => handlePay(target, amount, method)}
+          onSubmit={(amount, method, component) => handlePay(target, amount, method, component)}
         />
       )}
     </>
@@ -218,21 +247,38 @@ function PayDialog({
 }: {
   employee: Employee;
   onClose: () => void;
-  onSubmit: (amount: number, method: PaymentMethod) => void;
+  onSubmit: (amount: number, method: PaymentMethod, component: PayrollComponent) => void;
 }) {
-  const sdelnaya = employee.payType !== "salary";
-  const suggested = sdelnaya ? payrollBalance(employee) : employee.payValue;
+  const hasPiecework = employee.payType !== "salary";
+  const [component, setComponent] = useState<PayrollComponent>(hasPiecework ? "piecework" : "salary");
+  const suggested = component === "piecework" ? payrollBalance(employee) : employeeSalaryAmount(employee);
   const [amount, setAmount] = useState(String(suggested));
   const [method, setMethod] = useState<PaymentMethod | "">("");
   const value = Number(amount) || 0;
+
+  function chooseComponent(next: PayrollComponent) {
+    setComponent(next);
+    setAmount(String(next === "piecework" ? payrollBalance(employee) : employeeSalaryAmount(employee)));
+  }
 
   return (
     <Modal title="Выплата зарплаты" subtitle={employee.name} onClose={onClose}>
       <div className="space-y-3 p-4">
         <div className="rounded-lg p-3 text-sm" style={{ background: "var(--bg)" }}>
           <div className="flex justify-between"><span className="muted">Расчёт</span><b>{payLabel(employee)}</b></div>
-          {sdelnaya && <div className="flex justify-between"><span className="muted">К выплате</span><b>{formatMoney(suggested)}</b></div>}
+          <div className="flex justify-between"><span className="muted">{component === "piecework" ? "К выплате по работам" : "Оклад"}</span><b>{formatMoney(suggested)}</b></div>
         </div>
+        {employee.payType === "salary+percent" && (
+          <label className="block text-sm">
+            <span className="muted mb-1 block">Что выплачиваем</span>
+            <div className="field-control">
+              <select value={component} onChange={(event) => chooseComponent(event.target.value as PayrollComponent)}>
+                <option value="piecework">Процент от работ</option>
+                <option value="salary">Оклад</option>
+              </select>
+            </div>
+          </label>
+        )}
         <label className="block text-sm">
           <span className="muted mb-1 block">Сумма выплаты, ₽</span>
           <div className="field-control">
@@ -259,8 +305,8 @@ function PayDialog({
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Отмена</Button>
           <Button
-            onClick={() => method && onSubmit(value, method)}
-            disabled={!method || value <= 0 || (sdelnaya && value > suggested)}
+            onClick={() => method && onSubmit(value, method, component)}
+            disabled={!method || value <= 0 || (component === "piecework" && value > suggested)}
           >
             Выплатить
           </Button>
@@ -302,6 +348,77 @@ function WorkPercentDialog({
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Отмена</Button>
           <Button disabled={!Number.isFinite(percent) || percent < 0 || percent > 100} onClick={() => onSubmit(percent)}>
+            Сохранить
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+
+function PayrollTermsDialog({
+  employee, onClose, onSubmit,
+}: {
+  employee: Employee;
+  onClose: () => void;
+  onSubmit: (patch: Partial<Employee>) => void;
+}) {
+  const [payType, setPayType] = useState<Employee["payType"]>(employee.payType);
+  const [salary, setSalary] = useState(String(employeeSalaryAmount(employee)));
+  const [percent, setPercent] = useState(String(employeeWorkPercent(employee)));
+  const salaryValue = Number(salary);
+  const percentValue = Number(percent);
+  const validSalary = payType === "percent" || (Number.isFinite(salaryValue) && salaryValue >= 0 && salaryValue <= 10_000_000);
+  const validPercent = payType === "salary" || (Number.isFinite(percentValue) && percentValue >= 0 && percentValue <= 100);
+
+  return (
+    <Modal title="Условия зарплаты" subtitle={employee.name} onClose={onClose}>
+      <div className="space-y-3 p-4">
+        <label className="block text-sm">
+          <span className="muted mb-1 block">Схема оплаты</span>
+          <div className="field-control">
+            <select value={payType} onChange={(event) => setPayType(event.target.value as Employee["payType"])}>
+              <option value="percent">Только % от работ</option>
+              <option value="salary">Только оклад</option>
+              <option value="salary+percent">Оклад + % от работ</option>
+            </select>
+          </div>
+        </label>
+        {payType !== "percent" && (
+          <label className="block text-sm">
+            <span className="muted mb-1 block">Оклад в месяц, ₽</span>
+            <div className="field-control">
+              <input inputMode="numeric" value={salary} onChange={(event) => setSalary(moneyInput(event.target.value))} />
+            </div>
+          </label>
+        )}
+        {payType !== "salary" && (
+          <label className="block text-sm">
+            <span className="muted mb-1 block">Процент от работ, %</span>
+            <div className="field-control">
+              <input
+                inputMode="decimal"
+                value={percent}
+                onChange={(event) => setPercent(event.target.value.replace(",", ".").replace(/[^0-9.]/g, "").slice(0, 5))}
+              />
+            </div>
+          </label>
+        )}
+        <p className="muted text-xs">
+          Процент фиксируется в выданных заказах. Изменение ставки не пересчитает старую историю.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>Отмена</Button>
+          <Button
+            disabled={!validSalary || !validPercent}
+            onClick={() => onSubmit({
+              payType,
+              salaryAmount: payType === "percent" ? 0 : Math.round(salaryValue),
+              workPercent: payType === "salary" ? 0 : percentValue,
+              payValue: payType === "salary" ? Math.round(salaryValue) : employee.payValue,
+            })}
+          >
             Сохранить
           </Button>
         </div>

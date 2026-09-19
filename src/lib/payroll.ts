@@ -6,6 +6,12 @@ export function employeeWorkPercent(employee: Employee) {
   return Math.max(0, Math.min(100, Number(value) || 0));
 }
 
+export function employeeSalaryAmount(employee: Employee) {
+  if (employee.payType === "percent") return 0;
+  const fallback = employee.payType === "salary" ? employee.payValue : 0;
+  return Math.max(0, Math.round(Number(employee.salaryAmount ?? fallback) || 0));
+}
+
 /** Зарплата начисляется только по выданным заказам: это единое правило для всей CRM. */
 export function accruingOrders(orders: Order[]) {
   return orders.filter((order) => order.status === "выдан");
