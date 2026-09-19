@@ -173,3 +173,22 @@ test("review fixes migration repairs cash calculation and optional field clearin
   assert.match(sql, /'latestMigration', 19/);
   assert.match(sql, /review-fixes-019/);
 });
+
+
+test("security migration 020 hardens storage and blocks generic financial writes", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "020_security_hardening.sql"), "utf8");
+  assert.match(sql, /split_part\(p_object_name, '\/', 4\) <> ''/);
+  assert.match(sql, /v_file_name !~\*/);
+  assert.match(sql, /if not v_order_exists then[\s\S]*return false/);
+  assert.match(sql, /elsif v_role = 'advisor'[\s\S]*'orders'[\s\S]*elsif v_role = 'parts'/);
+  assert.doesNotMatch(
+    sql.match(/elsif v_role = 'advisor'[\s\S]*?elsif v_role = 'parts'/)?.[0] ?? "",
+    /'payments'|'stockMovements'|'stock'/,
+  );
+  assert.doesNotMatch(
+    sql.match(/elsif v_role = 'accountant'[\s\S]*?else\s+raise exception 'Неизвестная роль пользователя'/)?.[0] ?? "",
+    /'payments'|'expenses'|'cashShifts'/,
+  );
+  assert.match(sql, /'latestMigration', 20/);
+  assert.match(sql, /security-hardening-020/);
+});
