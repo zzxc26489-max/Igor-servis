@@ -11,8 +11,10 @@ permissions:
   contents: read
 
 env:
-  VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-  VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+  # CI проверяет код/сборку независимо от наличия production repository variables.
+  # Реальный Pages deploy ниже валидирует настоящие значения жёстко.
+  VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
+  VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
 
 jobs:
   verify:
