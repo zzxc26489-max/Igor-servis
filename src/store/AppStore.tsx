@@ -1344,13 +1344,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             ...prev,
             employees: prev.employees.map((item) => {
               if (item.id !== employeeId) return item;
-              // paid хранит погашенную сдельную часть. Для чистого оклада
-              // сохраняем старое поведение и используем его как общий итог выплат.
               const nextPaid = isPiecework || item.payType === "salary" ? item.paid + amount : item.paid;
               return { ...item, paid: nextPaid, lastPaidAt: now };
-            });
-        return error;
-      },
+            }),
             expenses: [
               {
                 id: createId("exp"),
@@ -1361,9 +1357,19 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 amount,
                 counterparty: employee.name,
                 status: "Оплачено" as const,
-                // Сдельная часть уже учтена в начислении; оклад — самостоятельный расход.
                 source: isPiecework ? ("payroll" as const) : undefined,
-                pay      openCashShift: async (openingCash, openedBy) => {
+                paymentMethod: method,
+                shiftId: method === "cash" ? shift?.id : undefined,
+                employeeId,
+                comment: note,
+              },
+              ...prev.expenses,
+            ],
+          };
+        });
+        return error;
+      },
+      openCashShift: async (openingCash, openedBy) => {
         const amount = Math.round(openingCash);
         if (!Number.isFinite(amount) || amount < 0) return "Начальный остаток не может быть отрицательным";
         const shiftId = createId("shift");
