@@ -37,7 +37,9 @@ import {
   listCloudBackups,
   loadCloudState,
   openCloudCashShift,
+  receiveCloudStock,
   restoreCloudBackup,
+  returnCloudStockSupplier,
   reserveCloudStockPart,
   saveCloudState,
   type CloudAuditInfo,
@@ -279,7 +281,7 @@ interface AppStoreValue extends DB {
   deleteVehicle: (id: string) => void;
   addStockMovement: (m: StockMovement) => void;
   updateStockItem: (id: string, patch: Partial<StockItem>) => void;
-  receiveStock: (input: ReceiveStockInput) => string | null;
+  receiveStock: (input: ReceiveStockInput) => Promise<string | null>;
   addExpense: (e: Expense) => string | null;
   updateCompany: (patch: Partial<CompanyInfo>) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
@@ -309,7 +311,7 @@ interface AppStoreValue extends DB {
     employee?: string,
   ) => Promise<string | null>;
   /** Возврат запчасти поставщику: списывает со склада и заводит ожидание денег. */
-  returnToSupplier: (input: ReturnToSupplierInput) => void;
+  returnToSupplier: (input: ReturnToSupplierInput) => Promise<string | null>;
   /** Деньги от поставщика пришли — возврат идёт в расчёты. */
   confirmRefund: (expenseId: string, method: PaymentMethod) => string | null;
   /** Выплата зарплаты сотруднику. */
