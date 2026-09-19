@@ -20,6 +20,7 @@ import { formatMoney, plural } from "../lib/format";
 import { orderTotals } from "../lib/order";
 import { todayISO } from "../lib/date";
 import { serviceReminders } from "../lib/serviceReminder";
+import { promiseLabel, promisedOrderAlerts } from "../lib/promisedDeadline";
 import type { Order } from "../types";
 
 export default function Dashboard() {
@@ -48,11 +49,20 @@ export default function Dashboard() {
   );
   const unassigned = visits.filter((order) => !order.liftId);
   const maintenanceReminders = useMemo(() => serviceReminders(vehicles).slice(0, 6), [vehicles]);
+  const deadlineAlerts = useMemo(() => promisedOrderAlerts(orders), [orders]);
 
   const attention = useMemo(() => {
-    const result: { order: Order; kind: "ready" | "parts" | "lift" | "debt" }[] = [];
-    ready.forEach((order) => result.push({ order, kind: "ready" }));
-    waitingParts.forEach((order) => result.push({ order, kind: "parts" }));
+    const result: { order: Order; kind: "ready" | "parts" | "lift" | "debt" | "deadline" }[] = [];
+    deadlineAlerts.forEach((alert) => {
+      const order = orders.find((item) => item.id === alert.orderId);
+      if (order) result.push({ order, kind: "deadline" });
+    });
+    ready.forEach((order) => {
+      if (!result.some((item) => item.order.id === order.id)) result.push({ order, kind: "ready" });
+    });
+    waitingParts.forEach((order) => {
+      if (!result.some((item) => item.order.id === order.id)) result.push({ order, kind: "parts" });
+    });
     unassigned.forEach((order) => {
       if (!result.some((item) => item.order.id === order.id)) result.push({ order, kind: "lift" });
     });
@@ -60,7 +70,7 @@ export default function Dashboard() {
       if (!result.some((item) => item.order.id === order.id)) result.push({ order, kind: "debt" });
     });
     return result.slice(0, 6);
-  }, [debtOrders, ready, unassigned, waitingParts]);
+  }, [deadlineAlerts, debtOrders, orders, ready, unassigned, waitingParts]);
 
   const fullDate = new Intl.DateTimeFormat("ru-RU", {
     weekday: "long",
@@ -204,7 +214,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between gap-3 p-4">
               <div>
                 <h2 className="panel-title">Требуют действия</h2>
-                <p className="muted mt-0.5 text-xs">Выдача, детали, долги и визиты без подъёмника</p>
+                <p className="muted mt-0.5 text-xs">Сроки, выдача, детали, долги и визиты без подъёмника</p>
               </div>
               <span className="rounded-md px-2 py-0.5 text-xs font-semibold" style={{ background: "var(--bg)", color: "var(--text-muted)" }}>{attention.length}</span>
             </div>
@@ -217,28 +227,33 @@ export default function Dashboard() {
                   const client = clients.find((item) => item.id === order.clientId);
                   const vehicle = vehicles.find((item) => item.id === order.vehicleId);
                   const { due, debt } = orderTotals(order);
+                  const deadline = kind === "deadline" ? deadlineAlerts.find((item) => item.orderId === order.id) : undefined;
                   const label = kind === "parts"
                     ? "Ждём детали"
                     : kind === "lift"
                       ? "Без подъёмника"
                       : kind === "debt"
                         ? "Ожидаем оплату"
-                        : "К выдаче";
+                        : kind === "deadline"
+                          ? deadline?.urgency === "overdue" ? "Срок просрочен" : "Срок скоро"
+                          : "К выдаче";
                   const color = kind === "parts"
                     ? "var(--warning)"
-                    : kind === "lift" || kind === "debt"
+                    : kind === "lift" || kind === "debt" || (kind === "deadline" && deadline?.urgency === "overdue")
                       ? "var(--danger)"
-                      : "var(--accent-strong)";
-                  const bg = kind === "parts"
+                      : kind === "deadline"
+                        ? "var(--warning)"
+                        : "var(--accent-strong)";
+                  const bg = kind === "parts" || (kind === "deadline" && deadline?.urgency === "soon")
                     ? "#fdf3e0"
-                    : kind === "lift" || kind === "debt"
+                    : kind === "lift" || kind === "debt" || kind === "deadline"
                       ? "#fff3f3"
                       : "var(--accent-soft)";
 
                   return (
                     <div key={order.id} className="p-4">
                       <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: bg, color }}>
-                        {(kind === "lift" || kind === "debt") && <IconAlertTriangle size={13} />}
+                        {(kind === "lift" || kind === "debt" || kind === "deadline") && <IconAlertTriangle size={13} />}
                         {label}
                       </span>
                       <Link to={`/orders/${order.id}`} className="mt-2 block text-base font-bold hover:text-[var(--accent)]">{vehicle ? `${vehicle.make} ${vehicle.model}` : order.number}</Link>
@@ -248,7 +263,9 @@ export default function Dashboard() {
                           ? <b className="text-sm">{formatMoney(due)}</b>
                           : kind === "debt"
                             ? <b className="text-sm" style={{ color: "var(--danger)" }}>Долг {formatMoney(debt)}</b>
-                            : <span className="muted text-xs">{order.scheduledStart ?? order.number}</span>}
+                            : kind === "deadline" && deadline
+                              ? <b className="text-sm" style={{ color }}>{promiseLabel(deadline.minutesLeft)}</b>
+                              : <span className="muted text-xs">{order.scheduledStart ?? order.number}</span>}
                         {client && <a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)]"><IconPhone size={16} /> Позвонить</a>}
                       </div>
                     </div>
