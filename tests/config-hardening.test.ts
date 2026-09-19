@@ -69,3 +69,22 @@ test("pages workflow uses least privilege per job", () => {
   assert.match(workflow, /sync-pages-branch:[\s\S]*permissions:[\s\S]*contents: write[\s\S]*actions: write/);
   assert.match(workflow, /deploy:[\s\S]*permissions:[\s\S]*pages: write[\s\S]*id-token: write/);
 });
+
+
+test("official GitHub actions are pinned to immutable commit SHAs", () => {
+  const ci = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+  const deploy = readFileSync(join(process.cwd(), ".github", "workflows", "deploy-pages.yml"), "utf8");
+  for (const workflow of [ci, deploy]) {
+    assert.doesNotMatch(workflow, /uses:\s+actions\/(checkout|setup-node|upload-pages-artifact|deploy-pages)@v\d+/);
+  }
+  assert.match(ci, /actions\/checkout@[0-9a-f]{40}/);
+  assert.match(deploy, /actions\/deploy-pages@[0-9a-f]{40}/);
+});
+
+test("service worker only caches static same-origin assets", () => {
+  const sw = readFileSync(join(process.cwd(), "public", "sw.js"), "utf8");
+  assert.match(sw, /cacheableStaticRequest/);
+  assert.match(sw, /request\.destination === "script"/);
+  assert.match(sw, /response\.type === "basic"/);
+  assert.doesNotMatch(sw, /event\.respondWith\([\s\S]*caches\.match\(request\)[\s\S]*\);\s*\}\);\s*$/m);
+});
