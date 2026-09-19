@@ -22,7 +22,7 @@ import Finance from "./pages/Finance";
 import Reports from "./pages/Reports";
 import NewOrder from "./pages/NewOrder";
 import Settings from "./pages/Settings";
-import WorkAct from "./pages/WorkAct";
+import OrderPrint from "./pages/OrderPrint";
 import MyWork from "./pages/MyWork";
 
 function RoleRoute({ path, children }: { path: string; children: ReactNode }) {
@@ -51,7 +51,7 @@ function AppRoutes() {
                 <Route path="orders" element={<RoleRoute path="/orders"><Orders /></RoleRoute>} />
                 <Route path="orders/new" element={<RoleRoute path="/orders"><NewOrder /></RoleRoute>} />
                 <Route path="orders/:orderId" element={<RoleRoute path="/orders"><OrderDetail /></RoleRoute>} />
-                <Route path="orders/:orderId/act" element={<RoleRoute path="/documents"><WorkAct /></RoleRoute>} />
+                <Route path="orders/:orderId/print" element={<RoleRoute path="/documents"><OrderPrint /></RoleRoute>} />
                 <Route path="stock" element={<RoleRoute path="/stock"><Stock /></RoleRoute>} />
                 <Route path="purchases" element={<RoleRoute path="/purchases"><Purchases /></RoleRoute>} />
                 <Route path="services" element={<RoleRoute path="/services"><Services /></RoleRoute>} />

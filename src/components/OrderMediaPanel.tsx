@@ -9,6 +9,7 @@ import { createId } from "../lib/id";
 import { nowISO } from "../lib/date";
 import { formatDateTime } from "../lib/format";
 import { buildOrderMediaPath, ORDER_MEDIA_LABELS, validateOrderMediaFile } from "../lib/orderMedia";
+import { compressOrderPhoto, fileToDataUrl } from "../lib/imageCompression";
 import { deleteCloudOrderMedia, downloadCloudOrderMedia, uploadCloudOrderMedia } from "../lib/cloud";
 import type { Order, OrderMedia, OrderMediaKind } from "../types";
 
@@ -16,34 +17,6 @@ const KINDS = Object.keys(ORDER_MEDIA_LABELS) as OrderMediaKind[];
 
 function canUpload(role?: string) {
   return !role || role === "owner" || role === "partner" || role === "advisor" || role === "mechanic";
-}
-
-async function compactImage(file: File) {
-  const source = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Не удалось прочитать фото"));
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.readAsDataURL(file);
-  });
-
-  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const node = new Image();
-    node.onerror = () => reject(new Error("Не удалось открыть фото"));
-    node.onload = () => resolve(node);
-    node.src = source;
-  });
-
-  const maxSide = 1440;
-  const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
-  const width = Math.max(1, Math.round(image.naturalWidth * scale));
-  const height = Math.max(1, Math.round(image.naturalHeight * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Не удалось подготовить фото");
-  context.drawImage(image, 0, 0, width, height);
-  return canvas.toDataURL("image/jpeg", 0.76);
 }
 
 function MediaPreview({ media }: { media: OrderMedia }) {
@@ -122,38 +95,36 @@ export default function OrderMediaPanel({
     const errors: string[] = [];
 
     for (const file of Array.from(files).slice(0, 8)) {
-      const validation = validateOrderMediaFile(file);
-      if (validation) {
-        errors.push(`${file.name}: ${validation}`);
-        continue;
-      }
-
       const id = createId("media");
       try {
+        const prepared = file.type.startsWith("image/") ? await compressOrderPhoto(file) : file;
+        const validation = validateOrderMediaFile(prepared);
+        if (validation) throw new Error(validation);
+
         if (configured) {
           if (!session || !cloud.workshopId) throw new Error("Сервер ещё подключается — повторите через несколько секунд");
-          const storagePath = buildOrderMediaPath(cloud.workshopId, order.id, id, file.name, file.type);
-          await uploadCloudOrderMedia(session, storagePath, file);
+          const storagePath = buildOrderMediaPath(cloud.workshopId, order.id, id, prepared.name, prepared.type);
+          await uploadCloudOrderMedia(session, storagePath, prepared);
           added.push({
             id,
             kind,
-            name: file.name,
-            mimeType: file.type,
-            size: file.size,
+            name: prepared.name,
+            mimeType: prepared.type,
+            size: prepared.size,
             createdAt: nowISO(),
             uploadedBy: cloud.displayName || session.user.email || "Сотрудник",
             note: note.trim() || undefined,
             storagePath,
           });
         } else {
-          if (!file.type.startsWith("image/")) throw new Error("Видео хранится только при подключённой серверной базе");
-          const localDataUrl = await compactImage(file);
+          if (!prepared.type.startsWith("image/")) throw new Error("Видео хранится только при подключённой серверной базе");
+          const localDataUrl = await fileToDataUrl(prepared);
           added.push({
             id,
             kind,
-            name: file.name,
-            mimeType: "image/jpeg",
-            size: file.size,
+            name: prepared.name,
+            mimeType: prepared.type,
+            size: prepared.size,
             createdAt: nowISO(),
             uploadedBy: cloud.displayName || "Локально",
             note: note.trim() || undefined,
