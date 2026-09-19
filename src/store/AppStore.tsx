@@ -1201,6 +1201,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             amount: total,
             note: input.note,
           };
+
           const expenses = createExpense && expenseId
             ? [
                 {
