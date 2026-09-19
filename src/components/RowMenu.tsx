@@ -68,7 +68,7 @@ export default function RowMenu({ label, actions }: { label: string; actions: Ro
         aria-haspopup="menu"
         aria-expanded={open}
         title={label}
-        className="grid h-9 w-9 place-items-center rounded-lg border transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] print:hidden"
+        className="grid h-11 w-11 place-items-center rounded-lg border transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:h-9 sm:w-9 print:hidden"
         style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
       >
         <IconDots size={18} />
@@ -88,7 +88,7 @@ export default function RowMenu({ label, actions }: { label: string; actions: Ro
                 setOpen(false);
                 action.onSelect();
               }}
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-none"
+              className="flex min-h-11 w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-none"
               style={{ color: action.danger ? "var(--danger)" : "var(--text)" }}
             >
               {action.icon}

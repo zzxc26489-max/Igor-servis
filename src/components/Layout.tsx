@@ -225,7 +225,7 @@ export default function Layout() {
             <button
               onClick={() => setOpen(false)}
               aria-label="Закрыть меню"
-              className="absolute right-3 top-3 z-10 rounded-lg p-1.5 text-white/70 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+              className="absolute right-2 top-2 z-10 grid h-11 w-11 place-items-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
             >
               <IconX size={20} />
             </button>
@@ -242,7 +242,7 @@ export default function Layout() {
         </div>
       )}
 
-      <div className="app-content flex min-w-0 flex-1 flex-col pb-16 lg:pb-0 print:block print:min-h-0 print:pb-0">
+      <div className="app-content flex min-w-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 print:block print:min-h-0 print:pb-0">
         {cloud.configured && cloud.status === "error" && (
           <div className="border-b bg-[#fff8e8] px-4 py-2 text-xs font-medium text-[#9a6a12] print:hidden sm:px-5">
             Связи с сервером нет. Изменения сохранены на этом устройстве и отправятся автоматически после восстановления связи.
@@ -252,7 +252,7 @@ export default function Layout() {
       </div>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t bg-white/95 px-1 backdrop-blur lg:hidden print:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex min-h-16 items-center justify-around border-t bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden print:hidden"
         style={{ borderColor: "var(--border)" }}
         aria-label="Основная навигация"
       >
@@ -269,7 +269,7 @@ export default function Layout() {
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `relative flex min-w-0 flex-1 flex-col items-center gap-1 px-2 py-1.5 text-[11px] focus-visible:outline-none ${
+              `relative flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-1.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent)] ${
                 isActive ? "font-semibold" : ""
               }`
             }
@@ -277,8 +277,7 @@ export default function Layout() {
           >
             {({ isActive }) => (
               <>
-                {isActive && <span className="absolute -top-px h-0.5 w-10 rounded-full bg-[var(--accent)]" />}
-                <span className="relative">
+                <span className={`relative grid h-8 w-12 place-items-center rounded-full transition-colors ${isActive ? "bg-[var(--accent-soft)]" : ""}`}>
                   <item.icon size={22} stroke={1.8} aria-hidden="true" />
                   {item.badge && badges[item.badge] > 0 && (
                     <span className="absolute -right-2 -top-1 min-w-4 rounded-full bg-[var(--danger)] px-1 text-center text-[9px] font-bold leading-4 text-white">
@@ -293,11 +292,13 @@ export default function Layout() {
         ))}
         <button
           onClick={() => setOpen(true)}
-          className="flex min-w-0 flex-1 flex-col items-center gap-1 px-2 py-1.5 text-[11px]"
+          className="flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-1.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent)]"
           style={{ color: "var(--text-muted)" }}
           aria-label="Открыть меню"
         >
-          <IconDotsCircleHorizontal size={22} stroke={1.8} aria-hidden="true" />
+          <span className="grid h-8 w-12 place-items-center rounded-full">
+            <IconDotsCircleHorizontal size={22} stroke={1.8} aria-hidden="true" />
+          </span>
           <span>Ещё</span>
         </button>
       </nav>

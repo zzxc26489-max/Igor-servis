@@ -30,10 +30,12 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  line-height: 1.45;
 }
 
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
+a { text-underline-offset: 0.18em; }
 
 .table-scroll {
   overflow-x: auto;
@@ -48,9 +50,9 @@ button { cursor: pointer; }
   background-repeat: no-repeat;
   background-attachment: local, local, scroll, scroll;
 }
-.app-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-.app-table th { color: #65716b; font-size: 0.69rem; font-weight: 700; letter-spacing: .025em; text-align: left; background: #f5f7f5; }
-.app-table th, .app-table td { padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--border); }
+.app-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; line-height: 1.35; }
+.app-table th { color: #5f6b65; font-size: 0.75rem; font-weight: 700; letter-spacing: .02em; text-align: left; background: #f5f7f5; }
+.app-table th, .app-table td { padding: 0.625rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .app-table tbody tr:last-child td { border-bottom: 0; }
 .app-table tbody tr { transition: background-color .15s ease; }
 .app-table tbody tr:hover { background: #fafbfa; }
@@ -77,10 +79,12 @@ button { cursor: pointer; }
   background: #fff;
   color: var(--text);
   font: inherit;
+  min-height: 2.75rem;
   padding: 0.55rem 0.7rem;
 }
 
 .field-control textarea {
+  min-height: 5.5rem;
   resize: vertical;
 }
 
@@ -230,7 +234,14 @@ button { cursor: pointer; }
 @media (max-width: 639px) {
   .app-table th,
   .app-table td {
-    padding: 0.65rem 0.5rem;
+    padding: 0.625rem 0.5rem;
+  }
+}
+
+@media (min-width: 640px) {
+  .field-control input,
+  .field-control select {
+    min-height: 2.375rem;
   }
 }
 

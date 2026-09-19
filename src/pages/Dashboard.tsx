@@ -106,7 +106,7 @@ export default function Dashboard() {
             <Link
               to="/schedule"
               onClick={(event) => event.stopPropagation()}
-              className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-[var(--accent)]"
+              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 text-sm font-semibold text-[var(--accent)] sm:min-h-0"
             >
               Полное расписание <IconArrowRight size={16} />
             </Link>
@@ -123,7 +123,7 @@ export default function Dashboard() {
                 <h2 className="panel-title">Визиты сегодня</h2>
                 <p className="muted mt-0.5 text-xs">{visits.length} {plural(visits.length, "запись", "записи", "записей")}</p>
               </div>
-              <Link to="/orders?filter=active" className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[var(--accent)]">
+              <Link to="/orders?filter=active" className="inline-flex min-h-11 shrink-0 items-center gap-1 text-sm font-semibold text-[var(--accent)] sm:min-h-0">
                 Все заказы <IconArrowRight size={16} />
               </Link>
             </div>
@@ -215,7 +215,7 @@ export default function Dashboard() {
                       : "var(--accent-soft)";
 
                   return (
-                    <div key={order.id} className="p-4">
+                    <div key={order.id} className="p-3 sm:p-4">
                       <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: bg, color }}>
                         {(kind === "lift" || kind === "debt" || kind === "deadline" || kind === "mechanic") && <IconAlertTriangle size={13} />}
                         {label}
@@ -235,11 +235,11 @@ export default function Dashboard() {
                                   </b>
                                 : <span className="muted text-xs">{order.scheduledStart ?? order.number}</span>}
                         {kind === "mechanic" ? (
-                          <Link to={`/orders/${order.id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)]">
+                          <Link to={`/orders/${order.id}`} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-[var(--accent)] sm:min-h-0">
                             Назначить механика
                           </Link>
                         ) : client ? (
-                          <a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)]"><IconPhone size={16} /> Позвонить</a>
+                          <a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-[var(--accent)] sm:min-h-0"><IconPhone size={16} /> Позвонить</a>
                         ) : null}
                       </div>
                     </div>
@@ -252,7 +252,7 @@ export default function Dashboard() {
 
         {debtOrders.length > 0 && (
           <div className="mt-4 flex justify-end">
-            <Link to="/orders?filter=debt" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)]">
+            <Link to="/orders?filter=debt" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-[var(--accent)] sm:min-h-0">
               Все долги клиентов · {formatMoney(debtOrders.reduce((sum, order) => sum + orderTotals(order).debt, 0))}
               <IconArrowRight size={16} />
             </Link>
@@ -277,7 +277,7 @@ export default function Dashboard() {
                 if (!vehicle) return null;
                 const overdue = reminder.tone === "overdue";
                 return (
-                  <div key={reminder.vehicleId} className="p-4">
+                  <div key={reminder.vehicleId} className="p-3 sm:p-4">
                     <div className="flex items-start justify-between gap-3">
                       <span className="min-w-0">
                         <span
@@ -297,11 +297,11 @@ export default function Dashboard() {
                     </div>
                     <p className="mt-2 text-sm">{reminder.label}</p>
                     <div className="mt-3 flex items-center justify-between gap-3">
-                      <Link to={`/orders/new?clientId=${vehicle.clientId}&vehicleId=${vehicle.id}`} className="text-sm font-semibold text-[var(--accent)]">
+                      <Link to={`/orders/new?clientId=${vehicle.clientId}&vehicleId=${vehicle.id}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--accent)] sm:min-h-0">
                         Записать
                       </Link>
                       {client && (
-                        <a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)]">
+                        <a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-[var(--accent)] sm:min-h-0">
                           <IconPhone size={16} /> Позвонить
                         </a>
                       )}
@@ -330,9 +330,9 @@ function Stat({ icon, label, value, unit, tone, to }: {
 }) {
   const color = tone === "accent" ? "var(--accent)" : tone === "warning" ? "var(--warning)" : "var(--text)";
   return (
-    <Link to={to} className="bg-white p-4 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent)]">
+    <Link to={to} className="bg-white p-3 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent)] sm:p-4">
       <div className="flex items-start gap-2 text-sm muted"><span className="mt-0.5 shrink-0">{icon}</span><span className="leading-tight">{label}</span></div>
-      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2"><span className="text-[28px] font-bold leading-none tabular-nums" style={{ color }}>{value}</span><span className="muted text-sm">{unit}</span></div>
+      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2"><span className="text-2xl font-bold leading-none tabular-nums sm:text-[28px]" style={{ color }}>{value}</span><span className="muted text-sm">{unit}</span></div>
     </Link>
   );
 }

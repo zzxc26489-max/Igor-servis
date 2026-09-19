@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { IconMenu2, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
@@ -86,13 +86,13 @@ export function TopBar({
   return (
     <>
       <header
-        className="sticky top-0 z-30 flex min-w-0 items-center gap-3 border-b bg-white/95 px-3 py-2.5 backdrop-blur sm:px-6 print:hidden"
+        className="sticky top-0 z-30 flex min-w-0 items-center gap-2.5 border-b bg-white/95 px-3 py-2 backdrop-blur sm:gap-3 sm:px-5 print:hidden"
         style={{ borderColor: "var(--border)" }}
       >
         <button
           onClick={() => setOpen(true)}
           aria-label="Открыть меню"
-          className="-ml-1 rounded-lg p-2 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] lg:hidden"
+          className="-ml-1 grid h-11 w-11 shrink-0 place-items-center rounded-lg hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] lg:hidden"
         >
           <IconMenu2 size={22} />
         </button>
@@ -110,7 +110,7 @@ export function TopBar({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Клиент, госномер, телефон или заказ"
-            className="w-full rounded-lg bg-transparent py-2 pl-10 pr-12 text-sm outline-none placeholder:text-[var(--text-muted)] focus:bg-[#f5f7f5]"
+            className="min-h-11 w-full rounded-lg bg-transparent py-2 pl-10 pr-3 text-sm outline-none placeholder:text-[var(--text-muted)] focus:bg-[#f5f7f5] sm:min-h-10 sm:pr-12"
             aria-label="Поиск по CRM"
           />
           <kbd
@@ -151,7 +151,7 @@ export function TopBar({
         </div>
       </header>
 
-      <div className="flex flex-wrap items-start justify-between gap-3 px-3 pt-3 sm:px-5 sm:pt-4 lg:px-5 print:hidden">
+      <div className="flex flex-wrap items-start justify-between gap-3 px-3 pt-3 sm:px-5 sm:pt-4 print:hidden">
         <div className="min-w-0">
           {breadcrumbs && breadcrumbs.length > 0 && (
             <nav className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }} aria-label="Хлебные крошки">
@@ -168,7 +168,7 @@ export function TopBar({
             </nav>
           )}
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em] sm:text-[34px]" style={{ color: "var(--text)" }}>
+            <h1 className="text-[26px] font-bold leading-tight tracking-[-0.03em] sm:text-[30px]" style={{ color: "var(--text)" }}>
               {title}
             </h1>
             {titleChip}
@@ -194,13 +194,13 @@ function NewRecordButton() {
 }
 
 export function Page({ children }: { children: ReactNode }) {
-  return <main className="min-w-0 flex-1 overflow-auto overflow-x-hidden px-3 py-3 pb-24 sm:p-5 sm:pb-6 lg:px-5 lg:py-5 print:flex-none print:overflow-visible print:p-0">{children}</main>;
+  return <main className="min-w-0 flex-1 overflow-auto overflow-x-hidden px-3 py-3 pb-5 sm:p-5 sm:pb-6 print:flex-none print:overflow-visible print:p-0">{children}</main>;
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`rounded-xl border bg-white p-4 shadow-[0_2px_8px_rgba(23,34,30,0.045)] ${className}`}
+      className={`rounded-xl border bg-white p-3 shadow-[0_2px_8px_rgba(23,34,30,0.045)] sm:p-4 ${className}`}
       style={{ borderColor: "var(--border)" }}
     >
       {children}
@@ -275,7 +275,7 @@ export function Metric({
   const base = "rounded-xl border bg-white p-3 shadow-[0_2px_8px_rgba(23,34,30,0.045)] sm:p-4";
   if (onClick) {
     return (
-      <button onClick={onClick} className={`${base} text-left transition hover:bg-gray-50`} style={{ borderColor: "var(--border)" }}>
+      <button onClick={onClick} className={`${base} text-left transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2`} style={{ borderColor: "var(--border)" }}>
         {body}
       </button>
     );
@@ -330,7 +330,7 @@ export function Button({
   title?: string;
   "aria-label"?: string;
 }) {
-  const dimensions = size === "icon" ? "h-11 w-11 p-0 sm:h-9 sm:w-9" : size === "sm" ? "min-h-11 px-3 py-2 sm:min-h-9 sm:py-1.5" : "min-h-11 px-3.5 py-2 sm:min-h-10";
+  const dimensions = size === "icon" ? "h-11 w-11 p-0 sm:h-9 sm:w-9" : size === "sm" ? "min-h-11 px-3 py-2 sm:min-h-9 sm:py-1.5" : "min-h-11 px-3.5 py-2 sm:min-h-9";
   const base =
     `inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)] ${dimensions}`;
   if (variant === "danger") {
@@ -391,41 +391,79 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
 }) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(
+    typeof document !== "undefined" && document.activeElement instanceof HTMLElement ? document.activeElement : null,
+  );
+
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const opener = openerRef.current;
+    const focusTimer = window.requestAnimationFrame(() => {
+      if (!dialogRef.current || dialogRef.current.contains(document.activeElement)) return;
+      const first = dialogRef.current.querySelector<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      (first ?? dialogRef.current).focus();
+    });
+
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )).filter((item) => !item.hasAttribute("hidden") && item.getClientRects().length > 0);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
     window.addEventListener("keydown", onKeyDown);
     document.body.style.overflow = "hidden";
     return () => {
+      window.cancelAnimationFrame(focusTimer);
       window.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
+      opener?.focus();
     };
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center print:hidden">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4 print:hidden">
       <button className="absolute inset-0 bg-black/40" aria-label="Закрыть окно" onClick={onClose} />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
-        className={`relative flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={`relative flex max-h-[calc(100dvh-.75rem)] w-full flex-col rounded-t-2xl bg-white pb-[env(safe-area-inset-bottom)] shadow-xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:pb-0 ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
       >
-        <div className="flex items-start justify-between gap-3 border-b p-4" style={{ borderColor: "var(--border)" }}>
+        <div className="flex items-start justify-between gap-3 border-b px-4 py-3.5 sm:px-5" style={{ borderColor: "var(--border)" }}>
           <div className="min-w-0">
-            <h2 className="panel-title truncate">{title}</h2>
+            <h2 id={titleId} className="panel-title truncate">{title}</h2>
             {subtitle && <p className="muted mt-0.5 text-sm">{subtitle}</p>}
           </div>
           <button
             onClick={onClose}
             aria-label="Закрыть"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-lg hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:h-9 sm:w-9"
           >
             <IconX size={20} />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto p-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
       </div>
     </div>
   );
@@ -473,7 +511,7 @@ export function ListCard({
     return <div className={className} style={{ borderColor: "var(--border)" }}>{inner}</div>;
   }
   return (
-    <button onClick={onClick} className={`${className} transition active:scale-[0.99]`} style={{ borderColor: "var(--border)" }}>
+    <button onClick={onClick} className={`${className} transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2`} style={{ borderColor: "var(--border)" }}>
       {inner}
     </button>
   );

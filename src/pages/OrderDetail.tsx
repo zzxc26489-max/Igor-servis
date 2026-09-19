@@ -921,7 +921,7 @@ export default function OrderDetail() {
         </div>
 
         <details className="mb-4 rounded-xl border bg-white print:hidden" style={{ borderColor: "var(--border)" }}>
-          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Внутренняя информация сервиса</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center px-4 py-3 text-sm font-semibold">Внутренняя информация сервиса</summary>
           <div className="grid grid-cols-1 gap-px border-t sm:grid-cols-3" style={{ background: "var(--border)", borderColor: "var(--border)" }}>
           <InfoCell icon={<IconTool size={18} />} tone="#f5f0ff" color="#6656b8" label="Подъёмник">
             <div className="truncate text-sm font-semibold">{lift?.name ?? "Не назначен"}</div>
@@ -932,7 +932,7 @@ export default function OrderDetail() {
             <button
               type="button"
               onClick={openLiftScheduleEditor}
-              className="mt-2 text-xs font-semibold text-[var(--accent)] hover:underline"
+              className="mt-1 inline-flex min-h-9 items-center text-xs font-semibold text-[var(--accent)] hover:underline"
             >
               {order.liftId ? "Изменить подъёмник и время" : "Поставить на подъёмник"}
             </button>
@@ -974,13 +974,13 @@ export default function OrderDetail() {
               <div key={step} className="relative flex min-w-0 flex-1 flex-col items-center">
                 {idx > 0 && (
                   <div
-                    className="absolute right-1/2 top-5 h-0.5 w-full sm:top-3"
+                    className="absolute right-1/2 top-[21px] h-0.5 w-full sm:top-3"
                     style={{ background: idx <= currentStepIndex ? "var(--accent)" : "var(--border)" }}
                   />
                 )}
                 <button
                   onClick={() => handleChangeStatus(step)}
-                  className="relative z-10 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-xs font-semibold text-white transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 sm:h-7 sm:w-7"
+                  className="relative z-10 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-xs font-semibold text-white transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 sm:h-7 sm:w-7"
                   style={{ background: idx <= currentStepIndex ? "var(--accent)" : "#cfd3da" }}
                   aria-label={`Установить статус «${step}»`}
                 >
@@ -994,13 +994,13 @@ export default function OrderDetail() {
 
         <div className="order-body grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
           <div className="min-w-0">
-            <div className="mb-3 flex gap-1 overflow-x-auto rounded-xl border bg-white p-1 print:hidden" style={{ borderColor: "var(--border)" }}>
+            <div className="mb-3 flex snap-x gap-1 overflow-x-auto rounded-xl border bg-white p-1 print:hidden" style={{ borderColor: "var(--border)" }}>
               {TABS.map((item) => (
                 <button
                   key={item}
                   ref={(node) => { if (tab === item) activeTabRef.current = node; }}
                   onClick={() => setTab(item)}
-                  className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition"
+                  className="min-h-11 shrink-0 snap-start rounded-lg px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
                   style={{
                     background: tab === item ? "var(--accent-soft)" : "transparent",
                     color: tab === item ? "var(--accent-strong)" : "var(--text-muted)",
@@ -1016,7 +1016,7 @@ export default function OrderDetail() {
                 <Card className="overflow-hidden p-0">
                   <div className="flex items-center justify-between p-4">
                     <h2 className="panel-title">Работы</h2>
-                    <button onClick={() => order.status === "выдан" ? showToast("Сначала верните автомобиль в работу", "error") : setAddingWork(true)} className="text-sm font-semibold print:hidden" style={{ color: order.status === "выдан" ? "var(--text-muted)" : "var(--accent)" }}>
+                    <button onClick={() => order.status === "выдан" ? showToast("Сначала верните автомобиль в работу", "error") : setAddingWork(true)} className="min-h-11 px-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:min-h-9 print:hidden" style={{ color: order.status === "выдан" ? "var(--text-muted)" : "var(--accent)" }}>
                       + Добавить работу
                     </button>
                   </div>
@@ -1045,7 +1045,7 @@ export default function OrderDetail() {
                               <button
                                 type="button"
                                 onClick={() => openReassignWork(w)}
-                                className="rounded-md border bg-white px-2.5 py-1.5 text-xs font-semibold transition hover:bg-gray-50"
+                                className="min-h-11 rounded-md border bg-white px-2.5 py-1.5 text-xs font-semibold transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:min-h-9"
                                 style={{ borderColor: w.executor ? "var(--border)" : "var(--warning)", color: w.executor ? "var(--text)" : "var(--warning)" }}
                               >
                                 {w.executor ? "Сменить механика" : "Назначить механика"}
@@ -1085,7 +1085,7 @@ export default function OrderDetail() {
                        }
                        setPartError("");
                        setAddingPart(true);
-                     }} className="text-sm font-semibold print:hidden" style={{ color: order.status === "выдан" ? "var(--text-muted)" : "var(--accent)" }}>
+                     }} className="min-h-11 px-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:min-h-9 print:hidden" style={{ color: order.status === "выдан" ? "var(--text-muted)" : "var(--accent)" }}>
                       + Со склада
                     </button>
                   </div>

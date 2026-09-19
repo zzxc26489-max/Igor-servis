@@ -99,7 +99,7 @@ export default function AddPart({
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Название, артикул, штрихкод, OE/кросс-номер, авто или ячейка"
                   aria-label="Поиск запчасти"
-                  className="w-full rounded-lg border py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[var(--accent)]"
+                  className="min-h-11 w-full rounded-lg border py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
                   style={{ borderColor: "var(--border)" }}
                 />
               </div>
@@ -120,7 +120,7 @@ export default function AddPart({
                   key={item}
                   type="button"
                   onClick={() => setCategory(item)}
-                  className="rounded-lg border px-2.5 py-1 text-xs font-medium transition"
+                  className="min-h-9 rounded-lg border px-2.5 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
                   style={{
                     borderColor: category === item ? "var(--accent)" : "var(--border)",
                     background: category === item ? "var(--accent)" : "white",
@@ -143,7 +143,7 @@ export default function AddPart({
                   type="button"
                   onClick={() => pick(item)}
                   disabled={free <= 0}
-                  className="flex w-full items-start justify-between gap-3 border-b px-4 py-3 text-left transition last:border-b-0 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-14 w-full items-start justify-between gap-3 border-b px-4 py-3 text-left transition last:border-b-0 hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
                   style={{ borderColor: "var(--border)" }}
                 >
                   <span className="min-w-0">
@@ -235,11 +235,12 @@ export default function AddPart({
 
           {error && <p className="text-sm" style={{ color: "var(--danger)" }}>{error}</p>}
 
-          <div className="flex flex-wrap justify-between gap-2">
-            <Button variant="secondary" onClick={() => setSelected(null)}>Выбрать другую</Button>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={onClose}>Отмена</Button>
+          <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+            <Button className="w-full sm:w-auto" variant="secondary" onClick={() => setSelected(null)}>Выбрать другую</Button>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <Button className="w-full sm:w-auto" variant="secondary" onClick={onClose}>Отмена</Button>
               <Button
+                className="w-full sm:w-auto"
                 disabled={tooMany || !validQty || !validPrice}
                 onClick={() => onSubmit(selected.id, count, Number(price) || 0)}
               >
