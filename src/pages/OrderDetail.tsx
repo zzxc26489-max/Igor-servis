@@ -4,7 +4,6 @@ import {
   IconArrowBackUp, IconArrowLeft, IconCalendarTime, IconCar, IconCheck, IconClipboardText,
   IconBrandWhatsapp, IconFileDescription, IconMessage, IconNotes, IconStopwatch, IconTool, IconTrash, IconUser,
 } from "@tabler/icons-react";
-import { formatWorkHours } from "../lib/workday";
 import { useAppStore } from "../store/AppStore";
 import { createId } from "../lib/id";
 import { useToast } from "../components/Toast";
@@ -24,9 +23,9 @@ import { CONSUMABLE_PRESETS } from "../data/consumables";
 import { formatQuantity, isValidQuantity } from "../lib/quantity";
 import { nowISO } from "../lib/date";
 import type { OrderConsumable, OrderLinePart, OrderLineWork, OrderStatus, PaymentMethod } from "../types";
-import defaultLogo from "../assets/logo.jpg";
 import { effectiveWorkStatus, WORK_STATUS_LABEL, workSessionMinutes } from "../lib/workSessions";
 import OrderMediaPanel from "../components/OrderMediaPanel";
+import ClientOrderDocument from "../components/ClientOrderDocument";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
 const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "Документы"] as const;
@@ -596,8 +595,8 @@ export default function OrderDetail() {
             {debt > 0 && (
               <Button className="mt-3 w-full justify-center" onClick={() => setPayOpen(true)}>Принять оплату</Button>
             )}
-            <Link to={`/orders/${order.id}/act`} className="mt-2 block">
-              <Button variant="secondary" className="w-full justify-center"><IconFileDescription size={18} /> Акт работ</Button>
+            <Link to={`/orders/${order.id}/print`} className="mt-2 block">
+              <Button variant="secondary" className="w-full justify-center"><IconFileDescription size={18} /> Заказ-наряд для клиента</Button>
             </Link>
 
             {settings.autoPriceAdjustment && (
@@ -623,7 +622,7 @@ export default function OrderDetail() {
             <label className="mt-3 block text-sm">
               <span className="muted mb-1 flex items-center gap-1.5"><IconNotes size={14} /> Договорённость с клиентом</span>
               <div className="field-control">
-                <textarea rows={3} defaultValue={order.notes || ""} onBlur={(e) => updateOrder(order.id, { notes: e.target.value })} placeholder="Не попадает в акт для клиента" />
+                <textarea rows={3} defaultValue={order.notes || ""} onBlur={(e) => updateOrder(order.id, { notes: e.target.value })} placeholder="Внутренняя договорённость, клиенту не показывается" />
               </div>
             </label>
     </>
@@ -681,31 +680,8 @@ export default function OrderDetail() {
       />
       <Page>
         <div className="order-doc">
-        <div className="mb-4 hidden print:block">
-          <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--border)" }}>
-            <div className="flex items-center gap-3">
-              <img
-                src={company.logoDataUrl || defaultLogo}
-                alt=""
-                className="document-logo h-14 w-14 shrink-0 rounded-xl object-contain"
-              />
-              <div>
-                <div className="text-lg font-bold">{company.shortName}</div>
-                <div className="text-sm">{company.address}</div>
-                <div className="text-sm">
-                  {[company.phone, company.phone2, formatWorkHours({ start: company.openTime, end: company.closeTime })].filter(Boolean).join(" · ")}
-                </div>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-lg font-bold">Заказ-наряд {order.number}</div>
-              <div className="text-sm">{formatDateTime(order.createdAt)}</div>
-            </div>
-          </div>
-        </div>
-
         <div
-          className="order-facts mb-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border shadow-[0_2px_8px_rgba(23,34,30,0.045)] sm:grid-cols-2 lg:grid-cols-5"
+          className="order-facts mb-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border shadow-[0_2px_8px_rgba(23,34,30,0.045)] sm:grid-cols-2 lg:grid-cols-3"
           style={{ background: "var(--border)", borderColor: "var(--border)" }}
         >
           <InfoCell icon={<IconUser size={18} />} tone="#e9f5ed" color="var(--accent)" label="Клиент">
@@ -725,6 +701,12 @@ export default function OrderDetail() {
               {vehicle?.mileage ? ` · ${vehicle.mileage.toLocaleString("ru-RU")} км` : ""}
             </div>
           </InfoCell>
+
+        </div>
+
+        <details className="mb-4 rounded-xl border bg-white print:hidden" style={{ borderColor: "var(--border)" }}>
+          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Внутренняя информация сервиса</summary>
+          <div className="grid grid-cols-1 gap-px border-t sm:grid-cols-3" style={{ background: "var(--border)", borderColor: "var(--border)" }}>
           <InfoCell icon={<IconTool size={18} />} tone="#f5f0ff" color="#6656b8" label="Подъёмник">
             <div className="truncate text-sm font-semibold">{lift?.name ?? "Не назначен"}</div>
             <div className="muted truncate text-xs">
@@ -758,7 +740,8 @@ export default function OrderDetail() {
               {order.guaranteeMonths ? `Гарантия ${order.guaranteeMonths} мес.` : "Гарантия не указана"}
             </div>
           </InfoCell>
-        </div>
+          </div>
+        </details>
 
         <Card className="mb-4 p-3 print:hidden">
           <p className="muted mb-2 text-center text-[11px]">Нажмите на этап, чтобы перевести заказ вперёд или вернуть назад</p>
@@ -1095,30 +1078,7 @@ export default function OrderDetail() {
         <div className="h-16 xl:hidden print:hidden" />
 
         <div className="hidden print:block">
-          <div className="order-print-notes mt-3 text-sm">
-            <div><b>Жалоба клиента:</b> {order.complaint || "—"}</div>
-            <div><b>Диагностика:</b> {order.diagnosis || "—"}</div>
-            <div><b>Внешние дефекты:</b> {order.defects || "—"}</div>
-            {order.guaranteeMonths ? <div><b>Гарантия:</b> {order.guaranteeMonths} мес.</div> : null}
-          </div>
-
-          <div className="order-print-total mt-3 border-t pt-2 text-sm" style={{ borderColor: "var(--border)" }}>
-            <div>Работы: {formatMoney(worksTotal)} · Запчасти: {formatMoney(partsTotal)}{discount > 0 ? ` · Скидка: −${formatMoney(discount)}` : ""}</div>
-            <div className="text-base font-bold">
-              К оплате: {formatMoney(due)} · Оплачено: {formatMoney(paid)} · Долг: {formatMoney(Math.max(0, debt))}
-            </div>
-          </div>
-
-          <div className="order-print-signs mt-6 grid grid-cols-2 gap-10 text-sm">
-            <div>
-              <div>Работы сдал (исполнитель)</div>
-              <div className="mt-6 border-t pt-1" style={{ borderColor: "var(--text)" }}>{order.advisor || company.responsible}</div>
-            </div>
-            <div>
-              <div>Работы принял (заказчик)</div>
-              <div className="mt-6 border-t pt-1" style={{ borderColor: "var(--text)" }}>{client?.name ?? ""}</div>
-            </div>
-          </div>
+          <ClientOrderDocument order={order} client={client} vehicle={vehicle} company={company} payments={payments} />
         </div>
         </div>
       </Page>
