@@ -165,14 +165,12 @@ function migrate(db: DB): DB {
       ...db.company,
       // Старая маска-заглушка «+7 (___) ___-__-__» не проходила проверку и
       // не давала сохранить настройки — такой номер считаем незаполненным.
-      phone: isValidPhone(db.company.phone) ? formatPhone(db.company.phone) : formatPhone(companySeed.phone),
-      phoneLabel: db.company.phoneLabel?.trim() || companySeed.phoneLabel,
+      phone: db.company.phone && isValidPhone(db.company.phone) ? formatPhone(db.company.phone) : "",
+      phoneLabel: db.company.phoneLabel?.trim() || "",
       phone2: db.company.phone2 && isValidPhone(db.company.phone2)
         ? formatPhone(db.company.phone2)
-        : companySeed.phone2 && isValidPhone(companySeed.phone2)
-          ? formatPhone(companySeed.phone2)
-          : undefined,
-      phone2Label: db.company.phone2Label?.trim() || companySeed.phone2Label,
+        : undefined,
+      phone2Label: db.company.phone2Label?.trim() || undefined,
       logoDataUrl: typeof db.company.logoDataUrl === "string" && db.company.logoDataUrl.startsWith("data:image/")
         ? db.company.logoDataUrl
         : undefined,
@@ -327,7 +325,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [db, rawSetDB] = useState<DB>(() => {
     if (cloudConfigured && session) {
       const cached = readCloudBase<DB>(session.user.id);
-      return cached ? migrate(cached.base) : migrate(seedDB());
+      return cached ? migrate(cached.base) : loadInitial();
     }
     return loadInitial();
   });
@@ -365,11 +363,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (cloudConfigured) {
-      // Старый общий локальный кэш мог содержать данные другой роли/пользователя.
-      localStorage.removeItem(STORAGE_KEY);
-      return;
-    }
+    // До успешной инициализации облака не удаляем локальную базу:
+    // она может быть единственной реальной копией, которую нужно загрузить в пустой Supabase.
+    if (cloudConfigured) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
   }, [cloudConfigured, db]);
 
@@ -408,6 +404,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
     cloudBaseRef.current = remote;
     writeCloudBase(session.user.id, snapshot.revision, remote);
+    // Серверная база успешно загружена — общий локальный ключ больше не нужен
+    // и не сможет раскрыть данные следующему пользователю этого браузера.
+    localStorage.removeItem(STORAGE_KEY);
     rawSetDB(next);
     setCloud({ ...meta, status: "ready", lastSyncedAt: new Date().toISOString() } as CloudSyncInfo);
   }, [session]);
@@ -553,6 +552,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     if (!error) {
       cloudBaseRef.current = dbRef.current;
       writeCloudBase(session.user.id, cloudRevisionRef.current, dbRef.current);
+      localStorage.removeItem(STORAGE_KEY);
       setCloud((prev) => ({ ...prev, status: "ready", lastSyncedAt: new Date().toISOString() }));
     }
     return error;
