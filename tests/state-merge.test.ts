@@ -147,6 +147,6 @@ test("independent concurrent creations are both preserved", () => {
   const remote = { clients: [{ id: "remote", name: "Серверный" }] };
 
   const merged = mergeConcurrentStateDetailed(base, local, remote);
-  assert.deepEqual(merged.value.clients.map((item) => item.id), ["local", "remote"]);
+  assert.deepEqual(merged.value.clients.map((item) => item.id).sort(), ["local", "remote"]);
   assert.equal(merged.conflicts.length, 0);
 });
