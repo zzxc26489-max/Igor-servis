@@ -11,6 +11,7 @@ import { formatMoney } from "../lib/format";
 import { APP_BUILD_DATE, APP_VERSION, DB_VERSION } from "../data/version";
 import { todayISO } from "../lib/date";
 import { isValidTime, timeToMinutes } from "../lib/workday";
+import { backupCounts, inspectBackupJson } from "../lib/backup";
 import defaultLogo from "../assets/logo.jpg";
 
 export default function Settings() {
@@ -169,8 +170,9 @@ export default function Settings() {
     const blob = new Blob([exportDB()], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
+    const stamp = new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }).replace(":", "-");
     link.href = url;
-    link.download = `igor-servis-backup-${todayISO()}.json`;
+    link.download = `igor-servis-backup-${todayISO()}-${stamp}.json`;
     link.click();
     URL.revokeObjectURL(url);
     showToast("Резервная копия сохранена");
@@ -178,23 +180,29 @@ export default function Settings() {
 
   async function handleRestore(file: File) {
     const text = await file.text();
-    let incoming: { orders?: unknown[]; clients?: unknown[]; stock?: unknown[]; expenses?: unknown[] } = {};
-    try {
-      incoming = JSON.parse(text);
-    } catch {
-      showToast("Файл не похож на резервную копию CRM", "error");
+    const inspected = inspectBackupJson(text);
+    if (!inspected) {
+      showToast("Файл повреждён, неполный или не является резервной копией CRM", "error");
       return;
     }
+    const counts = backupCounts(inspected.data);
+    const backupInfo = inspected.meta
+      ? `Создана ${new Date(inspected.meta.exportedAt).toLocaleString("ru-RU")}${inspected.meta.appVersion ? ` · CRM v${inspected.meta.appVersion}` : ""}${inspected.meta.dbVersion ? ` · база ${inspected.meta.dbVersion}` : ""}`
+      : "Старая резервная копия без метаданных — структура проверена";
+
     const ok = await confirm({
       title: "Восстановить из резервной копии",
       question: "Текущие данные в этом браузере будут полностью заменены содержимым файла.",
       summary: [
-        { label: "Заказ-наряды", value: `${orders.length} → ${incoming.orders?.length ?? 0}` },
-        { label: "Клиенты", value: `${clients.length} → ${incoming.clients?.length ?? 0}` },
-        { label: "Позиции склада", value: `${stock.length} → ${incoming.stock?.length ?? 0}` },
-        { label: "Расходы", value: `${expenses.length} → ${incoming.expenses?.length ?? 0}` },
+        { label: "Файл", value: file.name },
+        { label: "Копия", value: backupInfo },
+        { label: "Заказ-наряды", value: `${orders.length} → ${counts.orders}` },
+        { label: "Клиенты", value: `${clients.length} → ${counts.clients}` },
+        { label: "Автомобили", value: `${vehicles.length} → ${counts.vehicles}` },
+        { label: "Позиции склада", value: `${stock.length} → ${counts.stock}` },
+        { label: "Расходы", value: `${expenses.length} → ${counts.expenses}` },
       ],
-      note: "Сначала скачайте копию текущих данных, если они ещё нужны.",
+      note: "Перед восстановлением лучше скачать копию текущих данных. Неполные и повреждённые файлы CRM больше не принимает.",
       confirmLabel: "Восстановить",
       danger: true,
     });
@@ -202,7 +210,7 @@ export default function Settings() {
     if (importDB(text)) {
       showToast("Данные восстановлены из копии");
     } else {
-      showToast("Файл не похож на резервную копию CRM", "error");
+      showToast("Не удалось восстановить резервную копию", "error");
     }
   }
 
@@ -320,7 +328,7 @@ export default function Settings() {
                       <img src={logoDataUrl || defaultLogo} alt="Логотип сервиса" className="h-full w-full object-contain" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs muted">Печатается в заказ-наряде и акте. По умолчанию используется текущий логотип CRM; можно загрузить свой PNG/JPG/WEBP.</p>
+                      <p className="text-xs muted">Печатается в заказ-наряде. По умолчанию используется текущий логотип CRM; можно загрузить свой PNG/JPG/WEBP.</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <Button type="button" size="sm" variant="secondary" onClick={() => logoFileRef.current?.click()}>
                           Выбрать файл
