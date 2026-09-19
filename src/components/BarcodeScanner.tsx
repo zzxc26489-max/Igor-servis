@@ -4,7 +4,10 @@ import { Button, Modal } from "./ui";
 
 type BarcodeResult = { rawValue: string };
 type BarcodeDetectorInstance = { detect(source: unknown): Promise<BarcodeResult[]> };
-type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => BarcodeDetectorInstance;
+type BarcodeDetectorConstructor = {
+  new (options?: { formats?: string[] }): BarcodeDetectorInstance;
+  getSupportedFormats?: () => Promise<string[]>;
+};
 
 function barcodeDetectorCtor() {
   return (window as unknown as { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
@@ -56,9 +59,10 @@ export default function BarcodeScanner({
         await videoRef.current.play();
         setReady(true);
 
-        const detector = new Detector({
-          formats: ["ean_13", "ean_8", "code_128", "code_39", "codabar", "upc_a", "upc_e", "itf", "qr_code"],
-        });
+        const wanted = ["ean_13", "ean_8", "code_128", "code_39", "codabar", "upc_a", "upc_e", "itf", "qr_code", "data_matrix", "pdf417"];
+        const supported = Detector.getSupportedFormats ? await Detector.getSupportedFormats() : wanted;
+        const formats = wanted.filter((format) => supported.includes(format));
+        const detector = new Detector(formats.length ? { formats } : undefined);
 
         timer = window.setInterval(async () => {
           if (busy || stopped || !videoRef.current || videoRef.current.readyState < 2) return;
@@ -99,7 +103,7 @@ export default function BarcodeScanner({
   }
 
   return (
-    <Modal title={title} subtitle="Наведите камеру на штрихкод детали" onClose={onClose}>
+    <Modal title={title} subtitle="Наведите камеру на штрихкод или QR-код" onClose={onClose}>
       <div className="space-y-3 p-4">
         <div className="overflow-hidden rounded-xl border bg-black" style={{ borderColor: "var(--border)" }}>
           <video ref={videoRef} className="aspect-[4/3] w-full object-cover" muted playsInline />
@@ -123,10 +127,9 @@ export default function BarcodeScanner({
           <form className="flex gap-2" onSubmit={submitManual}>
             <input
               autoComplete="off"
-              inputMode="numeric"
               value={manual}
               onChange={(event) => setManual(event.target.value)}
-              placeholder="Например, 4006381333931"
+              placeholder="Штрихкод, SKU или содержимое QR"
               className="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
               style={{ borderColor: "var(--border)" }}
             />
