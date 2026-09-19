@@ -47,6 +47,7 @@ import { isValidQuantity, normalizeQuantity } from "../lib/quantity";
 import { activeCashShift, cashShiftSummary } from "../lib/cashShift";
 import { transitionWorkSessions } from "../lib/workSessions";
 import { createBackupJson, inspectBackupJson } from "../lib/backup";
+import { employeeWorkPercent } from "../lib/payroll";
 import { APP_VERSION, DB_VERSION } from "../data/version";
 
 const STORAGE_KEY = LOCAL_DB_KEY;
@@ -267,6 +268,7 @@ interface AppStoreValue extends DB {
   addExpense: (e: Expense) => void;
   updateCompany: (patch: Partial<CompanyInfo>) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
+  updateEmployee: (id: string, patch: Partial<Employee>) => void;
   addService: (service: Service) => void;
   updateService: (id: string, patch: Partial<Service>) => void;
   deleteService: (id: string) => void;
@@ -775,6 +777,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         }),
       updateCompany: (patch) => setDB((prev) => ({ ...prev, company: { ...prev.company, ...patch } })),
       updateSettings: (patch) => setDB((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } })),
+      updateEmployee: (id, patch) =>
+        setDB((prev) => ({
+          ...prev,
+          employees: prev.employees.map((employee) =>
+            employee.id === id ? { ...employee, ...patch } : employee,
+          ),
+        })),
       addService: (service) => setDB((prev) => ({ ...prev, services: [...prev.services, service] })),
       updateService: (id, patch) =>
         setDB((prev) => ({
@@ -869,9 +878,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           if (willIssue) {
             patch.issuedAt = now;
             patch.issuedAtEstimated = false;
+            patch.works = order.works.map((work) => {
+              if (!work.executor || Number.isFinite(work.payrollPercent)) return work;
+              const employee = prev.employees.find((item) => item.name === work.executor);
+              return employee ? { ...work, payrollPercent: employeeWorkPercent(employee) } : work;
+            });
           } else if (wasIssued) {
             patch.issuedAt = undefined;
             patch.issuedAtEstimated = undefined;
+            patch.works = order.works.map(({ payrollPercent: _payrollPercent, ...work }) => work);
           }
 
           const orders = prev.orders.map((item) => (item.id === id ? { ...item, ...patch } : item));
