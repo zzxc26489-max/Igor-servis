@@ -74,6 +74,48 @@ export type CloudCashShiftResult =
   | { ok: false; cashConflict: true; revision: number; message: string; data: unknown; updatedAt?: string; expectedCash?: number };
 
 
+export type CloudStockMutationResult =
+  | { ok: true; revision: number; updatedAt?: string; data: unknown }
+  | { ok: false; stockConflict: true; revision: number; message: string; data: unknown; updatedAt?: string };
+
+export interface CloudStockReceiveInput {
+  item: {
+    id: string;
+    code?: string;
+    name: string;
+    sku: string;
+    barcode?: string;
+    brand?: string;
+    category: string;
+    unit: string;
+    minQty: number;
+    cell: string;
+    supplier?: string;
+  };
+  qty: number;
+  unitPrice: number;
+  movementId: string;
+  expenseId?: string;
+  expenseCode?: string;
+  createExpense: boolean;
+  expenseMethod?: "cash" | "terminal" | "transfer";
+  employee: string;
+  note?: string;
+}
+
+export interface CloudStockSupplierReturnInput {
+  itemId: string;
+  qty: number;
+  unitPrice: number;
+  supplier: string;
+  employee: string;
+  reason: string;
+  movementId: string;
+  expenseId: string;
+  expenseCode?: string;
+}
+
+
 const rawUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "");
 const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
 
@@ -232,6 +274,55 @@ export async function closeCloudCashShift(
     },
     session.access_token,
   ) as Promise<CloudCashShiftResult>;
+}
+
+export async function receiveCloudStock(
+  session: CloudSession,
+  input: CloudStockReceiveInput,
+): Promise<CloudStockMutationResult> {
+  return request(
+    "/rest/v1/rpc/crm_receive_stock",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_item: input.item,
+        p_qty: input.qty,
+        p_unit_price: input.unitPrice,
+        p_movement_id: input.movementId,
+        p_expense_id: input.expenseId ?? null,
+        p_expense_code: input.expenseCode ?? null,
+        p_create_expense: input.createExpense,
+        p_expense_method: input.expenseMethod ?? null,
+        p_employee: input.employee?.trim() || null,
+        p_note: input.note?.trim() || null,
+      }),
+    },
+    session.access_token,
+  ) as Promise<CloudStockMutationResult>;
+}
+
+export async function returnCloudStockSupplier(
+  session: CloudSession,
+  input: CloudStockSupplierReturnInput,
+): Promise<CloudStockMutationResult> {
+  return request(
+    "/rest/v1/rpc/crm_return_stock_supplier",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_item_id: input.itemId,
+        p_qty: input.qty,
+        p_unit_price: input.unitPrice,
+        p_supplier: input.supplier,
+        p_employee: input.employee,
+        p_reason: input.reason,
+        p_movement_id: input.movementId,
+        p_expense_id: input.expenseId,
+        p_expense_code: input.expenseCode ?? null,
+      }),
+    },
+    session.access_token,
+  ) as Promise<CloudStockMutationResult>;
 }
 
 export async function createCloudBackup(session: CloudSession): Promise<{ ok: true; createdAt: string }> {
