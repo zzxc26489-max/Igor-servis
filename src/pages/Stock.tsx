@@ -12,6 +12,7 @@ import { lowStockItems } from "../lib/lowStock";
 import { useConfirm } from "../components/Confirm";
 import { useToast } from "../components/Toast";
 import StockReceive from "./StockReceive";
+import BarcodeScanner from "../components/BarcodeScanner";
 import { findPartReferences } from "../data/partReferences";
 import type { Order, PartReference, StockItem } from "../types";
 import { canManageStock } from "../lib/access";
@@ -31,6 +32,7 @@ export default function Stock() {
   const searchRef = useRef<HTMLInputElement>(null);
   const [receiveFor, setReceiveFor] = useState<string | null>(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [referenceForReceive, setReferenceForReceive] = useState<PartReference | null>(null);
 
   const categories = useMemo(() => Array.from(new Set(stock.map((item) => item.category))).sort(), [stock]);
@@ -57,7 +59,7 @@ export default function Stock() {
         if (chip === "reserved" && (reservations.get(item.id) ?? 0) === 0) return false;
         if (category !== "all" && item.category !== category) return false;
         if (!term) return true;
-        return `${item.code ?? ""} ${item.name} ${item.sku} ${item.brand ?? ""} ${item.cell ?? ""}`
+        return `${item.code ?? ""} ${item.name} ${item.sku} ${item.barcode ?? ""} ${item.brand ?? ""} ${item.cell ?? ""}`
           .toLocaleLowerCase("ru-RU")
           .includes(term);
       })
@@ -161,14 +163,8 @@ export default function Stock() {
             </div>
             <Button
               variant="secondary"
-              onClick={() => {
-                // Сканер работает как клавиатура: наша задача — поставить курсор в поле.
-                setQuery("");
-                setChip("all");
-                searchRef.current?.focus();
-                showToast("Поле готово — отсканируйте штрихкод или введите артикул");
-              }}
-              title="Курсор встанет в поле поиска: сканер вводит код как клавиатура"
+              onClick={() => setScannerOpen(true)}
+              title="Открыть камеру телефона для сканирования штрихкода"
             >
               <IconScan size={18} /> Сканировать
             </Button>
@@ -401,6 +397,19 @@ export default function Stock() {
           free={returnItem.qty - (reservations.get(returnItem.id) ?? 0)}
           onClose={() => setReturnFor(null)}
           onSubmit={(qty, reason) => handleReturn(returnItem, qty, reason)}
+        />
+      )}
+
+      {scannerOpen && (
+        <BarcodeScanner
+          title="Найти запчасть по штрихкоду"
+          onClose={() => setScannerOpen(false)}
+          onDetected={(value) => {
+            setQuery(value);
+            setChip("all");
+            searchRef.current?.focus();
+            showToast(`Код считан: ${value}`);
+          }}
         />
       )}
 
