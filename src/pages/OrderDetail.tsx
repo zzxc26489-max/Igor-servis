@@ -412,7 +412,7 @@ export default function OrderDetail() {
     });
     if (!ok) return;
 
-    const error = reservePart(order.id, stockItem.id, qty, price);
+    const error = await reservePart(order.id, stockItem.id, qty, price);
     if (error) {
       setPartError(error);
       return;
