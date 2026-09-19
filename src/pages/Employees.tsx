@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { IconCash, IconCheck, IconChevronDown, IconChevronUp, IconPercentage } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { Button, Card, Modal, Page, TopBar } from "../components/ui";
@@ -25,6 +25,8 @@ export default function Employees() {
   const [detailsFor, setDetailsFor] = useState<string | null>(null);
   const [rateFor, setRateFor] = useState<string | null>(null);
   const [termsFor, setTermsFor] = useState<string | null>(null);
+  const paySubmitRef = useRef(false);
+  const payOperationRef = useRef<{ fingerprint: string; id: string } | null>(null);
 
   const employees = computePayroll(rawEmployees, orders);
   const totalAccrued = employees.reduce((sum, employee) => sum + employee.accrued, 0);
@@ -35,6 +37,7 @@ export default function Employees() {
   const canEditRates = !cloud.configured || cloud.role === "owner" || cloud.role === "partner";
 
   async function handlePay(employee: Employee, amount: number, method: PaymentMethod, component: PayrollComponent) {
+    if (paySubmitRef.current) return;
     if (method === "cash" && !activeCashShift(cashShifts)) {
       showToast("Для выплаты наличными сначала откройте кассовую смену в Финансах → Касса", "error");
       return;
@@ -72,13 +75,32 @@ export default function Employees() {
       confirmLabel: "Выплатить",
     });
     if (!ok) return;
-    const payError = payEmployee(employee.id, amount, undefined, method, component);
-    if (payError) {
-      showToast(payError, "error");
-      return;
+
+    const fingerprint = JSON.stringify({ employeeId: employee.id, amount, method, component });
+    if (!payOperationRef.current || payOperationRef.current.fingerprint !== fingerprint) {
+      payOperationRef.current = { fingerprint, id: `payroll-${crypto.randomUUID()}` };
     }
-    setPayFor(null);
-    showToast(`Выплачено ${formatMoney(amount)} · ${employee.name}`);
+
+    paySubmitRef.current = true;
+    try {
+      const payError = await payEmployee(
+        employee.id,
+        amount,
+        undefined,
+        method,
+        component,
+        payOperationRef.current.id,
+      );
+      if (payError) {
+        showToast(payError, "error");
+        return;
+      }
+      payOperationRef.current = null;
+      setPayFor(null);
+      showToast(`Выплачено ${formatMoney(amount)} · ${employee.name}`);
+    } finally {
+      paySubmitRef.current = false;
+    }
   }
 
   return (

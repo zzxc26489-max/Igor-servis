@@ -106,3 +106,17 @@ test("atomic vehicle management migration protects duplicates and order history"
   assert.match(sql, /'latestMigration', 14/);
   assert.match(sql, /atomic-vehicle-management/);
 });
+
+
+test("idempotent financial mutations migration deduplicates money operations", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "015_idempotent_financial_mutations.sql"), "utf8");
+  assert.match(sql, /create or replace function public\.crm_add_expense/);
+  assert.match(sql, /create or replace function public\.crm_confirm_supplier_refund/);
+  assert.match(sql, /create or replace function public\.crm_pay_employee/);
+  assert.match(sql, /for update/g);
+  assert.match(sql, /where e ->> 'id' = v_id/);
+  assert.match(sql, /refundOperationId/);
+  assert.match(sql, /where e ->> 'id' = p_expense_id/);
+  assert.match(sql, /'latestMigration', 15/);
+  assert.match(sql, /idempotent-financial-mutations/);
+});
