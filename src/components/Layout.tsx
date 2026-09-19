@@ -219,7 +219,7 @@ export default function Layout() {
         <div className="fixed inset-0 z-40 lg:hidden print:hidden">
           <button className="absolute inset-0 bg-black/40" aria-label="Закрыть меню" onClick={() => setOpen(false)} />
           <div
-            className="relative isolate flex h-full w-72 max-w-[82vw] flex-col overflow-hidden shadow-xl"
+            className="relative isolate flex h-full w-[19rem] max-w-[86vw] flex-col overflow-hidden rounded-r-2xl shadow-2xl"
             style={{ background: "var(--sidebar-bg)", color: "var(--sidebar-text)" }}
           >
             <button
@@ -242,7 +242,7 @@ export default function Layout() {
         </div>
       )}
 
-      <div className="app-content flex min-w-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 print:block print:min-h-0 print:pb-0">
+      <div className="app-content flex min-w-0 flex-1 flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0 print:block print:min-h-0 print:pb-0">
         {cloud.configured && cloud.status === "error" && (
           <div className="border-b bg-[#fff8e8] px-4 py-2 text-xs font-medium text-[#9a6a12] print:hidden sm:px-5">
             Связи с сервером нет. Изменения сохранены на этом устройстве и отправятся автоматически после восстановления связи.
@@ -252,7 +252,7 @@ export default function Layout() {
       </div>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 flex min-h-16 items-center justify-around border-t bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden print:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex min-h-14 items-center justify-around border-t bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(23,34,30,.06)] backdrop-blur lg:hidden print:hidden"
         style={{ borderColor: "var(--border)" }}
         aria-label="Основная навигация"
       >
@@ -269,7 +269,7 @@ export default function Layout() {
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `relative flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-1.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent)] ${
+              `relative flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1.5 py-1 text-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent)] ${
                 isActive ? "font-semibold" : ""
               }`
             }
@@ -277,8 +277,8 @@ export default function Layout() {
           >
             {({ isActive }) => (
               <>
-                <span className={`relative grid h-8 w-12 place-items-center rounded-full transition-colors ${isActive ? "bg-[var(--accent-soft)]" : ""}`}>
-                  <item.icon size={22} stroke={1.8} aria-hidden="true" />
+                <span className={`relative grid h-7 w-11 place-items-center rounded-full transition-colors ${isActive ? "bg-[var(--accent-soft)]" : ""}`}>
+                  <item.icon size={20} stroke={1.8} aria-hidden="true" />
                   {item.badge && badges[item.badge] > 0 && (
                     <span className="absolute -right-2 -top-1 min-w-4 rounded-full bg-[var(--danger)] px-1 text-center text-[9px] font-bold leading-4 text-white">
                       {badges[item.badge]}
@@ -292,12 +292,12 @@ export default function Layout() {
         ))}
         <button
           onClick={() => setOpen(true)}
-          className="flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-1.5 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent)]"
+          className="flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1.5 py-1 text-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent)]"
           style={{ color: "var(--text-muted)" }}
           aria-label="Открыть меню"
         >
-          <span className="grid h-8 w-12 place-items-center rounded-full">
-            <IconDotsCircleHorizontal size={22} stroke={1.8} aria-hidden="true" />
+          <span className="grid h-7 w-11 place-items-center rounded-full">
+            <IconDotsCircleHorizontal size={20} stroke={1.8} aria-hidden="true" />
           </span>
           <span>Ещё</span>
         </button>
