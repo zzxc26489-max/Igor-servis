@@ -25,7 +25,9 @@ export default function Settings() {
   const [shortName, setShortName] = useState(company.shortName);
   const [address, setAddress] = useState(company.address);
   const [phone, setPhone] = useState(formatPhone(company.phone));
+  const [phoneLabel, setPhoneLabel] = useState(company.phoneLabel ?? "Игорь");
   const [phone2, setPhone2] = useState(company.phone2 ? formatPhone(company.phone2) : "");
+  const [phone2Label, setPhone2Label] = useState(company.phone2Label ?? "Юра");
   const [logoDataUrl, setLogoDataUrl] = useState(company.logoDataUrl ?? "");
   const [touched, setTouched] = useState(false);
   const [openTime, setOpenTime] = useState(company.openTime);
@@ -107,7 +109,9 @@ export default function Settings() {
       shortName: shortName.trim(),
       address: address.trim(),
       phone: phone.trim(),
+      phoneLabel: phoneLabel.trim() || undefined,
       phone2: phone2.trim() || undefined,
+      phone2Label: phone2Label.trim() || undefined,
       logoDataUrl: logoDataUrl || undefined,
       openTime,
       closeTime,
@@ -303,8 +307,24 @@ export default function Settings() {
                 </div>
               </label>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <PhoneField label="Телефон 1" value={phone} onChange={setPhone} touched={touched} />
-                <PhoneField label="Телефон 2" value={phone2} onChange={setPhone2} touched={touched} hint="Например, второй номер совладельца" />
+                <div className="space-y-2">
+                  <label className="block text-sm">
+                    <span className="mb-1 block muted">Подпись телефона 1</span>
+                    <div className="field-control">
+                      <input value={phoneLabel} onChange={(e) => setPhoneLabel(e.target.value)} placeholder="Игорь" />
+                    </div>
+                  </label>
+                  <PhoneField label="Телефон 1" value={phone} onChange={setPhone} touched={touched} />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm">
+                    <span className="mb-1 block muted">Подпись телефона 2</span>
+                    <div className="field-control">
+                      <input value={phone2Label} onChange={(e) => setPhone2Label(e.target.value)} placeholder="Юра" />
+                    </div>
+                  </label>
+                  <PhoneField label="Телефон 2" value={phone2} onChange={setPhone2} touched={touched} hint="Например, второй номер совладельца" />
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="block text-sm">
