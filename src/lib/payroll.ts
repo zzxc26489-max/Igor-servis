@@ -27,3 +27,43 @@ export function computePayroll(employees: Employee[], orders: Order[]): Employee
 export function payrollBalance(employee: Employee) {
   return Math.max(0, employee.accrued - employee.paid);
 }
+
+
+export interface PayrollBreakdownItem {
+  orderId: string;
+  orderNumber: string;
+  completedAt: string;
+  worksAmount: number;
+  accrued: number;
+  works: { id: string; name: string; qty: number; amount: number }[];
+}
+
+/** Детализация сдельного начисления сотрудника по выданным заказам. */
+export function payrollBreakdown(employee: Employee, orders: Order[]): PayrollBreakdownItem[] {
+  if (employee.payType === "salary") return [];
+
+  return accruingOrders(orders)
+    .flatMap((order) => {
+      const works = order.works
+        .filter((work) => work.executor === employee.name)
+        .map((work) => ({
+          id: work.id,
+          name: work.name,
+          qty: work.qty,
+          amount: work.price * work.qty,
+        }));
+      const worksAmount = works.reduce((sum, work) => sum + work.amount, 0);
+      if (worksAmount <= 0) return [];
+
+      const item: PayrollBreakdownItem = {
+        orderId: order.id,
+        orderNumber: order.number,
+        completedAt: order.issuedAt ?? order.completedAt ?? order.createdAt,
+        worksAmount,
+        accrued: Math.round((worksAmount * employee.payValue) / 100),
+        works,
+      };
+      return [item];
+    })
+    .sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+}
