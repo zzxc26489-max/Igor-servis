@@ -22,7 +22,7 @@ env:
 
 jobs:
   sync-pages-branch:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,8 +30,8 @@ jobs:
           fetch-depth: 0
       - name: Sync allowed Pages branch
         run: |
-          git fetch origin claude/igor-workshop-website-yrdani
-          git push origin HEAD:refs/heads/claude/igor-workshop-website-yrdani
+          git fetch origin claude/igor-workshop-website-yrdani:refs/remotes/origin/claude/igor-workshop-website-yrdani
+          git push --force-with-lease origin HEAD:refs/heads/claude/igor-workshop-website-yrdani
       - name: Start Pages deployment from allowed branch
         env:
           GH_TOKEN: ${{ github.token }}
@@ -47,6 +47,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npm test
       - run: npm run lint
       - run: npm run build

@@ -162,3 +162,14 @@ test("idempotent order delete and release migration avoids duplicate release mov
   assert.match(sql, /'latestMigration', 18/);
   assert.match(sql, /idempotent-order-delete-release/);
 });
+
+
+test("review fixes migration repairs cash calculation and optional field clearing", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "019_review_fixes.sql"), "utf8");
+  assert.match(sql, /coalesce\(expense ->> 'source', ''\) <> 'supplier_refund'/);
+  assert.match(sql, /- 'phone2'[\s\S]*- 'discountPercent'[\s\S]*- 'notes'/);
+  assert.match(sql, /- 'vin'[\s\S]*- 'mileage'[\s\S]*- 'nextServiceMileage'/);
+  assert.match(sql, /\(v_existing - 'normMinutes'\) \|\| p_service/);
+  assert.match(sql, /'latestMigration', 19/);
+  assert.match(sql, /review-fixes-019/);
+});
