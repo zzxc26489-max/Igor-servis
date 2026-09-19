@@ -35,7 +35,7 @@ const PERIODS: { value: PeriodKey; label: string }[] = [
 
 export default function Finance() {
   const {
-    orders, expenses, payments, cashShifts, employees: rawEmployees, clients, cloud,
+    orders, expenses, payments, cashShifts, employees: rawEmployees, clients, vehicles, cloud,
     addExpense, confirmRefund, openCashShift, closeCashShift,
   } = useAppStore();
   const { showToast } = useToast();
@@ -77,6 +77,18 @@ export default function Finance() {
     () => currentShift ? cashShiftSummary(currentShift, payments, expenses) : null,
     [currentShift, expenses, payments],
   );
+  const currentShiftPayments = useMemo(() => {
+    if (!currentShift) return [];
+    return payments
+      .filter((payment) => payment.shiftId === currentShift.id)
+      .sort((a, b) => b.at.localeCompare(a.at))
+      .map((payment) => {
+        const order = orders.find((item) => item.id === payment.orderId);
+        const client = order ? clients.find((item) => item.id === order.clientId) : undefined;
+        const vehicle = order ? vehicles.find((item) => item.id === order.vehicleId) : undefined;
+        return { payment, order, client, vehicle };
+      });
+  }, [clients, currentShift, orders, payments, vehicles]);
   const shiftHistory = useMemo(
     () => [...cashShifts].sort((a, b) => b.openedAt.localeCompare(a.openedAt)),
     [cashShifts],
@@ -700,6 +712,97 @@ export default function Finance() {
                       <Row label="Перевод / СБП" value={currentShiftSummary.transfer} signed />
                       <Row label="Ожидаемо в кассе" value={currentShiftSummary.expectedCash} tone="accent" />
                     </div>
+                  )}
+                </Card>
+
+                <Card className="overflow-hidden p-0">
+                  <div className="flex items-center justify-between gap-3 border-b p-4" style={{ borderColor: "var(--border)" }}>
+                    <div>
+                      <h2 className="panel-title">Оплаты текущей смены</h2>
+                      <p className="muted mt-1 text-xs">Кто принял деньги, каким способом и по какому заказу</p>
+                    </div>
+                    <span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: "var(--bg)", color: "var(--text-muted)" }}>
+                      {currentShiftPayments.length}
+                    </span>
+                  </div>
+
+                  {currentShiftPayments.length === 0 ? (
+                    <p className="muted p-4 text-sm">В этой смене оплат ещё не было.</p>
+                  ) : (
+                    <>
+                      <div className="divide-y lg:hidden" style={{ borderColor: "var(--border)" }}>
+                        {currentShiftPayments.map(({ payment, order, client, vehicle }) => {
+                          const sign = payment.kind === "refund" ? -1 : 1;
+                          return (
+                            <button
+                              key={payment.id}
+                              type="button"
+                              onClick={() => order && navigate(`/orders/${order.id}`)}
+                              className="w-full p-4 text-left transition hover:bg-gray-50"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <span className="min-w-0">
+                                  <b className="block truncate text-sm">
+                                    {vehicle ? `${vehicle.make} ${vehicle.model}` : order?.number ?? "Заказ не найден"}
+                                  </b>
+                                  <span className="muted block truncate text-xs">
+                                    {[vehicle?.plate, client?.name].filter(Boolean).join(" · ") || order?.number || "—"}
+                                  </span>
+                                </span>
+                                <b className="shrink-0 tabular-nums" style={{ color: sign > 0 ? "var(--accent)" : "var(--danger)" }}>
+                                  {sign > 0 ? "+" : "−"}{formatMoney(payment.amount)}
+                                </b>
+                              </div>
+                              <div className="muted mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                                <span>{new Date(payment.at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span>
+                                <span>{paymentMethodLabel(payment.method)}</span>
+                                <span>{payment.employee || "Сотрудник не указан"}</span>
+                                {order?.number && <span>{order.number}</span>}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="hidden lg:block">
+                        <table className="app-table">
+                          <thead>
+                            <tr>
+                              <th className="w-20">Время</th>
+                              <th>Заказ / автомобиль</th>
+                              <th>Клиент</th>
+                              <th>Способ</th>
+                              <th>Принял</th>
+                              <th className="text-right">Сумма</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {currentShiftPayments.map(({ payment, order, client, vehicle }) => {
+                              const sign = payment.kind === "refund" ? -1 : 1;
+                              return (
+                                <tr key={payment.id} onClick={() => order && navigate(`/orders/${order.id}`)} className={order ? "cursor-pointer" : ""}>
+                                  <td className="muted whitespace-nowrap">
+                                    {new Date(payment.at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+                                  </td>
+                                  <td>
+                                    <b>{order?.number ?? "—"}</b>
+                                    <div className="muted text-xs">
+                                      {vehicle ? `${vehicle.make} ${vehicle.model}${vehicle.plate ? ` · ${vehicle.plate}` : ""}` : "Автомобиль не найден"}
+                                    </div>
+                                  </td>
+                                  <td>{client?.name ?? "—"}</td>
+                                  <td>{paymentMethodLabel(payment.method)}</td>
+                                  <td>{payment.employee || "—"}</td>
+                                  <td className="text-right font-semibold tabular-nums" style={{ color: sign > 0 ? "var(--accent)" : "var(--danger)" }}>
+                                    {sign > 0 ? "+" : "−"}{formatMoney(payment.amount)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
                   )}
                 </Card>
 
