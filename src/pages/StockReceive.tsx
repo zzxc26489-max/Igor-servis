@@ -177,7 +177,7 @@ export default function StockReceive({
     });
     if (!ok) return;
 
-    receiveStock({
+    const receiveError = receiveStock({
       itemId: matched?.id,
       name: name.trim(),
       sku: sku.trim(),
@@ -194,6 +194,10 @@ export default function StockReceive({
       createExpense,
       expenseMethod: createExpense ? (expenseMethod || undefined) : undefined,
     });
+    if (receiveError) {
+      showToast(receiveError, "error");
+      return;
+    }
 
     showToast(
       matched
