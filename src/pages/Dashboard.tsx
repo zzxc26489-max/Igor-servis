@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   IconAlertTriangle,
   IconArrowRight,
+  IconBell,
   IconCalendarEvent,
   IconCheck,
   IconClipboardList,
@@ -18,6 +19,7 @@ import { useAppStore } from "../store/AppStore";
 import { formatMoney, plural } from "../lib/format";
 import { orderTotals } from "../lib/order";
 import { todayISO } from "../lib/date";
+import { serviceReminders } from "../lib/serviceReminder";
 import type { Order } from "../types";
 
 export default function Dashboard() {
@@ -42,6 +44,7 @@ export default function Dashboard() {
     [orders, today],
   );
   const unassigned = visits.filter((order) => !order.liftId);
+  const maintenanceReminders = useMemo(() => serviceReminders(vehicles).slice(0, 6), [vehicles]);
 
   const attention = useMemo(() => {
     const result: { order: Order; kind: "ready" | "parts" | "lift" }[] = [];
@@ -231,6 +234,60 @@ export default function Dashboard() {
             )}
           </Card>
         </div>
+
+        {maintenanceReminders.length > 0 && (
+          <Card className="mt-4 overflow-hidden p-0 max-sm:-mx-3 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
+            <div className="flex items-center justify-between gap-3 border-b p-4" style={{ borderColor: "var(--border)" }}>
+              <div>
+                <h2 className="panel-title flex items-center gap-2"><IconBell size={18} /> ТО клиентов</h2>
+                <p className="muted mt-0.5 text-xs">Просроченные и ближайшие напоминания по дате или пробегу</p>
+              </div>
+              <span className="rounded-md px-2 py-0.5 text-xs font-semibold" style={{ background: "var(--bg)", color: "var(--text-muted)" }}>
+                {maintenanceReminders.length}
+              </span>
+            </div>
+            <div className="grid divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-3" style={{ borderColor: "var(--border)" }}>
+              {maintenanceReminders.map((reminder) => {
+                const vehicle = vehicles.find((item) => item.id === reminder.vehicleId);
+                const client = vehicle ? clients.find((item) => item.id === vehicle.clientId) : undefined;
+                if (!vehicle) return null;
+                const overdue = reminder.tone === "overdue";
+                return (
+                  <div key={reminder.vehicleId} className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="min-w-0">
+                        <span
+                          className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                          style={{
+                            background: overdue ? "#fff3f3" : "#fdf3e0",
+                            color: overdue ? "var(--danger)" : "var(--warning)",
+                          }}
+                        >
+                          {overdue ? "ТО просрочено" : "ТО скоро"}
+                        </span>
+                        <Link to={`/clients/${vehicle.clientId}`} className="mt-2 block truncate font-bold hover:text-[var(--accent)]">
+                          {vehicle.make} {vehicle.model}
+                        </Link>
+                        <p className="muted truncate text-xs">{vehicle.plate}{client ? ` · ${client.name}` : ""}</p>
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm">{reminder.label}</p>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <Link to={`/orders/new?clientId=${vehicle.clientId}&vehicleId=${vehicle.id}`} className="text-sm font-semibold text-[var(--accent)]">
+                        Записать
+                      </Link>
+                      {client && (
+                        <a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)]">
+                          <IconPhone size={16} /> Позвонить
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
 
         <div className="mt-4 flex justify-end">
           <Link to="/orders/new">
