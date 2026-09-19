@@ -54,7 +54,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {children}
       {request && (
         <Modal title={request.title} onClose={() => finish(false)}>
-          <div className="space-y-3 p-4">
+          <div className="space-y-2.5 p-3.5 sm:space-y-3 sm:p-4">
             <p className="text-sm">{request.question}</p>
 
             {request.summary && request.summary.length > 0 && (
@@ -84,11 +84,11 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               </p>
             )}
 
-            <div className="flex flex-wrap justify-end gap-2 pt-1">
-              <Button variant="secondary" onClick={() => finish(false)}>
+            <div className="grid grid-cols-2 gap-2 pt-1 sm:flex sm:flex-wrap sm:justify-end">
+              <Button variant="secondary" className="w-full sm:w-auto" onClick={() => finish(false)}>
                 {request.cancelLabel ?? "Отмена"}
               </Button>
-              <Button variant={request.danger ? "danger" : "primary"} onClick={() => finish(true)}>
+              <Button variant={request.danger ? "danger" : "primary"} className="w-full sm:w-auto" onClick={() => finish(true)}>
                 <IconCheck size={18} /> {request.confirmLabel ?? "Подтверждаю"}
               </Button>
             </div>
