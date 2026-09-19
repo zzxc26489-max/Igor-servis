@@ -52,7 +52,7 @@ function AppRoutes() {
                 <Route path="orders" element={<RoleRoute path="/orders"><Orders /></RoleRoute>} />
                 <Route path="orders/new" element={<RoleRoute path="/orders"><NewOrder /></RoleRoute>} />
                 <Route path="orders/:orderId" element={<RoleRoute path="/orders"><OrderDetail /></RoleRoute>} />
-                <Route path="orders/:orderId/print" element={<RoleRoute path="/documents"><OrderPrint /></RoleRoute>} />
+                <Route path="orders/:orderId/print" element={<RoleRoute path="/orders"><OrderPrint /></RoleRoute>} />
                 <Route path="documents" element={<RoleRoute path="/documents"><Documents /></RoleRoute>} />
                 <Route path="stock" element={<RoleRoute path="/stock"><Stock /></RoleRoute>} />
                 <Route path="purchases" element={<RoleRoute path="/purchases"><Purchases /></RoleRoute>} />
