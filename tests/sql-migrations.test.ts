@@ -148,3 +148,17 @@ test("idempotent client and service CRUD migration rejects duplicates and no-ops
   assert.match(sql, /'latestMigration', 17/);
   assert.match(sql, /idempotent-reference-crud/);
 });
+
+
+test("idempotent order delete and release migration avoids duplicate release movements", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "018_idempotent_order_delete_release.sql"), "utf8");
+  assert.match(sql, /create or replace function public\.crm_release_order_part/);
+  assert.match(sql, /create or replace function public\.crm_delete_order/);
+  assert.match(sql, /for update/g);
+  assert.match(sql, /release-part:' \|\| p_order_id \|\| ':' \|\| p_part_id/);
+  assert.match(sql, /delete-order:' \|\| p_order_id/);
+  assert.match(sql, /Заказ с оплатами нельзя удалить/);
+  assert.match(sql, /if v_order is null then[\s\S]*'ok', true/);
+  assert.match(sql, /'latestMigration', 18/);
+  assert.match(sql, /idempotent-order-delete-release/);
+});
