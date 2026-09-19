@@ -255,6 +255,7 @@ export default function NewOrder() {
         parts: [],
         paid: 0,
         complaint: complaint.trim() || undefined,
+        mileageAtIntake: mileage ? Number(mileage) : undefined,
         scheduledStart: time,
         scheduledEnd: endTime,
         workDayStart: company.openTime,
