@@ -154,6 +154,7 @@ npm run build
 17. `supabase/017_idempotent_reference_crud.sql`
 18. `supabase/018_idempotent_order_delete_release.sql`
 19. `supabase/019_review_fixes.sql`
+20. `supabase/020_security_hardening.sql`
 
 
 ## Что ещё осталось перед боевым запуском
@@ -165,6 +166,6 @@ npm run build
 - замену демонстрационных клиентов/машин/заказов;
 - состояние общей базы;
 - наличие резервной копии;
-- актуальность серверных миграций Supabase.
+- актуальность серверных миграций Supabase (включая security migration 020).
 
 Автоматический расчёт сдельной зарплаты уже реализован: начисление идёт по выданным заказам и работам конкретного исполнителя.
