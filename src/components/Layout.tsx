@@ -61,10 +61,16 @@ const MECHANIC_MOBILE_NAV: NavItem[] = [
   { to: "/my-work", label: "Мои работы", icon: IconGauge, end: true },
 ];
 
+const PARTS_MOBILE_NAV: NavItem[] = [
+  { to: "/stock", label: "Склад", icon: IconCube, end: true },
+  { to: "/purchases", label: "Закупки", icon: IconShoppingCart, badge: "purchases" },
+  { to: "/orders", label: "Заказы", icon: IconClipboardList },
+];
+
 const ACCOUNTANT_MOBILE_NAV: NavItem[] = [
   { to: "/finance", label: "Финансы", icon: IconCoin, end: true },
+  { to: "/documents", label: "Документы", icon: IconFileDescription },
   { to: "/reports", label: "Отчёты", icon: IconChartBar },
-  { to: "/employees", label: "Сотрудники", icon: IconUsersGroup },
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -224,7 +230,13 @@ export default function Layout() {
         style={{ borderColor: "var(--border)" }}
         aria-label="Основная навигация"
       >
-        {(cloud.role === "mechanic" ? MECHANIC_MOBILE_NAV : cloud.role === "accountant" ? ACCOUNTANT_MOBILE_NAV : MOBILE_NAV_ITEMS)
+        {(cloud.role === "mechanic"
+          ? MECHANIC_MOBILE_NAV
+          : cloud.role === "accountant"
+            ? ACCOUNTANT_MOBILE_NAV
+            : cloud.role === "parts"
+              ? PARTS_MOBILE_NAV
+              : MOBILE_NAV_ITEMS)
           .filter((item) => !cloud.role || canOpenPath(cloud.role, item.to)).map((item) => (
           <NavLink
             key={item.to}
@@ -240,7 +252,14 @@ export default function Layout() {
             {({ isActive }) => (
               <>
                 {isActive && <span className="absolute -top-px h-0.5 w-10 rounded-full bg-[var(--accent)]" />}
-                <item.icon size={22} stroke={1.8} aria-hidden="true" />
+                <span className="relative">
+                  <item.icon size={22} stroke={1.8} aria-hidden="true" />
+                  {item.badge && badges[item.badge] > 0 && (
+                    <span className="absolute -right-2 -top-1 min-w-4 rounded-full bg-[var(--danger)] px-1 text-center text-[9px] font-bold leading-4 text-white">
+                      {badges[item.badge]}
+                    </span>
+                  )}
+                </span>
                 <span className="max-w-full truncate">{item.label}</span>
               </>
             )}
