@@ -170,6 +170,10 @@ export type CloudVehicleResult =
       updatedAt?: string;
     };
 
+export type CloudFinancialResult =
+  | { ok: true; revision: number; updatedAt?: string; data: unknown }
+  | { ok: false; financialConflict: true; revision: number; message: string; data: unknown; updatedAt?: string };
+
 const rawUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "");
 const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
 
@@ -437,6 +441,65 @@ export async function returnCloudStockSupplier(
     },
     session.access_token,
   ) as Promise<CloudStockMutationResult>;
+}
+
+export async function addCloudExpense(
+  session: CloudSession,
+  expense: unknown,
+): Promise<CloudFinancialResult> {
+  return requestMutation(
+    "/rest/v1/rpc/crm_add_expense",
+    { method: "POST", body: JSON.stringify({ p_expense: expense }) },
+    session.access_token,
+  ) as Promise<CloudFinancialResult>;
+}
+
+export async function confirmCloudSupplierRefund(
+  session: CloudSession,
+  expenseId: string,
+  method: "cash" | "terminal" | "transfer",
+  operationId: string,
+): Promise<CloudFinancialResult> {
+  return requestMutation(
+    "/rest/v1/rpc/crm_confirm_supplier_refund",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_expense_id: expenseId,
+        p_method: method,
+        p_operation_id: operationId,
+      }),
+    },
+    session.access_token,
+  ) as Promise<CloudFinancialResult>;
+}
+
+export async function payCloudEmployee(
+  session: CloudSession,
+  input: {
+    employeeId: string;
+    amount: number;
+    method: "cash" | "terminal" | "transfer";
+    component: "piecework" | "salary";
+    expenseId: string;
+    note?: string;
+  },
+): Promise<CloudFinancialResult> {
+  return requestMutation(
+    "/rest/v1/rpc/crm_pay_employee",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_employee_id: input.employeeId,
+        p_amount: input.amount,
+        p_method: input.method,
+        p_component: input.component,
+        p_expense_id: input.expenseId,
+        p_note: input.note?.trim() || null,
+      }),
+    },
+    session.access_token,
+  ) as Promise<CloudFinancialResult>;
 }
 
 export async function createCloudBackup(session: CloudSession): Promise<{ ok: true; createdAt: string }> {
