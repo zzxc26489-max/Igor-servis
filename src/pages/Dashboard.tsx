@@ -21,10 +21,11 @@ import { todayISO } from "../lib/date";
 import { serviceReminders } from "../lib/serviceReminder";
 import { promiseLabel, promisedOrderAlerts } from "../lib/promisedDeadline";
 import { ordersWithUnassignedWorks, unassignedWorks } from "../lib/workAssignment";
+import { buildAttentionItems } from "../lib/attention";
 import type { Order } from "../types";
 
 export default function Dashboard() {
-  const { orders, clients, vehicles, lifts } = useAppStore();
+  const { orders, clients, vehicles, lifts, stock } = useAppStore();
   const navigate = useNavigate();
   const today = todayISO();
 
@@ -76,6 +77,11 @@ export default function Dashboard() {
     return result.slice(0, 6);
   }, [deadlineAlerts, debtOrders, orders, ready, unassigned, unassignedWorkOrders, waitingParts]);
 
+  const focusItems = useMemo(
+    () => buildAttentionItems({ orders, clients, vehicles, stock }).slice(0, 4),
+    [clients, orders, stock, vehicles],
+  );
+
   const fullDate = new Intl.DateTimeFormat("ru-RU", {
     weekday: "long",
     day: "numeric",
@@ -96,6 +102,29 @@ export default function Dashboard() {
           <Stat to="/orders?filter=ожидает%20запчасти" icon={<IconPackage size={17} />} label="Ждут запчасти" value={waitingParts.length} unit={plural(waitingParts.length, "заказ", "заказа", "заказов")} tone="warning" />
           <Stat to="/schedule" icon={<IconClipboardList size={17} />} label="Свободны сейчас" value={freeLifts} unit={`из ${lifts.length} подъёмников`} />
         </div>
+
+        {focusItems.length > 0 && (
+          <Card className="mb-4 overflow-hidden p-0">
+            <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5 sm:px-4" style={{ borderColor: "var(--border)" }}>
+              <div>
+                <h2 className="panel-title flex items-center gap-2"><IconBell size={18} /> Фокус внимания</h2>
+                <p className="muted mt-0.5 text-xs">Самые важные задачи прямо сейчас</p>
+              </div>
+              <Link to="/attention" className="text-xs font-semibold text-[var(--accent)]">Все задачи →</Link>
+            </div>
+            <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+              {focusItems.map((item) => (
+                <Link key={item.id} to={item.to} className="flex items-start gap-3 px-3 py-2.5 transition hover:bg-[#f7f9f7] sm:px-4">
+                  <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: item.priority === "critical" ? "var(--danger)" : item.priority === "high" ? "var(--warning)" : "#3978c9" }} />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">{item.title}</span>
+                    <span className="muted mt-0.5 block text-xs">{item.detail}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </Card>
+        )}
 
         <details open className="mb-4 overflow-hidden rounded-xl border bg-white shadow-[0_2px_8px_rgba(23,34,30,0.045)]" style={{ borderColor: "var(--border)" }}>
           <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3">
