@@ -83,3 +83,70 @@ test("dirty check compares local state with last confirmed server base", () => {
   assert.equal(hasLocalChanges(base, { revisionData: [{ id: "1", value: "b" }] }), true);
   assert.equal(hasLocalChanges(null, base), false);
 });
+
+
+test("different fields of the same order merge without overwriting each other", () => {
+  const base = {
+    orders: [{ id: "o1", status: "запись", notes: "", paid: 0 }],
+  };
+  const local = {
+    orders: [{ id: "o1", status: "в работе", notes: "", paid: 0 }],
+  };
+  const remote = {
+    orders: [{ id: "o1", status: "запись", notes: "Проверить шум", paid: 0 }],
+  };
+
+  const merged = mergeConcurrentStateDetailed(base, local, remote);
+  assert.equal(merged.value.orders[0].status, "в работе");
+  assert.equal(merged.value.orders[0].notes, "Проверить шум");
+  assert.equal(merged.conflicts.length, 0);
+});
+
+test("server wins only the same field changed differently on both devices", () => {
+  const base = {
+    orders: [{ id: "o1", status: "запись", notes: "", paid: 0 }],
+  };
+  const local = {
+    orders: [{ id: "o1", status: "в работе", notes: "Локальная заметка", paid: 0 }],
+  };
+  const remote = {
+    orders: [{ id: "o1", status: "готово", notes: "", paid: 0 }],
+  };
+
+  const merged = mergeConcurrentStateDetailed(base, local, remote);
+  assert.equal(merged.value.orders[0].status, "готово");
+  assert.equal(merged.value.orders[0].notes, "Локальная заметка");
+  assert.equal(merged.conflicts.length, 1);
+  assert.equal(merged.conflicts[0].path, "orders[o1].status");
+});
+
+test("remote edit prevents stale local deletion from erasing new server data", () => {
+  const base = { vehicles: [{ id: "v1", plate: "A001AA", mileage: 1000 }] };
+  const local = { vehicles: [] };
+  const remote = { vehicles: [{ id: "v1", plate: "A001AA", mileage: 1200 }] };
+
+  const merged = mergeConcurrentStateDetailed(base, local, remote);
+  assert.equal(merged.value.vehicles.length, 1);
+  assert.equal(merged.value.vehicles[0].mileage, 1200);
+  assert.equal(merged.conflicts.length, 1);
+});
+
+test("confirmed server deletion wins over stale local edit", () => {
+  const base = { vehicles: [{ id: "v1", plate: "A001AA", mileage: 1000 }] };
+  const local = { vehicles: [{ id: "v1", plate: "A001AA", mileage: 1100 }] };
+  const remote = { vehicles: [] };
+
+  const merged = mergeConcurrentStateDetailed(base, local, remote);
+  assert.deepEqual(merged.value.vehicles, []);
+  assert.equal(merged.conflicts.length, 1);
+});
+
+test("independent concurrent creations are both preserved", () => {
+  const base = { clients: [] as Array<{ id: string; name: string }> };
+  const local = { clients: [{ id: "local", name: "Локальный" }] };
+  const remote = { clients: [{ id: "remote", name: "Серверный" }] };
+
+  const merged = mergeConcurrentStateDetailed(base, local, remote);
+  assert.deepEqual(merged.value.clients.map((item) => item.id), ["local", "remote"]);
+  assert.equal(merged.conflicts.length, 0);
+});
