@@ -136,22 +136,28 @@ create or replace function public.crm_merge_mechanic_orders(
 )
 returns jsonb
 language sql
+volatile
 set search_path = public
-as $
+as $fn$
   select coalesce(
     jsonb_agg(
       case
-        when incoming.item is null then current_order.item
+        when incoming.item is null or not permission.allowed then current_order.item
         else
           jsonb_set(
             jsonb_set(
               jsonb_set(
-                case
-                  when current_order.item ->> 'status' in ('запись', 'диагностика')
-                       and incoming.item ->> 'status' = 'в работе'
-                    then jsonb_set(current_order.item, '{status}', '"в работе"'::jsonb, true)
-                  else current_order.item
-                end,
+                jsonb_set(
+                  current_order.item,
+                  '{status}',
+                  case
+                    when current_order.item ->> 'status' in ('запись', 'диагностика')
+                         and incoming.item ->> 'status' = 'в работе'
+                      then '"в работе"'::jsonb
+                    else coalesce(current_order.item -> 'status', '"запись"'::jsonb)
+                  end,
+                  true
+                ),
                 '{timeline}',
                 case
                   when current_order.item ->> 'status' in ('запись', 'диагностика')
@@ -195,10 +201,17 @@ as $
               ), '[]'::jsonb),
               true
             ),
-            true
-          ),
-          '{media}',
-            coalesce(incoming.item -> 'media', current_order.item -> 'media', '[]'::jsonb),
+            '{media}',
+            coalesce(current_order.item -> 'media', '[]'::jsonb)
+              || coalesce((
+                select jsonb_agg(candidate)
+                from jsonb_array_elements(coalesce(incoming.item -> 'media', '[]'::jsonb)) candidate
+                where not exists (
+                  select 1
+                  from jsonb_array_elements(coalesce(current_order.item -> 'media', '[]'::jsonb)) existing
+                  where existing ->> 'id' = candidate ->> 'id'
+                )
+              ), '[]'::jsonb),
             true
           )
       end
@@ -212,7 +225,14 @@ as $
     from jsonb_array_elements(coalesce(p_incoming, '[]'::jsonb)) candidate
     where candidate ->> 'id' = current_order.item ->> 'id'
     limit 1
-  ) incoming on true;
-$$;
+  ) incoming on true
+  left join lateral (
+    select exists (
+      select 1
+      from jsonb_array_elements(coalesce(current_order.item -> 'works', '[]'::jsonb)) work
+      where work ->> 'executor' = p_display
+    ) as allowed
+  ) permission on true;
+$fn$;
 
 revoke all on function public.crm_merge_mechanic_orders(jsonb, jsonb, text) from public;
