@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mechanicWorkload, mechanicWorkloadLabel } from "../src/lib/mechanicWorkload.ts";
-import type { Order } from "../src/types.ts";
+import { isMechanicEmployee, mechanicCandidates, mechanicWorkload, mechanicWorkloadLabel } from "../src/lib/mechanicWorkload.ts";
+import type { Employee, Order } from "../src/types.ts";
 
 const orders: Order[] = [
   {
@@ -43,4 +43,41 @@ test("mechanic workload counts only unfinished works in active orders", () => {
 test("mechanic workload label is concise", () => {
   assert.equal(mechanicWorkloadLabel(mechanicWorkload(orders, "Алексей")), "2 активн. · 1 сейчас");
   assert.equal(mechanicWorkloadLabel(mechanicWorkload(orders, "Никто")), "свободен");
+});
+
+
+const employee = (id: string, name: string, role: string): Employee => ({
+  id,
+  name,
+  role,
+  payType: "percent",
+  payValue: 30,
+  accrued: 0,
+  paid: 0,
+});
+
+test("only mechanic roles are assignable to repair work", () => {
+  assert.equal(isMechanicEmployee(employee("1", "Иван", "Механик")), true);
+  assert.equal(isMechanicEmployee(employee("2", "Пётр", "Автомеханик-диагност")), true);
+  assert.equal(isMechanicEmployee(employee("3", "Игорь", "Владелец, мастер-приёмщик")), false);
+  assert.equal(isMechanicEmployee(employee("4", "Елена", "Учёт, документы")), false);
+});
+
+test("mechanic candidates exclude office roles and sort by workload", () => {
+  const employees = [
+    employee("1", "Алексей", "Механик"),
+    employee("2", "Сергей", "Механик"),
+    employee("3", "Елена", "Бухгалтер"),
+  ];
+  const candidates = mechanicCandidates(employees, orders);
+  assert.deepEqual(candidates.map((item) => item.employee.name), ["Сергей", "Алексей"]);
+});
+
+test("current legacy assignee stays selectable even when role is no longer mechanic", () => {
+  const employees = [
+    employee("1", "Игорь", "Владелец, мастер-приёмщик"),
+    employee("2", "Алексей", "Механик"),
+  ];
+  const candidates = mechanicCandidates(employees, orders, "Игорь");
+  assert.equal(candidates.some((item) => item.employee.name === "Игорь"), true);
 });
