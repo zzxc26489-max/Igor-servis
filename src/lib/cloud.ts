@@ -155,3 +155,45 @@ export async function restoreCloudBackup(
     session.access_token,
   ) as Promise<{ ok: true; revision: number; updatedAt?: string }>;
 }
+
+
+function storageObjectPath(storagePath: string) {
+  return storagePath.split("/").map(encodeURIComponent).join("/");
+}
+
+async function storageRequest(storagePath: string, init: RequestInit, session: CloudSession) {
+  if (!cloudConfigured) throw new Error("Серверная база не настроена");
+  const headers = new Headers(init.headers);
+  headers.set("apikey", anonKey);
+  headers.set("Authorization", `Bearer ${session.access_token}`);
+  const response = await fetch(
+    `${rawUrl}/storage/v1/object/order-media/${storageObjectPath(storagePath)}`,
+    { ...init, headers },
+  );
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: string; error?: string } | null;
+    throw new Error(body?.message || body?.error || `Ошибка хранилища: ${response.status}`);
+  }
+  return response;
+}
+
+export async function uploadCloudOrderMedia(session: CloudSession, storagePath: string, file: File) {
+  await storageRequest(storagePath, {
+    method: "POST",
+    headers: {
+      "Content-Type": file.type || "application/octet-stream",
+      "x-upsert": "false",
+      "cache-control": "3600",
+    },
+    body: file,
+  }, session);
+}
+
+export async function downloadCloudOrderMedia(session: CloudSession, storagePath: string) {
+  const response = await storageRequest(storagePath, { method: "GET" }, session);
+  return response.blob();
+}
+
+export async function deleteCloudOrderMedia(session: CloudSession, storagePath: string) {
+  await storageRequest(storagePath, { method: "DELETE" }, session);
+}
