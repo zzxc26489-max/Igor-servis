@@ -50,6 +50,7 @@ import {
   type CloudRole,
 } from "../lib/cloud";
 import { mergeConcurrentStateDetailed } from "../lib/stateMerge";
+import { shouldApplyServerRevision, shouldSurfaceServerLoadError } from "../lib/serverSyncPolicy";
 import { useAuth } from "../auth/AuthContext";
 import { LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
 import { isValidQuantity, normalizeQuantity } from "../lib/quantity";
@@ -404,7 +405,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
     // Главное правило опроса: ревизия на устройстве никогда не движется назад.
     // Поздний ответ старого запроса просто игнорируем.
-    if (snapshot.revision < cloudRevisionRef.current) return false;
+    if (!shouldApplyServerRevision({
+      currentRevision: cloudRevisionRef.current,
+      incomingRevision: snapshot.revision,
+    })) return false;
 
     const meta = {
       configured: true,
@@ -459,6 +463,47 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     return true;
   }, [session]);
 
+  const applyConfirmedServerState = useCallback((
+    result: { revision: number; data: unknown; updatedAt?: string },
+  ) => {
+    if (!session) return false;
+    if (!shouldApplyServerRevision({
+      currentRevision: cloudRevisionRef.current,
+      incomingRevision: result.revision,
+    })) return false;
+
+    const remote = migrate(result.data as DB);
+    const base = cloudBaseRef.current;
+    const local = migrate(dbRef.current);
+
+    let next = remote;
+    let conflicts = 0;
+    if (base && JSON.stringify(local) !== JSON.stringify(base)) {
+      const merged = mergeConcurrentStateDetailed(
+        base as unknown as Record<string, unknown>,
+        local as unknown as Record<string, unknown>,
+        remote as unknown as Record<string, unknown>,
+      );
+      next = migrate(merged.value as unknown as DB);
+      conflicts = merged.conflicts.length;
+    }
+
+    cloudRevisionRef.current = result.revision;
+    cloudBaseRef.current = remote;
+    writeCloudBase(session.user.id, result.revision, remote);
+    rawSetDB(next);
+    setCloud((prev) => ({
+      ...prev,
+      status: "ready",
+      revision: result.revision,
+      lastSyncedAt: result.updatedAt ?? new Date().toISOString(),
+      error: undefined,
+      conflictCount: conflicts ? (prev.conflictCount ?? 0) + conflicts : prev.conflictCount,
+      lastConflictAt: conflicts ? new Date().toISOString() : prev.lastConflictAt,
+    }));
+    return true;
+  }, [session]);
+
   const loadFromCloud = useCallback(async (showLoading = true) => {
     if (!cloudConfigured || !session) return "Серверная база не подключена";
     const requestId = ++cloudLoadRequestRef.current;
@@ -468,13 +513,18 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       }
       const snapshot = await loadCloudState(session);
       // Более старый запрос не должен менять интерфейс после более нового ответа.
-      if (requestId < cloudLoadRequestRef.current && snapshot.revision <= cloudRevisionRef.current) return null;
+      if (!shouldApplyServerRevision({
+        currentRevision: cloudRevisionRef.current,
+        incomingRevision: snapshot.revision,
+        requestId,
+        latestRequestId: cloudLoadRequestRef.current,
+      })) return null;
       applyCloudSnapshot(snapshot);
       return null;
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Не удалось загрузить общую базу";
       // Ошибка старого запроса не должна перекрыть состояние более свежей синхронизации.
-      if (requestId === cloudLoadRequestRef.current) {
+      if (shouldSurfaceServerLoadError(requestId, cloudLoadRequestRef.current)) {
         setCloud((prev) => ({ ...prev, configured: true, status: "error", error: message }));
       }
       return message;
@@ -507,6 +557,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
         const result = await saveCloudState(session, cloudRevisionRef.current, nextCandidate);
         if (result.ok) {
+          if (!shouldApplyServerRevision({
+            currentRevision: cloudRevisionRef.current,
+            incomingRevision: result.revision,
+          })) return null;
           cloudRevisionRef.current = result.revision;
           cloudBaseRef.current = nextCandidate;
           writeCloudBase(session.user.id, result.revision, nextCandidate);
