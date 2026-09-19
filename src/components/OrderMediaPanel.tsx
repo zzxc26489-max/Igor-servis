@@ -10,7 +10,7 @@ import { nowISO } from "../lib/date";
 import { formatDateTime } from "../lib/format";
 import { buildOrderMediaPath, ORDER_MEDIA_LABELS, validateOrderMediaFile } from "../lib/orderMedia";
 import { compressOrderPhoto, fileToDataUrl } from "../lib/imageCompression";
-import { deleteCloudOrderMedia, downloadCloudOrderMedia, uploadCloudOrderMedia } from "../lib/cloud";
+import { createCloudOrderMediaSignedUrl, deleteCloudOrderMedia, uploadCloudOrderMedia } from "../lib/cloud";
 import type { Order, OrderMedia, OrderMediaKind } from "../types";
 
 const KINDS = Object.keys(ORDER_MEDIA_LABELS) as OrderMediaKind[];
@@ -30,20 +30,17 @@ function MediaPreview({ media }: { media: OrderMedia }) {
       return;
     }
     let disposed = false;
-    let objectUrl = "";
     setError("");
-    void downloadCloudOrderMedia(session, media.storagePath)
-      .then((blob) => {
+    void createCloudOrderMediaSignedUrl(session, media.storagePath)
+      .then((url) => {
         if (disposed) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSrc(objectUrl);
+        setSrc(url);
       })
       .catch(() => {
         if (!disposed) setError("Не удалось открыть файл");
       });
     return () => {
       disposed = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [media.localDataUrl, media.storagePath, session]);
 
@@ -237,14 +234,10 @@ export default function OrderMediaPanel({
                       onClick={async () => {
                         try {
                           let url = item.localDataUrl ?? "";
-                          let objectUrl = "";
                           if (!url && item.storagePath && session) {
-                            const blob = await downloadCloudOrderMedia(session, item.storagePath);
-                            objectUrl = URL.createObjectURL(blob);
-                            url = objectUrl;
+                            url = await createCloudOrderMediaSignedUrl(session, item.storagePath);
                           }
                           if (url) window.open(url, "_blank", "noopener,noreferrer");
-                          if (objectUrl) window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
                         } catch {
                           showToast("Не удалось открыть файл", "error");
                         }
