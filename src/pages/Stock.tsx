@@ -490,6 +490,7 @@ function ItemCard({
 
       <div className="mt-3 space-y-1 border-t pt-3 text-sm" style={{ borderColor: "var(--border)" }}>
         <Row label="Категория" value={item.category} />
+        {item.barcode && <Row label="Штрихкод" value={item.barcode} />}
         <Row label="Цена закупки" value={formatMoney(item.purchasePrice)} />
         {item.lastPurchasePrice !== undefined && <Row label="Последняя закупка" value={formatMoney(item.lastPurchasePrice)} />}
         {item.supplier && <Row label="Поставщик" value={item.supplier} />}
