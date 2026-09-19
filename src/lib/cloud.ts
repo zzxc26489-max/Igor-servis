@@ -1,3 +1,5 @@
+import { createSerialQueue } from "./serialQueue";
+
 export type CloudRole = "owner" | "partner" | "advisor" | "parts" | "mechanic" | "accountant";
 
 export interface CloudUser {
@@ -188,7 +190,7 @@ async function request(path: string, init: RequestInit = {}, accessToken?: strin
   return response.json();
 }
 
-let mutationTail: Promise<void> = Promise.resolve();
+const enqueueMutation = createSerialQueue();
 
 /**
  * Все серверные мутации из одного браузера идут строго по очереди.
@@ -196,10 +198,7 @@ let mutationTail: Promise<void> = Promise.resolve();
  * ревизии и атомарные RPC.
  */
 function requestMutation(path: string, init: RequestInit = {}, accessToken?: string) {
-  const run = () => request(path, init, accessToken);
-  const result = mutationTail.then(run, run);
-  mutationTail = result.then(() => undefined, () => undefined);
-  return result;
+  return enqueueMutation(() => request(path, init, accessToken));
 }
 
 function normalizeSession(payload: Record<string, unknown>): CloudSession {
