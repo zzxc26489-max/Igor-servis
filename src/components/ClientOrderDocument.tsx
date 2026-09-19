@@ -1,7 +1,7 @@
 import { formatDateTime, formatMoney } from "../lib/format";
 import { recordedForOrder } from "../lib/payments";
 import defaultLogo from "../assets/logo.jpg";
-import type { Client, CompanySettings, Order, Payment, Vehicle } from "../types";
+import type { Client, CompanyInfo, Order, Payment, Vehicle } from "../types";
 
 export default function ClientOrderDocument({
   order,
@@ -13,7 +13,7 @@ export default function ClientOrderDocument({
   order: Order;
   client?: Client;
   vehicle?: Vehicle;
-  company: CompanySettings;
+  company: CompanyInfo;
   payments: Payment[];
 }) {
   const worksTotal = order.works.reduce((sum, work) => sum + work.price * work.qty, 0);
