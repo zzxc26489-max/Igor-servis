@@ -530,6 +530,35 @@ export async function setCloudOrderStatus(
   ) as Promise<CloudOrderStatusResult>;
 }
 
+export async function releaseCloudOrderPart(
+  session: CloudSession,
+  orderId: string,
+  partId: string,
+): Promise<CloudOrderStatusResult> {
+  return requestMutation(
+    "/rest/v1/rpc/crm_release_order_part",
+    {
+      method: "POST",
+      body: JSON.stringify({ p_order_id: orderId, p_part_id: partId }),
+    },
+    session.access_token,
+  ) as Promise<CloudOrderStatusResult>;
+}
+
+export async function deleteCloudOrder(
+  session: CloudSession,
+  orderId: string,
+): Promise<CloudOrderStatusResult> {
+  return requestMutation(
+    "/rest/v1/rpc/crm_delete_order",
+    {
+      method: "POST",
+      body: JSON.stringify({ p_order_id: orderId }),
+    },
+    session.access_token,
+  ) as Promise<CloudOrderStatusResult>;
+}
+
 export async function updateCloudClient(
   session: CloudSession,
   client: unknown,
