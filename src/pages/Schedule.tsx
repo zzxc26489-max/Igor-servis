@@ -306,7 +306,7 @@ export default function Schedule() {
             </div>
           </section>
 
-          <details className="overflow-hidden rounded-xl border bg-white" style={{ borderColor: "var(--border)" }}>
+          <details open className="overflow-hidden rounded-xl border bg-white" style={{ borderColor: "var(--border)" }}>
             <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">
               Подробная временная шкала
               <span className="muted ml-2 font-normal">для точного распределения по времени</span>
