@@ -79,7 +79,10 @@ begin
   ) into v_order_exists;
 
   if not v_order_exists then
-    return false;
+    -- После удаления заказ-наряда его приватные файлы могут остаться в Storage.
+    -- Только администраторские роли могут их увидеть и удалить; новую запись
+    -- в несуществующий заказ по-прежнему загрузить нельзя.
+    return not p_write and v_role in ('owner', 'partner', 'advisor');
   end if;
 
   if p_delete and v_role not in ('owner', 'partner', 'advisor') then
