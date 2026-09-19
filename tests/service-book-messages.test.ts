@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readyMessage, smsMessageHref, whatsappMessageHref } from "../src/lib/customerMessages.ts";
-import { vehicleOrders, vehicleServiceStats } from "../src/lib/serviceBook.ts";
+import { issuedVehicleOrders, vehicleOrders, vehicleServiceStats } from "../src/lib/serviceBook.ts";
 import type { Order } from "../src/types.ts";
 
 const orders: Order[] = [
@@ -28,6 +28,7 @@ const orders: Order[] = [
 
 test("service book keeps only selected vehicle and counts issued history", () => {
   assert.deepEqual(vehicleOrders(orders, "v1").map((order) => order.id), ["o2", "o1"]);
+  assert.deepEqual(issuedVehicleOrders(orders, "v1").map((order) => order.id), ["o1"]);
   const stats = vehicleServiceStats(orders, "v1");
   assert.equal(stats.totalOrders, 2);
   assert.equal(stats.issuedOrders, 1);

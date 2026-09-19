@@ -18,7 +18,7 @@ import {
 import { Button, Card, EmptyState, ListCard, Metric, Page, StatusBadge, TopBar } from "../components/ui";
 import { formatDate, formatDateTime, formatMoney, plural } from "../lib/format";
 import { orderTotals } from "../lib/order";
-import { vehicleOrders, vehicleServiceStats } from "../lib/serviceBook";
+import { issuedVehicleOrders, vehicleOrders, vehicleServiceStats } from "../lib/serviceBook";
 import type { Vehicle } from "../types";
 import { todayISO } from "../lib/date";
 
@@ -108,20 +108,17 @@ export default function ClientDetail() {
     [clientId, orders],
   );
   const stats = useMemo(() => {
-    const totals = clientOrders.reduce(
-      (acc, order) => {
-        const { due, debt } = orderTotals(order);
-        acc.spent += due;
-        acc.debt += Math.max(0, debt);
-        return acc;
-      },
-      { spent: 0, debt: 0 },
-    );
-    const paidOrders = clientOrders.filter((order) => orderTotals(order).due > 0);
+    const issued = clientOrders.filter((order) => order.status === "выдан");
+    const spent = issued.reduce((sum, order) => sum + orderTotals(order).due, 0);
+    const debt = clientOrders
+      .filter((order) => order.status !== "запись")
+      .reduce((sum, order) => sum + Math.max(0, orderTotals(order).debt), 0);
+    const paidOrders = issued.filter((order) => orderTotals(order).due > 0);
     return {
-      ...totals,
-      average: paidOrders.length ? Math.round(totals.spent / paidOrders.length) : 0,
-      lastVisit: clientOrders[0]?.createdAt,
+      spent,
+      debt,
+      average: paidOrders.length ? Math.round(spent / paidOrders.length) : 0,
+      lastVisit: issued[0]?.issuedAt ?? issued[0]?.completedAt ?? issued[0]?.createdAt,
     };
   }, [clientOrders]);
 
@@ -551,7 +548,8 @@ export default function ClientDetail() {
                         </div>
                       </div>
                       {serviceBookVehicleId === vehicle.id && (() => {
-                        const history = vehicleOrders(orders, vehicle.id);
+                        const history = issuedVehicleOrders(orders, vehicle.id);
+                        const active = vehicleOrders(orders, vehicle.id).filter((entry) => entry.status !== "выдан");
                         const serviceStats = vehicleServiceStats(orders, vehicle.id);
                         return (
                           <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--border)" }}>
@@ -561,7 +559,23 @@ export default function ClientDetail() {
                               <div className="rounded-lg bg-[var(--bg)] p-2 text-xs"><span className="muted block">Запчастей</span><b>{serviceStats.parts}</b></div>
                               <div className="rounded-lg bg-[var(--bg)] p-2 text-xs"><span className="muted block">За всё время</span><b>{formatMoney(serviceStats.spent)}</b></div>
                             </div>
-                            <h3 className="mb-2 text-sm font-semibold">Сервисная книжка автомобиля</h3>
+                            {active.length > 0 && (
+                              <div className="mb-3 rounded-lg border p-3 text-sm" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
+                                <div className="mb-1 font-semibold">Сейчас в работе / запланировано</div>
+                                {active.map((entry) => (
+                                  <button
+                                    key={entry.id}
+                                    type="button"
+                                    onClick={() => navigate(`/orders/${entry.id}`)}
+                                    className="flex w-full items-center justify-between gap-3 py-1 text-left"
+                                  >
+                                    <span className="min-w-0 truncate">{entry.number} · {entry.works[0]?.name ?? entry.complaint ?? "Без описания"}</span>
+                                    <StatusBadge status={entry.status} />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            <h3 className="mb-2 text-sm font-semibold">Завершённая история автомобиля</h3>
                             <div className="space-y-2">
                               {history.map((historyOrder) => {
                                 const { due } = orderTotals(historyOrder);
@@ -579,9 +593,16 @@ export default function ClientDetail() {
                                     </div>
                                     <div className="muted mt-1 text-xs">
                                       {formatDateTime(historyOrder.issuedAt ?? historyOrder.completedAt ?? historyOrder.createdAt)}
+                                      {historyOrder.mileageAtIntake ? ` · ${historyOrder.mileageAtIntake.toLocaleString("ru-RU")} км` : ""}
                                       {" · "}
                                       {historyOrder.works.map((work) => work.name).join(", ") || "работы не указаны"}
                                     </div>
+                                    {historyOrder.diagnosis && (
+                                      <div className="mt-1 text-xs"><b>Диагностика:</b> {historyOrder.diagnosis}</div>
+                                    )}
+                                    {historyOrder.defects && (
+                                      <div className="muted mt-1 text-xs">Состояние: {historyOrder.defects}</div>
+                                    )}
                                     {historyOrder.parts.length > 0 && (
                                       <div className="muted mt-1 text-xs">
                                         Запчасти: {historyOrder.parts.map((part) => `${part.name} × ${part.qty}`).join(", ")}
@@ -590,7 +611,7 @@ export default function ClientDetail() {
                                   </button>
                                 );
                               })}
-                              {history.length === 0 && <p className="muted text-xs">По этой машине заказ-нарядов ещё нет.</p>}
+                              {history.length === 0 && <p className="muted text-xs">Завершённых визитов по этой машине ещё нет.</p>}
                             </div>
                           </div>
                         );

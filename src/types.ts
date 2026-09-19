@@ -176,7 +176,9 @@ export interface Order {
   scheduledStart?: string;
   scheduledEnd?: string;
   complaint?: string;
-  /** Внутренний комментарий мастера. Клиенту и в акт не выводится. */
+  /** Пробег на момент приёмки. Нужен для истории и печати старых заказ-нарядов. */
+  mileageAtIntake?: number;
+  /** Внутренний комментарий мастера. Клиенту и в печатную версию не выводится. */
   mechanicComment?: string;
   /** История статусов: когда машина встала на подъёмник и когда сошла. */
   timeline?: StatusEvent[];
