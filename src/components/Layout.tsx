@@ -2,7 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import {
   IconCalendarEvent, IconChartBar, IconChevronDown, IconClipboardList, IconCoin,
   IconCube, IconDotsCircleHorizontal, IconHome2, IconSettings, IconShoppingCart,
-  IconTool, IconUsers, IconUsersGroup, IconX, IconGauge,
+  IconTool, IconUsers, IconUsersGroup, IconX, IconGauge, IconFileDescription,
 } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { lowStockItems } from "../lib/lowStock";
@@ -44,8 +44,10 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: "/clients", label: "Клиенты", icon: IconUsers },
       { to: "/services", label: "Услуги", icon: IconTool },
       { to: "/employees", label: "Сотрудники", icon: IconUsersGroup },
+  { to: "/documents", label: "Документы", icon: IconFileDescription },
       { to: "/finance", label: "Финансы", icon: IconCoin },
       { to: "/reports", label: "Отчёты", icon: IconChartBar },
+      { to: "/documents", label: "Документы", icon: IconFileDescription },
     ],
   },
 ];
