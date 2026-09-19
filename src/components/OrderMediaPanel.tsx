@@ -19,6 +19,10 @@ function canUpload(role?: string) {
   return !role || role === "owner" || role === "partner" || role === "advisor" || role === "mechanic";
 }
 
+function canDelete(role?: string) {
+  return !role || role === "owner" || role === "partner" || role === "advisor";
+}
+
 function MediaPreview({ media }: { media: OrderMedia }) {
   const { session } = useAuth();
   const [src, setSrc] = useState(media.localDataUrl ?? "");
@@ -79,6 +83,7 @@ export default function OrderMediaPanel({
 
   const media = [...(order.media ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const writable = canUpload(cloud.role);
+  const deletable = canDelete(cloud.role);
 
   async function addFiles(files: FileList | null) {
     if (!files?.length || busy) return;
@@ -145,6 +150,10 @@ export default function OrderMediaPanel({
   }
 
   async function removeMedia(item: OrderMedia) {
+    if (!deletable) {
+      showToast("Удалять фото и видео может только владелец, партнёр или приёмщик", "error");
+      return;
+    }
     const ok = await confirm({
       title: "Удалить файл из истории",
       question: "Файл исчезнет из заказа. Для серверного файла удаление необратимо.",
@@ -246,7 +255,7 @@ export default function OrderMediaPanel({
                       <IconDownload size={15} />
                     </button>
                   )}
-                  {writable && (
+                  {deletable && (
                     <button
                       type="button"
                       className="rounded-md p-1.5 hover:bg-[#fff4f4]"

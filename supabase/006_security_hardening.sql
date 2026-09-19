@@ -1,27 +1,14 @@
--- Медиа по заказам и безопасное хранилище Supabase Storage.
--- Выполнять ПОСЛЕ supabase/004_mechanic_accountant_roles.sql.
+-- Этап 6: усиление серверной безопасности.
+-- Выполнять ПОСЛЕ supabase/005_order_media_storage.sql.
 
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values (
-  'order-media',
-  'order-media',
-  false,
-  26214400,
-  array[
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'image/heic',
-    'image/heif',
-    'video/mp4',
-    'video/webm',
-    'video/quicktime'
-  ]
-)
-on conflict (id) do update
-set public = excluded.public,
-    file_size_limit = excluded.file_size_limit,
-    allowed_mime_types = excluded.allowed_mime_types;
+-- Пересоздаём политики Storage: механик может добавлять медиа только к своим заказам,
+-- но удаление серверных файлов разрешено только владельцу, партнёру и приёмщику.
+drop policy if exists "order_media_select" on storage.objects;
+drop policy if exists "order_media_insert" on storage.objects;
+drop policy if exists "order_media_delete" on storage.objects;
+
+revoke all on function public.crm_can_access_order_media(text, boolean) from public, authenticated;
+drop function if exists public.crm_can_access_order_media(text, boolean);
 
 create or replace function public.crm_can_access_order_media(
   p_object_name text,
@@ -33,7 +20,7 @@ language plpgsql
 stable
 security definer
 set search_path = public
-as $$
+as $fn$
 declare
   v_workshop uuid;
   v_role text;
@@ -92,12 +79,11 @@ begin
       )
   );
 end;
-$$;
+$fn$;
 
 revoke all on function public.crm_can_access_order_media(text, boolean, boolean) from public;
 grant execute on function public.crm_can_access_order_media(text, boolean, boolean) to authenticated;
 
-drop policy if exists "order_media_select" on storage.objects;
 create policy "order_media_select"
 on storage.objects
 for select
@@ -107,7 +93,6 @@ using (
   and public.crm_can_access_order_media(name, false, false)
 );
 
-drop policy if exists "order_media_insert" on storage.objects;
 create policy "order_media_insert"
 on storage.objects
 for insert
@@ -117,7 +102,6 @@ with check (
   and public.crm_can_access_order_media(name, true, false)
 );
 
-drop policy if exists "order_media_delete" on storage.objects;
 create policy "order_media_delete"
 on storage.objects
 for delete
@@ -127,8 +111,8 @@ using (
   and public.crm_can_access_order_media(name, true, true)
 );
 
--- Механик может добавлять медиа только к назначенному ему заказу.
--- Все остальные поля заказа по-прежнему берутся из серверной версии.
+-- Сервер сам проверяет, что заказ действительно назначен этому механику.
+-- Нельзя подставить ID чужого заказа и перевести его в работу или изменить его медиа.
 create or replace function public.crm_merge_mechanic_orders(
   p_current jsonb,
   p_incoming jsonb,

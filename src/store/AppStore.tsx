@@ -311,7 +311,13 @@ const AppStoreContext = createContext<AppStoreValue | null>(null);
 
 export function AppStoreProvider({ children }: { children: ReactNode }) {
   const { configured: cloudConfigured, session } = useAuth();
-  const [db, rawSetDB] = useState<DB>(loadInitial);
+  const [db, rawSetDB] = useState<DB>(() => {
+    if (cloudConfigured && session) {
+      const cached = readCloudBase<DB>(session.user.id);
+      return cached ? migrate(cached.base) : migrate(seedDB());
+    }
+    return loadInitial();
+  });
   const dbRef = useRef(db);
   const cloudBaseRef = useRef<DB | null>(null);
   const cloudRevisionRef = useRef(0);
@@ -346,8 +352,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (cloudConfigured) {
+      // Старый общий локальный кэш мог содержать данные другой роли/пользователя.
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-  }, [db]);
+  }, [cloudConfigured, db]);
 
   const applyCloudSnapshot = useCallback((snapshot: Awaited<ReturnType<typeof loadCloudState>>) => {
     if (!session) return;
