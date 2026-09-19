@@ -175,6 +175,8 @@ export interface Order {
   notes?: string;
   scheduledStart?: string;
   scheduledEnd?: string;
+  /** Внутренний срок, когда пообещали клиенту готовность. В печатный заказ-наряд не выводится. */
+  promisedAt?: string;
   complaint?: string;
   /** Пробег на момент приёмки. Нужен для истории и печати старых заказ-нарядов. */
   mileageAtIntake?: number;
