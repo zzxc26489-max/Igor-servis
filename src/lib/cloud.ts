@@ -45,6 +45,19 @@ export type CloudSaveResult =
   | { ok: true; revision: number; updatedAt?: string }
   | { ok: false; conflict: true; revision: number; data: unknown };
 
+export type CloudStockReserveResult =
+  | { ok: true; revision: number; updatedAt?: string; data: unknown }
+  | { ok: false; stockConflict: true; revision: number; message: string; data: unknown };
+
+export interface CloudStockReserveInput {
+  orderId: string;
+  itemId: string;
+  qty: number;
+  price: number;
+  partId: string;
+  movementId: string;
+}
+
 const rawUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "");
 const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
 
@@ -118,6 +131,27 @@ export async function saveCloudState(
     },
     session.access_token,
   ) as Promise<CloudSaveResult>;
+}
+
+export async function reserveCloudStockPart(
+  session: CloudSession,
+  input: CloudStockReserveInput,
+): Promise<CloudStockReserveResult> {
+  return request(
+    "/rest/v1/rpc/crm_reserve_stock_part",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_order_id: input.orderId,
+        p_item_id: input.itemId,
+        p_qty: input.qty,
+        p_price: input.price,
+        p_part_id: input.partId,
+        p_movement_id: input.movementId,
+      }),
+    },
+    session.access_token,
+  ) as Promise<CloudStockReserveResult>;
 }
 
 export async function createCloudBackup(session: CloudSession): Promise<{ ok: true; createdAt: string }> {
