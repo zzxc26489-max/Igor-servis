@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconAlertTriangle,
   IconChevronDown,
@@ -72,10 +72,15 @@ function visitLabel(order: Order) {
   return `${formatDate(date)}${order.scheduledStart ? ` · ${order.scheduledStart}` : ""}`;
 }
 
+function initialFilter(value: string | null): FilterValue {
+  return STATUS_FILTERS.some((item) => item.value === value) ? value as FilterValue : "active";
+}
+
 export default function Orders() {
   const { orders, clients, vehicles } = useAppStore();
   const navigate = useNavigate();
-  const [statusFilter, setStatusFilter] = useState<FilterValue>("active");
+  const [searchParams] = useSearchParams();
+  const [statusFilter, setStatusFilter] = useState<FilterValue>(() => initialFilter(searchParams.get("filter")));
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");

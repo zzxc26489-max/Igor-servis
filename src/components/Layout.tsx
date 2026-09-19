@@ -44,10 +44,9 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: "/clients", label: "Клиенты", icon: IconUsers },
       { to: "/services", label: "Услуги", icon: IconTool },
       { to: "/employees", label: "Сотрудники", icon: IconUsersGroup },
-  { to: "/documents", label: "Документы", icon: IconFileDescription },
+      { to: "/documents", label: "Документы", icon: IconFileDescription },
       { to: "/finance", label: "Финансы", icon: IconCoin },
       { to: "/reports", label: "Отчёты", icon: IconChartBar },
-      { to: "/documents", label: "Документы", icon: IconFileDescription },
     ],
   },
 ];
