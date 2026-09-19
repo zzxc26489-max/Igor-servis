@@ -838,10 +838,7 @@ export default function OrderDetail() {
                               {w.executor ? ` · ${WORK_STATUS_LABEL[effectiveWorkStatus(w)]}` : ""}
                               {workSessionMinutes(w) > 0 ? ` · факт ${formatDuration(workSessionMinutes(w))}` : ""}
                             </div>
-                          </td>
-                          <td className="text-right tabular-nums">
-                            {w.qty}
-                            <div className="mt-1 print:hidden">
+                            <div className="mt-2 print:hidden">
                               <select
                                 value={w.executor ?? ""}
                                 onChange={(event) => {
@@ -855,7 +852,7 @@ export default function OrderDetail() {
                                   });
                                   showToast(executor ? `Исполнитель: ${executor}` : "Исполнитель снят");
                                 }}
-                                className="max-w-36 rounded-md border bg-white px-2 py-1 text-xs"
+                                className="max-w-full rounded-md border bg-white px-2 py-1 text-xs"
                                 style={{ borderColor: w.executor ? "var(--border)" : "var(--warning)" }}
                                 aria-label={`Исполнитель работы ${w.name}`}
                               >
@@ -864,6 +861,7 @@ export default function OrderDetail() {
                               </select>
                             </div>
                           </td>
+                          <td className="text-right tabular-nums">{w.qty}</td>
                           <td className="whitespace-nowrap text-right tabular-nums">{formatMoney(w.price * w.qty)}</td>
                           <td className="text-right print:hidden">
                             <RowMenu
