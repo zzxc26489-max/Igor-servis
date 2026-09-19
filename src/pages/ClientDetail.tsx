@@ -232,7 +232,7 @@ export default function ClientDetail() {
     setVehicleFormOpen(true);
   }
 
-  function handleVehicleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleVehicleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!client) return;
     setVehicleTouched(true);
@@ -282,10 +282,18 @@ export default function ClientDetail() {
       nextServiceMileage: vehicleForm.nextServiceMileage ? Number(vehicleForm.nextServiceMileage) : undefined,
     };
     if (editingVehicleId) {
-      updateVehicle(editingVehicleId, patch);
+      const error = await updateVehicle(editingVehicleId, patch);
+      if (error) {
+        showToast(error, "error");
+        return;
+      }
       showToast("Автомобиль обновлён");
     } else {
-      addVehicle({ id: createId("vehicle"), clientId: client.id, ...patch });
+      const error = await addVehicle({ id: createId("vehicle"), clientId: client.id, ...patch });
+      if (error) {
+        showToast(error, "error");
+        return;
+      }
       showToast("Автомобиль добавлен");
     }
     resetVehicleForm();
@@ -309,9 +317,13 @@ export default function ClientDetail() {
       danger: true,
     });
     if (!ok) return;
-    deleteVehicle(vehicle.id);
+    const error = await deleteVehicle(vehicle.id);
+    if (error) {
+      showToast(error, "error");
+      return;
+    }
     if (editingVehicleId === vehicle.id) resetVehicleForm();
-    showToast("Автомобиль удалён", "error");
+    showToast("Автомобиль удалён");
   }
 
   function toggleRegular() {
