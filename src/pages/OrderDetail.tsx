@@ -29,6 +29,7 @@ import ClientOrderDocument from "../components/ClientOrderDocument";
 import { orderActivity } from "../lib/orderActivity";
 import { autoLiftEnd, autoLiftSchedulePatch, isSlotFree, orderDay, toMinutes } from "../lib/lift";
 import { mechanicCandidates, mechanicWorkloadLabel } from "../lib/mechanicWorkload";
+import { issueBlockers, orderedParts } from "../lib/orderIssue";
 
 const STATUS_FLOW: OrderStatus[] = ["запись", "диагностика", "в работе", "готово", "выдан"];
 const TABS = ["Работы и запчасти", "Приёмка", "Оплаты", "История", "Документы"] as const;
@@ -600,6 +601,27 @@ export default function OrderDetail() {
     const issuing = next === "выдан";
     const reverting = order.status === "выдан" && next !== "выдан";
     const reopening = canReopen && (next === "в работе" || next === "диагностика");
+
+    if (next === "готово") {
+      const pendingParts = orderedParts(order);
+      if (pendingParts.length > 0) {
+        showToast(
+          pendingParts.length === 1
+            ? `Сначала получите запчасть «${pendingParts[0].name}»`
+            : `Сначала получите заказанные запчасти: ${pendingParts.length}`,
+          "error",
+        );
+        return;
+      }
+    }
+
+    if (issuing) {
+      const blockers = issueBlockers(order, stock);
+      if (blockers.length > 0) {
+        showToast(blockers[0], "error");
+        return;
+      }
+    }
     const summary: Parameters<typeof confirm>[0]["summary"] = [
       { label: "Заказ-наряд", value: order.number },
       { label: "Автомобиль", value: carTitle },
@@ -627,7 +649,7 @@ export default function OrderDetail() {
             : "Статус заказ-наряда изменится.",
       summary,
       note: issuing && debt > 0 ? "Клиент остаётся должен — заказ попадёт в «Ожидаем оплату»." : undefined,
-      confirmLabel: issuing ? "Выдать" : "Изменить статус",
+      confirmLabel: issuing && debt > 0 ? "Выдать с долгом" : issuing ? "Выдать" : "Изменить статус",
     });
     if (!ok) return;
     const statusError = setOrderStatus(order.id, next);
