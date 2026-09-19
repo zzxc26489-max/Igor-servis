@@ -1365,7 +1365,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [backupCloud, cloud, db, listAudit, listBackups, loadFromCloud, pushCloudState, restoreBackup, session, setDB, uploadLocalToCloud],
+    [backupCloud, cloud, cloudConfigured, db, listAudit, listBackups, loadFromCloud, pushCloudState, restoreBackup, session, setDB, uploadLocalToCloud],
   );
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
