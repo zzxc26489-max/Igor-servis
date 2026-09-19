@@ -96,13 +96,19 @@ export default function LiftTimeline({
                 }}
               />
             ))}
-            {showNow && (
+          </div>
+
+          {showNow && (
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0 z-30"
+              style={{ left: `${LABEL_WIDTH}px` }}
+            >
               <span
-                className="absolute inset-y-0 z-20 w-px -translate-x-1/2"
+                className="absolute inset-y-0 w-px -translate-x-1/2"
                 style={{ left: `${percent(nowMinutes)}%`, background: "var(--text)" }}
               />
-            )}
-          </div>
+            </div>
+          )}
 
           {lifts.map((lift) => {
             const state = liftState(orders, lift, day);
