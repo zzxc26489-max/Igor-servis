@@ -48,11 +48,14 @@ export default defineConfig(({ mode }) => {
   const anonKey = String(env.VITE_SUPABASE_ANON_KEY ?? '').trim()
 
   if (mode === 'production') {
-    if (!supabaseOrigin) {
-      throw new Error('Production build requires a valid HTTPS VITE_SUPABASE_URL')
+    const hasUrl = Boolean(String(env.VITE_SUPABASE_URL ?? '').trim())
+    const hasKey = Boolean(anonKey)
+
+    if (hasUrl !== hasKey) {
+      throw new Error('Production build requires both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, or neither for local-only mode')
     }
-    if (!anonKey) {
-      throw new Error('Production build requires VITE_SUPABASE_ANON_KEY')
+    if (hasUrl && !supabaseOrigin) {
+      throw new Error('Production VITE_SUPABASE_URL must be a valid HTTPS URL')
     }
   }
 
