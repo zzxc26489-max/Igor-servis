@@ -14,6 +14,8 @@ import { isValidTime, timeToMinutes } from "../lib/workday";
 import { backupCounts, inspectBackupJson } from "../lib/backup";
 import defaultLogo from "../assets/logo.jpg";
 import { compressImageToDataUrl } from "../lib/imageCompression";
+import { useAuth } from "../auth/AuthContext";
+import { loadCloudServerCapabilities } from "../lib/cloud";
 
 export default function Settings() {
   const {
@@ -22,6 +24,7 @@ export default function Settings() {
     listBackups, listAudit, restoreBackup,
   } = useAppStore();
   const { showToast } = useToast();
+  const { session } = useAuth();
   const confirm = useConfirm();
   const [shortName, setShortName] = useState(company.shortName);
   const [address, setAddress] = useState(company.address);
@@ -38,6 +41,8 @@ export default function Settings() {
   const [cloudBackups, setCloudBackups] = useState<Awaited<ReturnType<typeof listBackups>>>([]);
   const [cloudAudit, setCloudAudit] = useState<Awaited<ReturnType<typeof listAudit>>>([]);
   const [cloudAdminLoading, setCloudAdminLoading] = useState(false);
+  const [serverMigration, setServerMigration] = useState<number | null>(null);
+  const [serverMigrationChecked, setServerMigrationChecked] = useState(false);
 
   const readiness = [
     {
@@ -66,6 +71,17 @@ export default function Settings() {
       detail: cloud.configured ? (cloud.status === "ready" ? "Синхронизация включена" : `Статус: ${cloud.status}`) : "Supabase не подключён",
     },
     {
+      label: "Серверные миграции",
+      ok: !cloud.configured || !serverMigrationChecked || (serverMigration ?? 0) >= 12,
+      detail: !cloud.configured
+        ? "Проверка не нужна без Supabase"
+        : !serverMigrationChecked
+          ? "Проверяем версию серверной схемы…"
+          : serverMigration !== null
+            ? `Версия ${serverMigration} · актуально`
+            : "Схема устарела: выполните миграции 007–012 по порядку",
+    },
+    {
       label: "Резервная копия",
       ok: !cloud.configured || cloudBackups.length > 0,
       detail: cloud.configured ? (cloudBackups.length ? `${cloudBackups.length} серверных копий доступно` : "Создайте первую серверную копию") : "Доступен ручной JSON-экспорт",
@@ -86,6 +102,23 @@ export default function Settings() {
       .finally(() => !cancelled && setCloudAdminLoading(false));
     return () => { cancelled = true; };
   }, [cloud.configured, cloud.revision, cloud.status, listAudit, listBackups]);
+
+  useEffect(() => {
+    if (!cloud.configured || cloud.status === "needs_upload" || !session) return;
+    let cancelled = false;
+    void loadCloudServerCapabilities(session)
+      .then((capabilities) => {
+        if (cancelled) return;
+        setServerMigration(capabilities.latestMigration);
+        setServerMigrationChecked(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setServerMigration(null);
+        setServerMigrationChecked(true);
+      });
+    return () => { cancelled = true; };
+  }, [cloud.configured, cloud.revision, cloud.status, session]);
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
