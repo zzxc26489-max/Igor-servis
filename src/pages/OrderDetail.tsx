@@ -99,6 +99,7 @@ export default function OrderDetail() {
   const [intakeComplaint, setIntakeComplaint] = useState(order?.complaint ?? "");
   const [intakeDiagnosis, setIntakeDiagnosis] = useState(order?.diagnosis ?? "");
   const [intakeDefects, setIntakeDefects] = useState(order?.defects ?? "");
+  const [intakeRecommendations, setIntakeRecommendations] = useState(order?.recommendations ?? "");
   const [intakeGuarantee, setIntakeGuarantee] = useState(order?.guaranteeMonths ? String(order.guaranteeMonths) : "");
   const [intakeMileage, setIntakeMileage] = useState("");
   const [mechanicComment, setMechanicComment] = useState(order?.mechanicComment ?? "");
@@ -114,6 +115,7 @@ export default function OrderDetail() {
     setIntakeComplaint(order.complaint ?? "");
     setIntakeDiagnosis(order.diagnosis ?? "");
     setIntakeDefects(order.defects ?? "");
+    setIntakeRecommendations(order.recommendations ?? "");
     setIntakeGuarantee(order.guaranteeMonths ? String(order.guaranteeMonths) : "");
     setIntakeMileage(vehicle?.mileage ? String(vehicle.mileage) : "");
     setMechanicComment(order.mechanicComment ?? "");
@@ -420,6 +422,7 @@ export default function OrderDetail() {
       complaint: intakeComplaint.trim(),
       diagnosis: intakeDiagnosis.trim(),
       defects: intakeDefects.trim(),
+      recommendations: intakeRecommendations.trim(),
       guaranteeMonths,
       mechanicComment: mechanicComment.trim(),
     });
@@ -958,11 +961,18 @@ export default function OrderDetail() {
                     </div>
                   </label>
                   <label className="block text-sm sm:col-span-2">
+                    <span className="muted mb-1 block">Рекомендации клиенту</span>
+                    <div className="field-control">
+                      <textarea rows={3} value={intakeRecommendations} onChange={(e) => setIntakeRecommendations(e.target.value)} placeholder="Например: через 5 000 км заменить задние колодки, наблюдать запотевание амортизатора" />
+                    </div>
+                    <span className="muted mt-1 block text-xs">Показывается клиенту в заказ-наряде и сохраняется в истории автомобиля.</span>
+                  </label>
+                  <label className="block text-sm sm:col-span-2">
                     <span className="muted mb-1 block">Комментарий мастера для своих</span>
                     <div className="field-control">
                       <textarea rows={3} value={mechanicComment} onChange={(e) => setMechanicComment(e.target.value)} placeholder="Например: клиент просил позвонить после разбора, болт прикипел, нужен повторный контроль" />
                     </div>
-                    <span className="muted mt-1 block text-xs">Внутренняя заметка: клиенту и в акт выполненных работ не показывается.</span>
+                    <span className="muted mt-1 block text-xs">Внутренняя заметка: клиенту и в заказ-наряде не показывается.</span>
                   </label>
                   <label className="block text-sm">
                     <span className="muted mb-1 block">Гарантия на работы, месяцев</span>

@@ -69,11 +69,12 @@ export default function ClientOrderDocument({
         </div>
       </section>
 
-      {(order.complaint || order.diagnosis || order.defects) && (
+      {(order.complaint || order.diagnosis || order.defects || order.recommendations) && (
         <section className="client-order-info mt-4 space-y-1 border-y py-3 text-sm" style={{ borderColor: "var(--border)" }}>
           {order.complaint && <p><b>Обращение клиента:</b> {order.complaint}</p>}
           {order.diagnosis && <p><b>Диагностика:</b> {order.diagnosis}</p>}
           {order.defects && <p><b>Состояние / внешние дефекты:</b> {order.defects}</p>}
+          {order.recommendations && <p><b>Рекомендации сервиса:</b> {order.recommendations}</p>}
         </section>
       )}
 

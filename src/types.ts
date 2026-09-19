@@ -189,6 +189,8 @@ export interface Order {
   workDayEstimated?: boolean;
   diagnosis?: string;
   defects?: string;
+  /** Рекомендации клиенту после диагностики или ремонта. Показываются в заказ-наряде и истории авто. */
+  recommendations?: string;
   guaranteeMonths?: number;
 }
 
