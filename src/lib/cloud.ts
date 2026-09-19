@@ -41,6 +41,11 @@ export interface CloudAuditInfo {
   createdAt: string;
 }
 
+export interface CloudServerCapabilities {
+  latestMigration: number;
+  features: string[];
+}
+
 export type CloudSaveResult =
   | { ok: true; revision: number; updatedAt?: string }
   | { ok: false; conflict: true; revision: number; data: unknown };
@@ -348,6 +353,16 @@ export async function listCloudAudit(session: CloudSession, limit = 50): Promise
     { method: "POST", body: JSON.stringify({ p_limit: limit }) },
     session.access_token,
   ) as Promise<CloudAuditInfo[]>;
+}
+
+export async function loadCloudServerCapabilities(
+  session: CloudSession,
+): Promise<CloudServerCapabilities> {
+  return request(
+    "/rest/v1/rpc/crm_server_capabilities",
+    { method: "POST", body: "{}" },
+    session.access_token,
+  ) as Promise<CloudServerCapabilities>;
 }
 
 export async function restoreCloudBackup(

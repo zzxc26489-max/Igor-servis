@@ -73,3 +73,11 @@ test("atomic stock receive and supplier return migration locks stock changes", (
   assert.match(sql, /stock_received/);
   assert.match(sql, /stock_returned_supplier/);
 });
+
+
+test("server capabilities migration reports latest schema version", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "012_server_capabilities.sql"), "utf8");
+  assert.match(sql, /create or replace function public\.crm_server_capabilities/);
+  assert.match(sql, /'latestMigration', 12/);
+  assert.match(sql, /atomic-stock-receive-return/);
+});
