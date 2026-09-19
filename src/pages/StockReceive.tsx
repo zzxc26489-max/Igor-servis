@@ -353,9 +353,15 @@ export default function StockReceive({
         title="Сканировать запчасть"
         onClose={() => setScannerOpen(false)}
         onDetected={(value) => {
+          const found = stock.find((item) => item.barcode?.toLowerCase() === value.trim().toLowerCase());
           setBarcode(value);
-          applySku(value);
-          showToast(`Код считан: ${value}`);
+          if (found) {
+            applySku(found.sku);
+            showToast(`Найдена позиция: ${found.name}`);
+          } else {
+            setMatchedId("");
+            showToast("Штрихкод сохранён. Укажите артикул новой позиции.");
+          }
         }}
       />
     )}
