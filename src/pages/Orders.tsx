@@ -162,7 +162,7 @@ export default function Orders() {
     <>
       <TopBar title="Заказ-наряды" subtitle={`Показано: ${shown.length} из ${orders.length}`} />
       <Page>
-        <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="mb-3 grid grid-cols-2 gap-2 sm:mb-4 sm:gap-3 xl:grid-cols-4">
           <Metric
             icon={<IconClipboardList size={18} />}
             label="Активных"
@@ -195,8 +195,8 @@ export default function Orders() {
           />
         </div>
 
-        <Card className="overflow-hidden p-0 max-sm:-mx-3 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
-          <div className="flex flex-col gap-3 border-b p-4 max-sm:px-3 max-sm:py-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--border)" }}>
+        <Card className="overflow-hidden p-0 max-sm:-mx-2.5 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
+          <div className="flex flex-col gap-2 border-b p-3 sm:flex-row sm:gap-3 sm:items-center sm:justify-between" style={{ borderColor: "var(--border)" }}>
             <div>
               <h2 className="panel-title">Список заказ-нарядов</h2>
               <p className="muted mt-0.5 text-xs">Поиск работает по клиенту, телефону, машине, госномеру и номеру заказа.</p>
@@ -236,7 +236,7 @@ export default function Orders() {
             </div>
           </div>
 
-          <div className="space-y-2 p-3 max-sm:p-2 lg:hidden">
+          <div className="space-y-1.5 p-2 lg:hidden sm:space-y-2 sm:p-3">
             {page.map((order) => {
               const client = clientById.get(order.clientId);
               const vehicle = vehicleById.get(order.vehicleId);
