@@ -12,7 +12,7 @@ const productionCsp = {
         'http-equiv': 'Content-Security-Policy',
         content: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https:; object-src 'none'; base-uri 'self'; form-action 'self'",
       },
-      injectTo: 'head' as const,
+      injectTo: 'head-prepend' as const,
     }]
   },
 }

@@ -59,6 +59,7 @@ import {
 } from "../lib/cloud";
 import { mergeConcurrentStateDetailed } from "../lib/stateMerge";
 import { hasLocalChanges, SERVER_POLL_MS, shouldApplyServerRevision, shouldSurfaceServerLoadError } from "../lib/serverSyncPolicy";
+import { changedPatch, rebasePatch } from "../lib/entityPatch";
 import { useAuth } from "../auth/AuthContext";
 import { LOCAL_DB_KEY, readCloudBase, writeCloudBase } from "../lib/cloudCache";
 import { isValidQuantity, normalizeQuantity } from "../lib/quantity";
@@ -882,12 +883,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       updateClient: async (id, patch) => {
         const current = dbRef.current.clients.find((item) => item.id === id);
         if (!current) return "Клиент не найден";
-        const client = { ...current, ...patch, id };
+        const delta = changedPatch(current, patch);
 
         if (cloudConfigured && session) {
           if (!navigator.onLine) return "Нет связи с сервером. Изменение клиента нужно подтвердить онлайн.";
           const syncError = await pushCloudState(dbRef.current);
           if (syncError) return `Не удалось подтвердить актуальную базу: ${syncError}`;
+          const fresh = dbRef.current.clients.find((item) => item.id === id);
+          if (!fresh) return "Клиент уже удалён на другом устройстве";
+          const client = rebasePatch(fresh, delta);
           try {
             setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
             const result = await updateCloudClient(session, client);
@@ -900,6 +904,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        const client = rebasePatch(current, delta);
         const phoneDigits = client.phone.replace(/\D/g, "");
         const duplicate = dbRef.current.clients.find(
           (item) => item.id !== id && item.phone.replace(/\D/g, "") === phoneDigits,
@@ -945,12 +950,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       updateVehicle: async (id, patch) => {
         const current = dbRef.current.vehicles.find((item) => item.id === id);
         if (!current) return "Автомобиль не найден";
-        const vehicle = { ...current, ...patch, id, clientId: current.clientId };
+        const delta = changedPatch(current, patch);
 
         if (cloudConfigured && session) {
           if (!navigator.onLine) return "Нет связи с сервером. Изменение автомобиля нужно подтвердить онлайн.";
           const syncError = await pushCloudState(dbRef.current);
           if (syncError) return `Не удалось подтвердить актуальную базу: ${syncError}`;
+          const fresh = dbRef.current.vehicles.find((item) => item.id === id);
+          if (!fresh) return "Автомобиль уже удалён на другом устройстве";
+          const vehicle = { ...rebasePatch(fresh, delta), id, clientId: fresh.clientId };
           try {
             setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
             const result = await saveCloudVehicle(session, vehicle, false);
@@ -963,6 +971,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        const vehicle = { ...rebasePatch(current, delta), id, clientId: current.clientId };
         const plateKey = vehicle.plate.replace(/[\s-]/g, "").toUpperCase();
         const vinKey = vehicle.vin?.replace(/[\s-]/g, "").toUpperCase();
         const duplicate = dbRef.current.vehicles.find((item) =>
@@ -1255,12 +1264,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       updateService: async (id, patch) => {
         const current = dbRef.current.services.find((item) => item.id === id);
         if (!current) return "Услуга уже удалена или не найдена";
-        const service = { ...current, ...patch, id };
+        const delta = changedPatch(current, patch);
 
         if (cloudConfigured && session) {
           if (!navigator.onLine) return "Нет связи с сервером. Изменение услуги нужно подтвердить онлайн.";
           const syncError = await pushCloudState(dbRef.current);
           if (syncError) return `Не удалось подтвердить актуальный прайс: ${syncError}`;
+          const fresh = dbRef.current.services.find((item) => item.id === id);
+          if (!fresh) return "Услуга уже удалена на другом устройстве";
+          const service = { ...rebasePatch(fresh, delta), id };
           try {
             setCloud((prev) => ({ ...prev, status: "saving", error: undefined }));
             const result = await saveCloudService(session, service);
@@ -1273,6 +1285,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        const service = { ...rebasePatch(current, delta), id };
         const duplicate = dbRef.current.services.find(
           (item) =>
             item.id !== id
