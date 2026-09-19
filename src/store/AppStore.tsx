@@ -202,7 +202,14 @@ function loadInitial(): DB {
       return migrate({
         ...seedDB(),
         ...parsed,
-        company: { ...companySeed, ...parsed.company },
+        company: {
+          ...companySeed,
+          ...parsed.company,
+          phone: parsed.company?.phone ?? "",
+          phoneLabel: parsed.company?.phoneLabel ?? "",
+          phone2: parsed.company?.phone2,
+          phone2Label: parsed.company?.phone2Label,
+        },
         settings: { ...defaultSettings, ...parsed.settings },
       });
     }
