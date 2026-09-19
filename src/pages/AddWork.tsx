@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { IconSearch } from "@tabler/icons-react";
 import { Button, Modal } from "../components/ui";
 import { useAppStore } from "../store/AppStore";
@@ -7,8 +7,10 @@ import { isValidMoney, moneyInput } from "../lib/formats";
 import { formatDuration } from "../lib/worktime";
 import { mechanicCandidates, mechanicWorkloadLabel } from "../lib/mechanicWorkload";
 import type { Service } from "../types";
+import { createId } from "../lib/id";
 
 export interface NewWork {
+  id: string;
   name: string;
   qty: number;
   price: number;
@@ -29,6 +31,8 @@ export default function AddWork({ onClose, onSubmit }: { onClose: () => void; on
   const [norm, setNorm] = useState("");
   const [qty, setQty] = useState("1");
   const [executor, setExecutor] = useState("");
+  const workIdRef = useRef(createId("work"));
+  const submittedRef = useRef(false);
 
   const categories = useMemo(
     () => ["all", ...Array.from(new Set(services.map((item) => item.category))).sort()],
@@ -200,13 +204,18 @@ export default function AddWork({ onClose, onSubmit }: { onClose: () => void; on
               <Button variant="secondary" onClick={onClose}>Отмена</Button>
               <Button
                 disabled={!name.trim() || !validQty || !validPrice}
-                onClick={() => onSubmit({
-                  name: name.trim(),
-                  qty: count,
-                  price: Number(price) || 0,
-                  executor: executor || undefined,
-                  normMinutes: Number(norm) || undefined,
-                })}
+                onClick={() => {
+                  if (submittedRef.current) return;
+                  submittedRef.current = true;
+                  onSubmit({
+                    id: workIdRef.current,
+                    name: name.trim(),
+                    qty: count,
+                    price: Number(price) || 0,
+                    executor: executor || undefined,
+                    normMinutes: Number(norm) || undefined,
+                  });
+                }}
               >
                 Добавить в заказ
               </Button>
