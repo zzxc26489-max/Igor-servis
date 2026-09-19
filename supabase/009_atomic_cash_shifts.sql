@@ -206,7 +206,7 @@ begin
 
   select
     coalesce(sum(case
-      when expense ->> 'source' <> 'supplier_refund'
+      when coalesce(expense ->> 'source', '') <> 'supplier_refund'
         and expense ->> 'status' = 'Оплачено'
       then (expense ->> 'amount')::numeric else 0 end), 0),
     coalesce(sum(case
