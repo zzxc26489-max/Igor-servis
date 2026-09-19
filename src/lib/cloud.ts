@@ -69,6 +69,11 @@ export interface CloudPaymentEntry {
 }
 
 
+export type CloudCashShiftResult =
+  | { ok: true; revision: number; updatedAt?: string; data: unknown; expectedCash?: number; difference?: number }
+  | { ok: false; cashConflict: true; revision: number; message: string; data: unknown; updatedAt?: string; expectedCash?: number };
+
+
 const rawUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "");
 const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
 
@@ -185,6 +190,48 @@ export async function applyCloudOrderPayment(
     },
     session.access_token,
   ) as Promise<CloudPaymentResult>;
+}
+
+export async function openCloudCashShift(
+  session: CloudSession,
+  shiftId: string,
+  openingCash: number,
+  openedBy?: string,
+): Promise<CloudCashShiftResult> {
+  return request(
+    "/rest/v1/rpc/crm_open_cash_shift",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_shift_id: shiftId,
+        p_opening_cash: openingCash,
+        p_opened_by: openedBy?.trim() || null,
+      }),
+    },
+    session.access_token,
+  ) as Promise<CloudCashShiftResult>;
+}
+
+export async function closeCloudCashShift(
+  session: CloudSession,
+  shiftId: string,
+  countedCash: number,
+  closedBy?: string,
+  comment?: string,
+): Promise<CloudCashShiftResult> {
+  return request(
+    "/rest/v1/rpc/crm_close_cash_shift",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_shift_id: shiftId,
+        p_counted_cash: countedCash,
+        p_closed_by: closedBy?.trim() || null,
+        p_comment: comment?.trim() || null,
+      }),
+    },
+    session.access_token,
+  ) as Promise<CloudCashShiftResult>;
 }
 
 export async function createCloudBackup(session: CloudSession): Promise<{ ok: true; createdAt: string }> {
