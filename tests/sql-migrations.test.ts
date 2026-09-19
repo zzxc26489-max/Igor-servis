@@ -61,3 +61,15 @@ test("advisor stock sync migration persists stock together with issue movements"
   assert.match(sql, /'stockMovements', coalesce\(p_data -> 'stockMovements'/);
   assert.match(sql, /'orders', coalesce\(p_data -> 'orders'/);
 });
+
+
+test("atomic stock receive and supplier return migration locks stock changes", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "011_atomic_stock_receiving_returns.sql"), "utf8");
+  assert.match(sql, /create or replace function public\.crm_receive_stock/);
+  assert.match(sql, /create or replace function public\.crm_return_stock_supplier/);
+  assert.match(sql, /for update/g);
+  assert.match(sql, /Ячейка %s уже занята другой позицией/);
+  assert.match(sql, /v_available := v_stock_qty - v_reserved/);
+  assert.match(sql, /stock_received/);
+  assert.match(sql, /stock_returned_supplier/);
+});
