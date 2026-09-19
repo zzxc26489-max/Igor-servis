@@ -1,11 +1,33 @@
 import { Link } from "react-router-dom";
-import { IconCar } from "@tabler/icons-react";
 import { useAppStore } from "../store/AppStore";
 import { bookingLink, bookingTarget, compactLiftLabel, liftLabel, liftState, toMinutes } from "../lib/lift";
 import { workDay, workHourScale } from "../lib/workday";
 import { todayISO } from "../lib/date";
 export { orderDay } from "../lib/lift";
 
+
+function LiftIcon({ size = 18, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M5 4v15M19 4v15" />
+      <path d="M4 19h16" />
+      <path d="M5 11h4l2.2 2.2" />
+      <path d="M19 11h-4l-2.2 2.2" />
+      <path d="M3.5 4h3M17.5 4h3" />
+    </svg>
+  );
+}
 
 const PALETTE = [
   { bg: "#e8f5ed", border: "#c9e6d5" },
@@ -41,8 +63,8 @@ export default function LiftTimeline({
 
   return (
     <div className="table-scroll">
-      <div className="min-w-[760px] px-3 pb-4 sm:min-w-[820px]">
-        <div className="grid grid-cols-[80px_minmax(0,1fr)] sm:grid-cols-[156px_minmax(0,1fr)]">
+      <div className="min-w-[700px] px-3 pb-4 sm:min-w-[780px]">
+        <div className="grid grid-cols-[64px_minmax(0,1fr)] sm:grid-cols-[132px_minmax(0,1fr)]">
           <div
             className="sticky left-0 z-20 h-12 border-b border-r bg-white"
             style={{ borderColor: "#e6ebe8" }}
@@ -79,7 +101,7 @@ export default function LiftTimeline({
         </div>
 
         <div className="relative">
-          <div className="pointer-events-none absolute inset-y-0 right-0 left-[80px] z-0 sm:left-[156px]">
+          <div className="pointer-events-none absolute inset-y-0 right-0 left-[64px] z-0 sm:left-[132px]">
             {scale.map((hour) => (
               <span
                 key={hour}
@@ -93,7 +115,7 @@ export default function LiftTimeline({
           </div>
 
           {showNow && (
-            <div className="pointer-events-none absolute inset-y-0 right-0 left-[80px] z-30 sm:left-[156px]">
+            <div className="pointer-events-none absolute inset-y-0 right-0 left-[64px] z-30 sm:left-[132px]">
               <span
                 className="absolute inset-y-0 w-px -translate-x-1/2"
                 style={{ left: `${percent(nowMinutes)}%`, background: "var(--text)" }}
@@ -109,21 +131,21 @@ export default function LiftTimeline({
             return (
               <div
                 key={lift.id}
-                className="relative grid min-h-[96px] grid-cols-[80px_minmax(0,1fr)] border-b last:border-b-0 sm:grid-cols-[156px_minmax(0,1fr)]"
+                className="relative grid min-h-[96px] grid-cols-[64px_minmax(0,1fr)] border-b last:border-b-0 sm:grid-cols-[132px_minmax(0,1fr)]"
                 style={{ borderColor: "#e9eeeb" }}
               >
                 <div
-                  className="sticky left-0 z-20 flex flex-col items-center justify-center border-r bg-white px-2 py-3 shadow-[8px_0_12px_-12px_rgba(23,34,30,.45)] sm:items-start sm:px-0 sm:py-4 sm:pr-4"
+                  className="sticky left-0 z-20 flex flex-col items-center justify-center border-r bg-white px-1.5 py-2.5 shadow-[8px_0_12px_-12px_rgba(23,34,30,.45)] sm:items-start sm:px-0 sm:py-3 sm:pr-3"
                   style={{ borderColor: "#e6ebe8" }}
                   aria-label={`${lift.name}: ${liftLabel(state)}`}
                   title={`${lift.name} · ${liftLabel(state)}`}
                 >
                   <span className="flex items-center gap-1.5">
-                    <IconCar size={18} stroke={1.8} className="shrink-0 text-[var(--text-muted)]" />
+                    <LiftIcon size={18} className="shrink-0 text-[var(--text-muted)]" />
                     <b className="text-[13px] leading-tight sm:hidden">{lift.id}</b>
                     <b className="hidden whitespace-nowrap text-[14px] leading-tight sm:block">{lift.name}</b>
                   </span>
-                  <span className="mt-1.5 flex items-center gap-1 whitespace-nowrap text-[10px] text-[var(--text-muted)] sm:mt-2 sm:gap-2 sm:text-[12px]">
+                  <span className="mt-1 flex items-center gap-1 whitespace-nowrap text-[9px] text-[var(--text-muted)] sm:mt-1.5 sm:gap-1.5 sm:text-[11px]">
                     <i
                       className="h-2 w-2 shrink-0 rounded-full sm:h-2.5 sm:w-2.5"
                       style={{
