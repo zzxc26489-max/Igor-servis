@@ -94,3 +94,15 @@ test("atomic order creation migration prevents duplicate numbers, vehicles and l
   assert.match(sql, /'latestMigration', 13/);
   assert.match(sql, /atomic-order-create/);
 });
+
+
+test("atomic vehicle management migration protects duplicates and order history", () => {
+  const sql = readFileSync(join(process.cwd(), "supabase", "014_atomic_vehicle_management.sql"), "utf8");
+  assert.match(sql, /create or replace function public\.crm_save_vehicle/);
+  assert.match(sql, /create or replace function public\.crm_delete_vehicle/);
+  assert.match(sql, /for update/g);
+  assert.match(sql, /Автомобиль %s уже есть в базе/);
+  assert.match(sql, /По этому автомобилю уже есть заказ-наряды, удалить его нельзя/);
+  assert.match(sql, /'latestMigration', 14/);
+  assert.match(sql, /atomic-vehicle-management/);
+});
