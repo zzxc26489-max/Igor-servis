@@ -60,7 +60,7 @@ export default function NewOrder() {
   const [date, setDate] = useState(presetDate && /^\d{4}-\d{2}-\d{2}$/.test(presetDate) ? presetDate : today);
   const [time, setTime] = useState(presetTime && /^\d{2}:\d{2}$/.test(presetTime) ? presetTime : "10:00");
   const [liftId, setLiftId] = useState(presetLift && lifts.some((lift) => String(lift.id) === presetLift) ? presetLift : "");
-  const [note, setNote] = useState("");
+  const [complaint, setComplaint] = useState("");
   const [error, setError] = useState("");
 
   const selectedClient = clients.find((client) => client.id === existingClientId);
@@ -254,7 +254,7 @@ export default function NewOrder() {
         works: [],
         parts: [],
         paid: 0,
-        notes: note.trim() || undefined,
+        complaint: complaint.trim() || undefined,
         scheduledStart: time,
         scheduledEnd: endTime,
         workDayStart: company.openTime,
@@ -348,7 +348,7 @@ export default function NewOrder() {
                       <div className="text-xs font-semibold uppercase tracking-[.06em]" style={{ color: "var(--accent-strong)" }}>Клиент из базы</div>
                       <div className="truncate text-sm font-semibold">{selectedClient?.name}</div>
                     </div>
-                    <button type="button" onClick={() => setExistingClientId("")} className="shrink-0 text-sm font-semibold" style={{ color: "var(--accent)" }}>
+                    <button type="button" onClick={startNewClient} className="shrink-0 text-sm font-semibold" style={{ color: "var(--accent)" }}>
                       Сменить
                     </button>
                   </div>
@@ -450,8 +450,8 @@ export default function NewOrder() {
                       : "Этот подъёмник занят весь день."}
                 </div>
 
-                <Field label="Комментарий" className="mt-4">
-                  <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={4} placeholder="Причина обращения, пожелания клиента" />
+                <Field label="Причина обращения" className="mt-4">
+                  <textarea value={complaint} onChange={(event) => setComplaint(event.target.value)} rows={4} placeholder="Что беспокоит клиента, симптомы, пожелания" />
                 </Field>
               </Card>
 
