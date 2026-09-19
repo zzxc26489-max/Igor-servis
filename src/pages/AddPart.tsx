@@ -76,9 +76,10 @@ export default function AddPart({
   const tooMany = selected ? count > free : false;
 
   return (
+    <>
     <Modal
       title={selected ? "Количество и цена" : "Запчасть со склада"}
-      subtitle={selected ? `${selected.name} · ${selected.sku}` : "Найдите позицию по названию, артикулу или ячейке"}
+      subtitle={selected ? `${selected.name} · ${selected.sku}` : "Найдите позицию по названию, артикулу, штрихкоду или ячейке"}
       onClose={onClose}
       wide={!selected}
     >
