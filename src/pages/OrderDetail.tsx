@@ -523,7 +523,7 @@ export default function OrderDetail() {
       confirmLabel: "Принять оплату",
     });
     if (!ok) return;
-    const error = acceptPayment(order.id, parts, paymentEmployee);
+    const error = await acceptPayment(order.id, parts, paymentEmployee);
     if (error) {
       showToast(error, "error");
       return;
@@ -562,7 +562,7 @@ export default function OrderDetail() {
       danger: true,
     });
     if (!ok) return;
-    const error = refundPayment(order.id, amount, refundMethod, paymentEmployee);
+    const error = await refundPayment(order.id, amount, refundMethod, paymentEmployee);
     if (error) {
       showToast(error, "error");
       return;
