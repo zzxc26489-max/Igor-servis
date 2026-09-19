@@ -31,6 +31,7 @@ export function canOpenPath(role: CloudRole, path: string) {
       path.startsWith("/schedule") ||
       path.startsWith("/orders") ||
       path.startsWith("/clients") ||
+      path.startsWith("/reputation") ||
       path.startsWith("/stock") ||
       path === "/documents"
     );
